@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-read-writers
+feature: board.agent.guard
+intent: An independent writer's change a write rests on refuses it (an end element's turn that keeps its bounds, a pasted payload's live elements) and an unrelated one applies (a lone element's container, a turn in place, alignment by bounds, an ungroup's member styles, other pages' structure, a reorder's far neighbours).
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/independent.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: independent}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

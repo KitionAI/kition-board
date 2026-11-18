@@ -1,0 +1,53 @@
+format: 1
+id: board.agent.act/ship-step
+feature: board.agent.act
+intent: >-
+  The agent extends a flow chart: a new step inside the frame, joined from the last step, with the
+  check clean. A new element's id is only known from the answer that made it, so this is the
+  make-then-connect sequence the guide describes.
+layer: eval
+source:
+  kind: synthetic
+  from: repo:conformance/basic.kboard
+  license: Apache-2.0
+  note: A copy of the conformance fixture the board engine writes.
+input: [input/plan.kboard]
+steps:
+  - task:
+      prompt: >-
+        In plan.kboard, add a step "Ship" after Build inside the Sprint frame, with a connector from
+        Build to Ship. When you are done the board's check should report no problems.
+      max_turns: 20
+  - query: { path: plan.kboard, args: { follow: pages.0.elements, fields: [kind, text, parent, shapeStyle, position, start, end] }, as: after }
+  - check: { path: plan.kboard, as: diagnostics }
+expected:
+  - actual: out:after
+    compare: values
+    value:
+      total: 6
+      objects:
+        any: { fields.kind: shape, fields.text.0.insert: Ship, fields.parent: 01a18a90-f63d-74f3-bebb-52aee9e169c1 }
+  - actual: out:diagnostics
+    compare: diagnostics
+    value: { absent: [board.disconnected-node, board.outside-frame, board.overlap], max_errors: 0 }
+  - actual: out:after
+    compare: values
+    collateral: true
+    value:
+      objects.0.fields.kind: frame
+      objects.1.fields.text.0.insert: Plan
+      objects.1.fields.position.x: 60
+      objects.2.fields.text.0.insert: Build
+      objects.2.fields.position.x: 420
+      objects.3.fields.start.binding.target: 01a18a90-f63e-7428-86a6-6e44f54b183d
+      objects.3.fields.end.binding.target: 01a18a90-f63e-7428-86a6-6e459211c5e1
+solution:
+  - tool: board_batch
+    args:
+      path: plan.kboard
+      ops:
+        - { op: create, type: Element, in: 01a18a90-f63c-76bf-bdef-245dd84b017f.elements, ref: $ship, fields: { kind: shape, shapeStyle: flow-node, parent: 01a18a90-f63d-74f3-bebb-52aee9e169c1, position: { x: 420, y: 220 }, size: { w: 160, h: 80 } } }
+        - { op: text.set, target: $ship, field: text, text: Ship }
+        - { op: create, type: Element, in: 01a18a90-f63c-76bf-bdef-245dd84b017f.elements, fields: { kind: connector, start: { binding: { target: 01a18a90-f63e-7428-86a6-6e459211c5e1, anchor: [0.5, 1] } }, end: { binding: { target: $ship, anchor: [0.5, 0] } } } }
+since: "2026-11-17"
+timeout_s: 600

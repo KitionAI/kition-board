@@ -1,0 +1,45 @@
+format: 1
+id: board.agent.recover/disconnected-flow
+feature: board.agent.recover
+intent: >-
+  The agent runs the kit's check, which reports two flow nodes with no connector and a fix that
+  names only one end, and repairs it with the one connector the flow needs, Plan to Build.
+layer: eval
+source:
+  kind: synthetic
+  from: repo:conformance/check-disconnected-node.kboard
+  license: Apache-2.0
+  note: A copy of the conformance fixture for board.disconnected-node.
+input: [input/flow.kboard]
+steps:
+  - task:
+      prompt: >-
+        Run the kit's check on flow.kboard and fix what it reports. The flow goes from Plan to
+        Build.
+      max_turns: 20
+  - query: { path: flow.kboard, args: { follow: pages.0.elements, fields: [kind, text, parent, shapeStyle, position, start, end] }, as: after }
+  - check: { path: flow.kboard, as: diagnostics }
+expected:
+  - actual: out:diagnostics
+    compare: diagnostics
+    value: { absent: [board.disconnected-node], max_errors: 0 }
+  - actual: out:after
+    compare: values
+    value:
+      objects:
+        any: { fields.kind: connector, fields.start.binding.target: 01a16848-e64d-76be-b587-6843e3e683e3, fields.end.binding.target: 01a16848-e64e-745b-b4c7-e7b1a2bd7d78 }
+  - actual: out:after
+    compare: values
+    collateral: true
+    value:
+      total: 3
+      objects.0.fields.text.0.insert: Plan
+      objects.1.fields.text.0.insert: Build
+solution:
+  - tool: board_run
+    args:
+      path: flow.kboard
+      steps:
+        - { command: connector.create, params: { from: { element: 01a16848-e64d-76be-b587-6843e3e683e3, anchor: [1, 0.5] }, to: { element: 01a16848-e64e-745b-b4c7-e7b1a2bd7d78, anchor: [0, 0.5] } } }
+since: "2026-11-17"
+timeout_s: 600

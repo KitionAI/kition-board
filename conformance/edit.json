@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "command": "element.create",
+      "params": {
+        "elements": [
+          {
+            "kind": "shape",
+            "shapeStyle": "sticky",
+            "position": [
+              60,
+              240
+            ],
+            "size": [
+              160,
+              60
+            ],
+            "text": "Ship on Friday"
+          }
+        ]
+      }
+    }
+  ]
+}

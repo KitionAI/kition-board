@@ -1,0 +1,20 @@
+format: 1
+id: board.agent.context/reads-declared
+feature: board.agent.context
+intent: >-
+  What each command reads (the shown page) and the parameter on fills are derived from the code: the test follows every command's dispatch and fails when kition_board_model::acts disagrees.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/acts.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board-kit
+      test: acts
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

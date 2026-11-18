@@ -1,0 +1,23 @@
+[package]
+name = "kition-board-scene"
+description = "The Board kit's scene: every element as an SVG fragment (the in-page editor draws these), and the same SVG rasterised for render, previews and thumbnails."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+kition-kit = { workspace = true }
+kition-board-kdm = { workspace = true }
+kition-board-text = { workspace = true }
+resvg = { workspace = true }
+krilla = { workspace = true }
+krilla-svg = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+kition-board-model = { workspace = true }

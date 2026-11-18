@@ -1,0 +1,17 @@
+[package]
+name = "kition-board-kdm"
+description = "The Board kit's KDM model: schema kit.board v2, the materialised view, validation and repair, blobs, and the .kboard file as a replica (kition-sdk session)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+kition-kit = { workspace = true }
+kition-board-kboard = { workspace = true }
+kition-board-text = { workspace = true }
+serde_json = { workspace = true }

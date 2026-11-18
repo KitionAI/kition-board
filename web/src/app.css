@@ -1,0 +1,335 @@
+/* The board editor's own styles; everything else comes from @kition/kit-editor and the host's theme tokens. */
+
+.board-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.board-canvas {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: var(--kb-paper, #ffffff);
+  touch-action: none;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /* The board's colour tokens; a theme may restyle them (design note 4.2). */
+  --kb-paper: #ffffff;
+}
+
+.board-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.board-overlay rect,
+.board-overlay circle,
+.board-overlay polyline,
+.board-overlay line {
+  vector-effect: non-scaling-stroke;
+}
+
+.board-selected {
+  fill: none;
+  stroke: var(--kit-primary, #966e00);
+  pointer-events: none;
+}
+
+.board-selection-box {
+  fill: none;
+  stroke: var(--kit-primary, #966e00);
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.board-handle {
+  fill: #ffffff;
+  stroke: var(--kit-primary, #966e00);
+}
+
+.board-connect-handle {
+  fill: var(--kit-primary, #966e00);
+  fill-opacity: 0.25;
+  stroke: var(--kit-primary, #966e00);
+  cursor: crosshair;
+}
+
+.board-brush {
+  fill: color-mix(in srgb, var(--kit-primary, #966e00) 8%, transparent);
+  stroke: var(--kit-primary, #966e00);
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.board-draft,
+.board-target {
+  fill: none;
+  stroke: var(--kit-primary, #966e00);
+  pointer-events: none;
+}
+
+.board-live,
+.board-pen {
+  fill: none;
+  stroke: var(--kb-stroke-ink, #1e1e1e);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.board-guide {
+  stroke: #e03131;
+  pointer-events: none;
+}
+
+.board-text-editor {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  padding: 4px 6px;
+  border: 1px solid var(--kit-primary, #966e00);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e1e1e;
+  font-family: 'Inter', 'Droid Sans Fallback', sans-serif;
+  line-height: 1.25;
+  outline: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.board-minimap {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  overflow: hidden;
+  border: 1px solid var(--kit-border, #e5e3df);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+
+.board-minimap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.board-minimap-view {
+  position: absolute;
+  border: 1.5px solid var(--kit-primary, #966e00);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.board-pen.board-highlight {
+  stroke: #fab005;
+  stroke-opacity: 0.45;
+}
+
+/* The style panel (design.md: 8px controls, the project purple for the chosen one). */
+.board-style {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-style-scope,
+.board-style-empty {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.board-style .kui-panel-section-body > .kui-element {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.board-swatches {
+  display: grid;
+  grid-template-columns: repeat(5, 24px);
+  gap: 6px;
+}
+
+.board-swatch {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--kit-border, #e5e3df);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.board-swatch[aria-pressed='true'] {
+  outline: 2px solid var(--kit-primary, #966e00);
+  outline-offset: 1px;
+}
+
+.board-swatch-custom {
+  background: conic-gradient(#e03131, #f08c00, #2f9e44, #1971c2, #5645d4, #e03131);
+  overflow: hidden;
+}
+
+.board-swatch-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.board-chips {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.board-chip {
+  min-width: 36px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--kit-border, #e5e3df);
+  border-radius: var(--kit-radius-control, 8px);
+  background: var(--kit-surface, #ffffff);
+  color: var(--kit-text, #1e1e1e);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.board-chip[aria-pressed='true'] {
+  border-color: var(--kit-primary, #966e00);
+  background: var(--kit-primary, #966e00);
+  color: var(--kit-primary-text, #ffffff);
+}
+
+.board-drop-target {
+  fill: color-mix(in srgb, var(--kit-primary, #966e00) 5%, transparent);
+  stroke: var(--kit-primary, #966e00);
+  pointer-events: none;
+}
+
+/* A selected mind-map node's quick controls (v1's WhiteboardMindMapQuickControls). */
+.board-mind-stem {
+  stroke: var(--kit-primary, #966e00);
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.board-mind-control {
+  cursor: pointer;
+}
+
+.board-mind-dot {
+  fill: var(--kit-primary, #966e00);
+  fill-opacity: 0.85;
+  stroke: none;
+}
+
+.board-mind-collapse .board-mind-dot {
+  fill: #ffffff;
+  stroke: var(--kit-primary, #966e00);
+}
+
+.board-mind-control path {
+  fill: none;
+  stroke: #ffffff;
+  stroke-linecap: round;
+}
+
+.board-mind-collapse path {
+  stroke: var(--kit-primary, #966e00);
+}
+
+.board-mind-control text {
+  fill: #ffffff;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  pointer-events: none;
+}
+
+.board-mind-control:hover .board-mind-dot {
+  fill-opacity: 1;
+}
+
+.board-mind-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.board-card-target {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.board-card-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 320px;
+}
+
+.board-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.board-templates-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+}
+
+.board-templates {
+  display: grid;
+  grid-template-columns: repeat(2, 260px);
+  gap: 8px;
+}
+
+.board-template {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--kit-border, #e5e3df);
+  border-radius: var(--kit-radius-card, 12px);
+  background: var(--kit-surface, #ffffff);
+  color: var(--kit-text, #1e1e1e);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-template:hover {
+  border-color: var(--kit-primary, #966e00);
+  box-shadow: var(--kit-shadow-card, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+.board-template svg {
+  color: var(--kit-primary, #966e00);
+}
+
+.board-template-name {
+  font-size: 13px;
+  font-weight: 600;
+}

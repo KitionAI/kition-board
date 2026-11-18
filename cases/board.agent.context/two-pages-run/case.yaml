@@ -1,0 +1,22 @@
+format: 1
+id: board.agent.context/two-pages-run
+feature: board.agent.context
+intent: >-
+  Through the agent's tools, one run acts on two pages (the run's target, a step's at.part) with on filling element parameters; nothing carries over to the next run, and a page the run makes and shows takes the steps after it in that run only.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/premise.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: premise
+      filter: a_run_acts_on_two_pages_and_leaves_the_shown_page_alone
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+tags: [headless]
+since: "2026-11-17"

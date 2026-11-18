@@ -1,0 +1,20 @@
+format: 1
+id: regressions/issue-1
+feature: board.export
+intent: >-
+  A board made with create(name, width, height) is width × height document pixels with board
+  (0, 0) at document pixel (0, 0), so render and thumbnails show exactly the document; content past
+  an edge grows the frame on that side only, and the size survives save and reopen. Before, create
+  ignored the size and the frame was the content plus a 40-unit margin, at least 1920 × 1080.
+layer: gate
+source:
+  kind: issue
+  from: Kition Board regression suite
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: scene, filter: issue_1_create_sets_the_document_size_at_the_origin }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

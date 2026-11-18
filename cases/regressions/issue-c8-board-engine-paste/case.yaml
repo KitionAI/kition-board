@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-engine-paste
+feature: board.elements
+intent: A paste writes a board the repair leaves as it is (no binding to what takes none, no anchor outside 0..1, no parent that is not a container or makes a cycle), puts the copies' top-left at `at` with connector points counted, and stores a bound end where a copied text without a size is; a refused image.insert stores no bytes.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/engine_paste.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: engine_paste}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

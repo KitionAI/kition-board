@@ -1,0 +1,16 @@
+format: 1
+id: regressions/issue-c8-board-3-dependencies
+feature: board.agent.guard
+intent: Group members and mind-map nodes are real dependencies, while other-page edits are unrelated; image placement and raw z-index controls preserve every saved field from both writers. Explicit waiting_for_sdk tests retain unsupported guard expectations.
+layer: gate
+timeout_s: 60
+source: {kind: synthetic, from: bindings/headless/tests/matrix3.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: matrix3, filter: own_dependencies_matrix}
+  - cargo-test: {package: kition-board, test: matrix3, filter: image_placement_matrix}
+  - cargo-test: {package: kition-board, test: matrix3, filter: z_index_matrix}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

@@ -1,0 +1,20 @@
+format: 1
+id: board.agent.preview/render-named-view
+feature: board.agent.preview
+intent: >-
+  file.render draws the view it is given (a page by id or number, a frame, an element with a margin, an area); without a target the first page's document area, never the shown page; scale and maxSize set the size, and what it cannot draw is refused with a typed error.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/render.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board-kit
+      test: render
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

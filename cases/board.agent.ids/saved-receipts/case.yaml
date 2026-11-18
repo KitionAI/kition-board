@@ -1,0 +1,14 @@
+format: 1
+id: board.agent.ids/saved-receipts
+feature: board.agent.ids
+intent: The native replica, engine view and derived facts after representative commands on every fixture exactly equal what saving and reopening holds.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/saved.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: saved}
+  - cargo-test: {package: kition-board, test: receipts}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

@@ -1,0 +1,65 @@
+[workspace]
+resolver = "3"
+members = ["crates/*/*", "bindings/*", "tools/xtask"]
+default-members = ["crates/*/*", "bindings/headless", "tools/xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.95"
+repository = "https://github.com/KitionAI/kition-board"
+
+[workspace.dependencies]
+# internal
+kition-board-check = { path = "crates/engine/check" }
+kition-board-kboard = { path = "crates/formats/kboard" }
+kition-board-kdm = { path = "crates/kdm/kdm-model" }
+kition-board-model = { path = "crates/engine/model" }
+kition-board-scene = { path = "crates/render/scene" }
+kition-board-text = { path = "crates/render/text" }
+
+# kition-sdk, pinned by commit (one revision for every crate of it)
+kition-kit = { git = "https://github.com/KitionAI/kition-sdk", rev = "f5ea478430d1e85069b6c6c9fac1de6b8e5c5d57", features = ["session"] }
+kition-headless = { git = "https://github.com/KitionAI/kition-sdk", rev = "f5ea478430d1e85069b6c6c9fac1de6b8e5c5d57" }
+kition-convergence = { git = "https://github.com/KitionAI/kition-sdk", rev = "f5ea478430d1e85069b6c6c9fac1de6b8e5c5d57" }
+kition-kit-server = { git = "https://github.com/KitionAI/kition-sdk", rev = "f5ea478430d1e85069b6c6c9fac1de6b8e5c5d57" }
+# The kits' MCP tools (`kition-kits-mcp`'s library), for the end-to-end agent tests.
+kition-kits = { git = "https://github.com/KitionAI/kition-sdk", rev = "f5ea478430d1e85069b6c6c9fac1de6b8e5c5d57" }
+
+# foundation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.10"
+thiserror = "2"
+zip = { version = "3", default-features = false, features = ["deflate"] }
+
+# rendering: font metrics, and the raster of the same SVG the editor draws
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "variable-fonts"] }
+resvg = { version = "0.47", default-features = false, features = ["text", "raster-images"] }
+# PDF export: the same SVG scene as vector PDF (krilla-svg draws a usvg tree with krilla)
+krilla = { version = "0.8", default-features = false, features = ["raster-images"] }
+krilla-svg = "0.8"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+debug = 0

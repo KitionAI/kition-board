@@ -1,0 +1,22 @@
+format: 1
+id: board.agent.ids/cascade-receipt
+feature: board.agent.ids
+intent: >-
+  Deleting a shape frees the ends of the connectors attached to it and deleting a frame deletes what it holds: the receipt tells the whole cascade by id (the freed end before and after), though the command answers only what it deleted.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/premise.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: premise
+      filter: a_deletion_receipt_tells_the_cascade
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+tags: [headless]
+since: "2026-11-17"

@@ -1,0 +1,32 @@
+[package]
+name = "kition-board-kit"
+description = "The Board engine for Kition's in-page editor: open, edit, and save Kition boards (.kboard) from JavaScript (WebAssembly), on the Kition SDK."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+kition-kit = { workspace = true }
+kition-board-kdm = { workspace = true }
+kition-board-check = { workspace = true }
+kition-board-model = { workspace = true }
+kition-board-scene = { workspace = true }
+kition-board-text = { workspace = true }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+
+[dev-dependencies]
+# The showcase sample builder (examples/showcase.rs) saves its thumbnails.
+image = { version = "0.25", default-features = false, features = ["png"] }
+kition-board-kboard = { workspace = true }
+kition-board-model = { workspace = true }
+# The Kition platform convergence suite (L6), on the same kition-sdk revision.
+kition-convergence = { workspace = true }

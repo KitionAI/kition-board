@@ -1,0 +1,94 @@
+{
+  "kdm": 1,
+  "kit": "kit.board",
+  "schemaVersion": 2,
+  "root": "Board",
+  "types": {
+    "Board": {
+      "batchOps": { "*": { "direct": true } },
+      "label": "title",
+      "derived": {
+        "pageCount": {"description": "Number of pages used by the default name of a new page"},
+        "structure": {"description": "Fingerprint of ordered parent links, mind-map nodes and connector bindings; isolated objects are excluded"},
+        "mapStructure": {"description": "Fingerprint of mind-map nodes and ordered effective branches, independent of container membership"},
+        "keys": {"description": "Fingerprint of authoring keys on all pages"},
+        "frameOrder": {"description": "Frame ids in page stacking order for historical destination tie replay"}
+      },
+      "fields": {
+        "title": { "kind": "string" },
+        "size": { "kind": "json", "optional": true },
+        "pages": { "kind": "list", "of": "Page" }
+      }
+    },
+    "Page": {
+      "batchOps": { "*": { "direct": true } },
+      "label": "name",
+      "derived": {
+        "hierarchy": {"description": "Fingerprint of this page's unordered parent links, independent of stacking and connector bindings"},
+        "geometry": {"description": "Content bounds of this page used by default content-relative placement"}
+      },
+      "fields": {
+        "name": { "kind": "string" },
+        "elements": { "kind": "list", "of": "Element" }
+      }
+    },
+    "Element": {
+      "batchOps": { "*": { "direct": true } },
+      "label": "text",
+      "derived": {
+        "bounds": {"description": "Own axis-aligned bounds; null for groups and connectors whose geometry reads other objects"},
+        "frame": {"description": "Unrotated frame rectangle for destination frame picking; null for other kinds"},
+        "link": {"description": "Workspace card target path, null for other elements"}
+      },
+      "fields": {
+        "kind": { "kind": "enum", "values": ["shape", "text", "stroke", "connector", "image", "card", "frame", "group"], "readOnly": true },
+        "position": { "kind": "json", "optional": true, "position": true, "members": {"x":{"minimum":-1000000,"maximum":1000000},"y":{"minimum":-1000000,"maximum":1000000}} },
+        "size": { "kind": "json", "optional": true, "members": {"w":{"minimum":0,"maximum":100000},"h":{"minimum":0,"maximum":100000}} },
+        "rotation": { "kind": "number", "optional": true, "minimum": -3600, "maximum": 3600 },
+        "locked": { "kind": "boolean", "optional": true, "label": "locked" },
+        "parent": { "kind": "ref", "of": "Element", "optional": true, "position": true },
+        "key": { "kind": "string", "optional": true, "sample": false },
+        "shapeType": { "kind": "string", "optional": true },
+        "shapeStyle": { "kind": "string", "optional": true },
+        "strokeColor": { "kind": "string", "optional": true },
+        "fillColor": { "kind": "string", "optional": true },
+        "fillStyle": { "kind": "string", "optional": true },
+        "dashStyle": { "kind": "string", "optional": true },
+        "strokeSize": { "kind": "string", "optional": true },
+        "opacity": { "kind": "number", "optional": true, "minimum": 0, "maximum": 1 },
+        "roundness": { "kind": "number", "optional": true, "minimum": 0, "maximum": 100000 },
+        "text": {
+          "kind": "text",
+          "marks": {
+            "bold": { "expand": "after" },
+            "italic": { "expand": "after" },
+            "link": { "expand": "none" }
+          }
+        },
+        "textFormat": { "kind": "enum", "values": ["plain", "markdown"], "optional": true },
+        "fontSize": { "kind": "number", "optional": true, "minimum": 1, "maximum": 1000 },
+        "fontFamily": { "kind": "enum", "values": ["sans", "serif", "mono"], "optional": true },
+        "textAlign": { "kind": "enum", "values": ["left", "center", "right"], "optional": true },
+        "points": { "kind": "json", "optional": true },
+        "start": { "kind": "json", "optional": true },
+        "end": { "kind": "json", "optional": true },
+        "waypoints": { "kind": "json", "optional": true },
+        "labelPosition": { "kind": "number", "optional": true, "minimum": 0, "maximum": 1 },
+        "connectorType": { "kind": "string", "optional": true },
+        "startArrowhead": { "kind": "string", "optional": true },
+        "endArrowhead": { "kind": "string", "optional": true },
+        "connectorRole": { "kind": "string", "optional": true },
+        "mindMapBranchAxis": { "kind": "string", "optional": true },
+        "mindMapBranchSide": { "kind": "string", "optional": true },
+        "mindMapDirection": { "kind": "string", "optional": true },
+        "mindMapCollapsed": { "kind": "boolean", "optional": true, "label": "collapsed" },
+        "image": { "kind": "blob", "optional": true },
+        "alt": { "kind": "string", "optional": true },
+        "card": { "kind": "json", "optional": true },
+        "sourceRefIds": { "kind": "json", "optional": true }
+      }
+    },
+    "CommentThread": { "batchOps": { "*": { "direct": true } }, "fields": { "anchor": { "kind": "json" }, "resolved": { "kind": "boolean", "optional": true }, "comments": { "kind": "list", "of": "Comment" } } },
+    "Comment": { "batchOps": { "*": { "direct": true } }, "fields": { "author": { "kind": "string" }, "name": { "kind": "string", "optional": true }, "body": { "kind": "text" }, "created": { "kind": "string" } } }
+  }
+}

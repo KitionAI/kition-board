@@ -1,0 +1,18 @@
+[package]
+name = "kition-board-kboard"
+description = "The .kboard file of Kition Board: a ZIP container holding a KDM snapshot, its change log and the blobs, as bytes."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+zip = { workspace = true }

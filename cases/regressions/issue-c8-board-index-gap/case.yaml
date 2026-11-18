@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-index-gap
+feature: board.agent.guard
+intent: An independent writer inserting before a page insertion index must refuse the stale write; inserting after the window must apply. This exposes the pinned SDK's empty-window replay defect.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/outside.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: outside, filter: insertion_before_an_index}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

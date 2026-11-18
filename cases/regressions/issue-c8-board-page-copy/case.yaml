@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-page-copy
+feature: board.agent.guard
+intent: Copying or deleting a page must hold the fields of the addressable elements it consumes, not only their ids in the page's list.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/map_premises.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: map_premises, filter: page_copy_and_delete}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

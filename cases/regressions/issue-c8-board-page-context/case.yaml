@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-page-context
+feature: board.agent.context
+intent: The agent can address a page by its stable UUID in target and at.part, independently of the editor's shown page.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/land11.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: land11}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

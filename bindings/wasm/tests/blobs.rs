@@ -1,0 +1,122 @@
+//! Pictures as blobs (design note 1.2, 2.1): they travel in the `.kboard` file and between
+//! replicas (`blobs`, `blobsSince`, `addBlobs`), and a picture whose bytes arrive after its change
+//! (`blobs-late`) shows once they come.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+
+use kition_board_kboard as kboard;
+use kition_board_kit::BoardDocument;
+use kition_kit::KitDocument;
+use kition_kit::kdm::Origin;
+use kition_kit::session::KitSessionDocument;
+use serde_json::json;
+
+const PICTURE: &[u8] = b"\x89PNG\r\n\x1a\n not really a picture";
+
+/// Adds an image element showing `bytes` to the first page, through the session.
+fn add_picture(doc: &mut BoardDocument, bytes: &[u8]) -> String {
+    let blob = doc.session_mut().blobs_mut().put(bytes, "image/png");
+    let page = doc.model().pages()[0].id.clone();
+    let hash = blob.hash.clone();
+    doc.session_mut()
+        .execute(&Origin::person("person:test"), |_, tx| {
+            let mut fields = serde_json::Map::new();
+            fields.insert("kind".into(), json!("image"));
+            fields.insert("position".into(), json!({ "x": 10, "y": 10 }));
+            fields.insert("size".into(), json!({ "w": 100, "h": 80 }));
+            fields.insert("image".into(), serde_json::to_value(&blob).unwrap());
+            fields.insert("alt".into(), json!("A chart"));
+            let id = tx.create("Element", fields)?;
+            let at = tx.list_items(&page, "elements")?.len();
+            tx.list_insert(&page, "elements", at, &id)?;
+            Ok(())
+        })
+        .unwrap();
+    hash
+}
+
+#[test]
+fn pictures_travel_in_the_file() {
+    let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
+    let hash = add_picture(&mut doc, PICTURE);
+    let bytes = doc.save(None).unwrap();
+    let parts = kboard::read(&bytes).unwrap();
+    assert_eq!(parts.blobs.get(&hash).map(Vec::as_slice), Some(PICTURE));
+    let back = BoardDocument::open("Plan.kboard", &bytes).unwrap();
+    assert!(back.has_blob(&hash));
+    assert!(back.missing_blobs().is_empty());
+    assert_eq!(back.inspect().unwrap()["missingBlobs"], json!([]));
+}
+
+#[test]
+fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
+    let mut a = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
+    let mut b = BoardDocument::open("Plan.kboard", &a.save(None).unwrap()).unwrap();
+    let since = b.version().encode();
+    let hash = add_picture(&mut a, PICTURE);
+    // The changes arrive first.
+    let changes = kition_kit::session::__export_changes(&a, &since).unwrap();
+    KitSessionDocument::import_changes(&mut b, &changes).unwrap();
+    assert_eq!(b.missing_blobs(), vec![hash.clone()]);
+    assert_eq!(b.inspect().unwrap()["missingBlobs"], json!([hash.clone()]));
+    let without = kboard::read(&b.save(None).unwrap()).unwrap();
+    assert!(without.blobs.is_empty(), "a save never invents bytes it lacks");
+    // Then the blobs: only what b lacks.
+    let bundle = a.blobs_since(&since).unwrap();
+    assert!(!bundle.is_empty());
+    let revision = b.revision();
+    assert!(b.add_blobs(&bundle).unwrap(), "a late blob changes the view");
+    assert!(b.revision() > revision);
+    assert!(b.missing_blobs().is_empty());
+    assert!(!b.add_blobs(&bundle).unwrap(), "adding them again changes nothing");
+    assert_eq!(kboard::read(&b.save(None).unwrap()).unwrap().blobs.get(&hash).map(Vec::as_slice), Some(PICTURE));
+    // A peer at the current version needs nothing; one with nothing needs every referenced blob.
+    assert!(b.blobs_since(&b.version().encode()).unwrap().is_empty());
+    assert_eq!(a.blobs_since(&[]).unwrap(), a.blobs_bundle());
+}
+
+#[test]
+fn a_board_opens_from_a_stored_replica_and_its_blobs() {
+    let mut a = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
+    let hash = add_picture(&mut a, PICTURE);
+    let snapshot = kition_kit::session::__snapshot(&a).unwrap();
+    let alone = BoardDocument::open_with_replica("Plan.kboard", &[], &snapshot, &a.blobs_bundle()).unwrap();
+    assert_eq!(alone.doc_id(), a.doc_id());
+    assert!(alone.has_blob(&hash));
+    // With the file too, edits only the file has are kept.
+    let file = a.save(None).unwrap();
+    let mut later = BoardDocument::open("Plan.kboard", &file).unwrap();
+    later
+        .execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 300 }, "size": { "w": 50, "h": 50 } }] }))
+        .unwrap();
+    let newer_file = later.save(None).unwrap();
+    let both = BoardDocument::open_with_replica("Plan.kboard", &newer_file, &snapshot, &[]).unwrap();
+    assert_eq!(both.doc_id(), a.doc_id());
+    assert_eq!(both.model().element_count(), 2);
+    assert!(both.has_blob(&hash), "the file's blobs come along");
+    assert!(BoardDocument::open_with_replica("Plan.kboard", &[], b"not a replica", &[]).is_err());
+    assert!(BoardDocument::open_with_replica("Plan.kboard", &[], &snapshot, b"short").is_err(), "a damaged blob bundle");
+}
+
+#[test]
+fn saves_append_to_the_file_the_document_opened() {
+    let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
+    // Enough content that one more shape stays under the compaction threshold.
+    let shapes: Vec<_> = (0..40).map(|x| json!({ "kind": "shape", "position": { "x": x * 30, "y": 400 }, "size": { "w": 20, "h": 20 } })).collect();
+    doc.execute("element.create", json!({ "elements": shapes })).unwrap();
+    let first = doc.save(None).unwrap();
+    doc.mark_saved();
+    let mut doc = BoardDocument::open("Plan.kboard", &first).unwrap();
+    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 0, "y": 0 }, "size": { "w": 50, "h": 50 } }] }))
+        .unwrap();
+    let second = doc.save(None).unwrap();
+    assert!(doc.dirty(), "save leaves the document dirty until mark_saved");
+    doc.mark_saved();
+    let parts = kboard::read(&second).unwrap();
+    assert_eq!(parts.snapshot, kboard::read(&first).unwrap().snapshot);
+    assert_eq!(parts.changes.len(), 1);
+    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 90, "y": 0 }, "size": { "w": 50, "h": 50 } }] }))
+        .unwrap();
+    let third = kboard::read(&doc.save(None).unwrap()).unwrap();
+    assert_eq!(third.changes.len(), 2, "the next save appends to what mark_saved recorded");
+    assert_eq!(third.changes[0], parts.changes[0]);
+}

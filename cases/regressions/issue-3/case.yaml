@@ -1,0 +1,20 @@
+format: 1
+id: regressions/issue-3
+feature: board.drawing
+intent: >-
+  A line shape runs along its box's longer side through its middle, so a tall box draws a
+  vertical line as a wide box draws a horizontal one; a freehand stroke takes dashStyle (solid,
+  dashed, dotted) in stroke.create and element.update, and draws its dashes. Before, a line shape
+  was always horizontal and stroke.create refused a dash style.
+layer: gate
+source:
+  kind: issue
+  from: Kition Board regression suite
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: lines_and_dashes }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

@@ -1,0 +1,16 @@
+format: 1
+id: regressions/issue-c8-board-3-named
+feature: board.agent.guard
+intent: Writes address the actual named group or mind-map node, automatic placements hold their content-extreme contributor, and a different frame moving under a destination point invalidates that address. Every applying cell preserves the saved merge.
+layer: gate
+timeout_s: 60
+source: {kind: synthetic, from: bindings/headless/tests/matrix3.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: matrix3, filter: named_targets_and_content_extremes_matrix}
+  - cargo-test: {package: kition-board, test: matrix3, filter: new_point_candidates_matrix}
+  - cargo-test: {package: kition-board, test: matrix3, filter: other_page_geometry_does_not_refuse_image_placement}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

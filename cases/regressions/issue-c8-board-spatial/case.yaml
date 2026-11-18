@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-spatial
+feature: board.agent.ids
+intent: A destination frame moved out of a reparenting gesture's point causes a conflict, while unrelated property edits apply.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/outside.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: outside}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

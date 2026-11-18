@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-3-nested
+feature: board.agent.guard
+intent: All write declarations match an independent reading on nested frames, groups, sizeless text, a cross-container connector and a locked contained element; carried selected children do not supply layout reference bounds.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/declarations_independent.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: declarations_independent, filter: nested_write_rows}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

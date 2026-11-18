@@ -1,0 +1,22 @@
+format: 1
+id: regressions/issue-draft-replica-blobs
+feature: board.agent.draft
+intent: >-
+  `kition-board` opens a board from its replica with the pictures it shows: `model.export` of an
+  open board answers its changes and the blobs they reference, `model.open` and `model.import`
+  take them, and the replica is the same board with no picture missing, editable apart from the
+  file. An agent's headless draft (KHP A12) is such a replica; the kit sent no blobs and took
+  none, so a draft of a board with a picture lost the picture's bytes.
+layer: gate
+source:
+  kind: probe
+  from: "agent readiness review (drafts declared false); kition-slide 2611cda"
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board, test: replica }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

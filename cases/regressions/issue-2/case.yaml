@@ -1,0 +1,22 @@
+format: 1
+id: regressions/issue-2
+feature: board.text
+intent: >-
+  Bold and italic marks are drawn on text elements and shape labels, in the editor's SVG and the
+  raster alike: bold at weight 700 with the weight axis set (the raster takes the axis, not
+  font-weight), italic slanted about its baseline. A text element with textFormat markdown draws
+  its headings (larger, bold), lists, quotes, bold, italic, code and link text without the
+  markers, and survives save and reopen. Before, marks were stored but not drawn and Markdown
+  showed its raw markers.
+layer: gate
+source:
+  kind: issue
+  from: Kition Board regression suite
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: text_styles }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

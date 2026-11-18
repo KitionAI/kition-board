@@ -1,0 +1,14 @@
+format: 1
+id: regressions/issue-c8-board-3-derived
+feature: board.agent.guard
+intent: Derived writes hold their actual geometry, membership and content inputs; unrelated edits apply and the complete saved result contains both writers' edits.
+layer: gate
+timeout_s: 60
+source: {kind: synthetic, from: bindings/headless/tests/matrix3.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: matrix3, filter: derived_results_matrix}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

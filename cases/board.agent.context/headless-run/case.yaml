@@ -1,0 +1,21 @@
+format: 1
+id: board.agent.context/headless-run
+feature: board.agent.context
+intent: >-
+  A run's steps land on the pages their part names by id (context.set), and context.restore puts the person's page back, so nothing an agent does leaves the editor elsewhere.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/context.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: context
+      filter: a_run_sets_each_steps_page_and_puts_the_editor_back
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

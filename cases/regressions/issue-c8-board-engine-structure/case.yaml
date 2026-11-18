@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-engine-structure
+feature: board.elements
+intent: Commands keep the hierarchy their parameters say - ungrouping a group with the group inside it frees every member to the outer group's parent; a dropped group member stays in its group; a container is reordered with its content; rotate writes rotation only on kinds that have one and turns a group as one about its centre.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/engine_structure.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: engine_structure}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

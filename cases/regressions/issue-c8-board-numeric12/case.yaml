@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-numeric12
+feature: board.agent.environment
+intent: Command schemas publish the engine's numeric limits and whole-value or path JSON member edits enforce the same bounds atomically.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/limits12.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: limits12}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

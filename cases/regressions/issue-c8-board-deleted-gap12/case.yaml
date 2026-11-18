@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-deleted-gap12
+feature: board.agent.guard
+intent: A stale page insertion or move destination refuses after an earlier page is removed or moved, and permits edits after its gap. It fails while the SDK loses the list position of a deletion.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/gaps12.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: gaps12}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

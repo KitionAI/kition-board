@@ -1,0 +1,17 @@
+format: 1
+id: board.pages/save-reopen
+feature: board.pages
+intent: >-
+  Pages created, renamed, duplicated, reordered and switched with the page commands keep their order, names and elements through a .kboard save and reopen, and a second save.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/round_trip.rs (pages_survive_save_and_reopen)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: round_trip, filter: pages_survive_save_and_reopen }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

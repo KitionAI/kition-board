@@ -1,0 +1,69 @@
+format: 1
+id: board.agent.conversation/backlog-frame
+feature: board.agent.conversation
+intent: >-
+  Over two messages the agent builds next to an existing frame: a Backlog frame holding two sticky
+  notes, then a connector between them, with the check clean and the Sprint flow untouched. The
+  board kit declares no drafts, so this is the multi-turn case.
+layer: eval
+source:
+  kind: synthetic
+  from: repo:conformance/basic.kboard
+  license: Apache-2.0
+  note: A copy of the conformance fixture the board engine writes.
+input: [input/plan.kboard]
+steps:
+  - task:
+      turns:
+        - >-
+          In plan.kboard, to the right of the Sprint frame, add a frame named "Backlog" holding two
+          sticky notes, "Docs" and "Tests".
+        - Now connect Docs to Tests with a connector, and make sure the board's check finds nothing wrong.
+      max_turns: 20
+  - query: { path: plan.kboard, args: { follow: pages.0.elements, fields: [kind, text, parent, shapeStyle, position, start, end] }, as: after }
+  - check: { path: plan.kboard, as: diagnostics }
+expected:
+  - actual: out:after
+    compare: values
+    value:
+      total: 8
+      objects:
+        any: { fields.kind: frame, fields.text.0.insert: Backlog }
+  - actual: out:after
+    compare: values
+    value:
+      objects:
+        any: { fields.shapeStyle: sticky, fields.text.0.insert: Docs }
+  - actual: out:after
+    compare: values
+    value:
+      objects:
+        any: { fields.shapeStyle: sticky, fields.text.0.insert: Tests }
+  - actual: out:diagnostics
+    compare: diagnostics
+    value: { absent: [board.outside-frame, board.overlap, board.empty-frame], max_errors: 0 }
+  - actual: out:after
+    compare: values
+    collateral: true
+    value:
+      objects.0.fields.kind: frame
+      objects.1.fields.text.0.insert: Plan
+      objects.1.fields.position.x: 60
+      objects.2.fields.text.0.insert: Build
+      objects.2.fields.position.x: 420
+      objects.3.fields.start.binding.target: 01a18a90-f63e-7428-86a6-6e44f54b183d
+      objects.3.fields.end.binding.target: 01a18a90-f63e-7428-86a6-6e459211c5e1
+solution:
+  - tool: board_batch
+    args:
+      path: plan.kboard
+      ops:
+        - { op: create, type: Element, in: 01a18a90-f63c-76bf-bdef-245dd84b017f.elements, ref: $frame, fields: { kind: frame, position: { x: 720, y: 0 }, size: { w: 520, h: 320 } } }
+        - { op: text.set, target: $frame, field: text, text: Backlog }
+        - { op: create, type: Element, in: 01a18a90-f63c-76bf-bdef-245dd84b017f.elements, ref: $docs, fields: { kind: shape, shapeStyle: sticky, parent: $frame, position: { x: 760, y: 100 }, size: { w: 160, h: 120 } } }
+        - { op: text.set, target: $docs, field: text, text: Docs }
+        - { op: create, type: Element, in: 01a18a90-f63c-76bf-bdef-245dd84b017f.elements, ref: $tests, fields: { kind: shape, shapeStyle: sticky, parent: $frame, position: { x: 1040, y: 100 }, size: { w: 160, h: 120 } } }
+        - { op: text.set, target: $tests, field: text, text: Tests }
+        - { op: create, type: Element, in: 01a18a90-f63c-76bf-bdef-245dd84b017f.elements, fields: { kind: connector, start: { binding: { target: $docs, anchor: [1, 0.5] } }, end: { binding: { target: $tests, anchor: [0, 0.5] } } } }
+since: "2026-11-17"
+timeout_s: 600

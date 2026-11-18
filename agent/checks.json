@@ -1,0 +1,75 @@
+[
+  {
+    "code": "board.card-target-missing",
+    "severity": "error",
+    "summary": "A card points at a workspace file that does not exist (reported only when the host lends files and says so).",
+    "fixture": "check-card-target-missing.kboard"
+  },
+  {
+    "code": "board.image-missing-blob",
+    "severity": "error",
+    "summary": "A picture's bytes are not in the board, so it shows as a placeholder.",
+    "fixture": "check-image-missing-blob.kboard"
+  },
+  {
+    "code": "board.dangling-binding",
+    "severity": "error",
+    "summary": "A connector end is attached to an element that is gone, on another page, or cannot take connectors (or was, in the file, until opening detached it).",
+    "fixture": "check-dangling-binding.kboard"
+  },
+  {
+    "code": "board.card-target-changed",
+    "severity": "warning",
+    "summary": "A board card's path now holds another board than the one it was made for (the docId it stored differs from the file's).",
+    "fixture": "check-card-target-changed.kboard"
+  },
+  {
+    "code": "board.label-overflow",
+    "severity": "warning",
+    "summary": "A shape's label or a sized text box does not fit its box with the engine's fonts.",
+    "fixture": "check-label-overflow.kboard",
+    "overflow": "text"
+  },
+  {
+    "code": "board.overlapping-label",
+    "severity": "warning",
+    "summary": "Two text elements overlap.",
+    "fixture": "check-overlapping-label.kboard"
+  },
+  {
+    "code": "board.overlap",
+    "severity": "warning",
+    "summary": "Two flow-chart nodes overlap.",
+    "fixture": "check-overlap.kboard"
+  },
+  {
+    "code": "board.disconnected-node",
+    "severity": "warning",
+    "summary": "A flow-chart node has no connector while the page holds other flow-chart nodes.",
+    "fixture": "check-disconnected-node.kboard"
+  },
+  {
+    "code": "board.missing-label",
+    "severity": "warning",
+    "summary": "A flow-chart or mind-map node has no label.",
+    "fixture": "check-missing-label.kboard"
+  },
+  {
+    "code": "board.outside-frame",
+    "severity": "warning",
+    "summary": "An element reaches outside the frame that holds it.",
+    "fixture": "check-outside-frame.kboard"
+  },
+  {
+    "code": "board.connector-crosses-node",
+    "severity": "info",
+    "summary": "A connector's route runs through a shape that is neither of its ends.",
+    "fixture": "check-connector-crosses-node.kboard"
+  },
+  {
+    "code": "board.empty-frame",
+    "severity": "info",
+    "summary": "A frame holds no elements.",
+    "fixture": "check-empty-frame.kboard"
+  }
+]

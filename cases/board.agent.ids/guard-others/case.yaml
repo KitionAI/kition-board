@@ -1,0 +1,22 @@
+format: 1
+id: board.agent.ids/guard-others
+feature: board.agent.ids
+intent: >-
+  With basis, another agent's edit of another element does not refuse my write: it applies, and others names that element and the other agent.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/premise.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: premise
+      filter: another_agents_edit_of_another_element_is_reported_and_my_write_applies
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+tags: [headless]
+since: "2026-11-17"

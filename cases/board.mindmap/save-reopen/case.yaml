@@ -1,0 +1,17 @@
+format: 1
+id: board.mindmap/save-reopen
+feature: board.mindmap
+intent: >-
+  A mind map grown with mindmap.addChild and mindmap.addSibling, collapsed, turned and laid out keeps every node and branch through a .kboard save and reopen, and a second save.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/round_trip.rs (mind_maps_survive_save_and_reopen)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: round_trip, filter: mind_maps_survive_save_and_reopen }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

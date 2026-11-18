@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-object-params
+feature: board.agent.ids
+intent: Every UUID resolver, including nested parents and connector ends, declares its exact object type to the premise guard.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/object_params.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: object_params}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

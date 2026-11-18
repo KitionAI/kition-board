@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-engine-locks
+feature: board.elements
+intent: A command refuses when it would write a locked element and writes nothing then (a deleted container's locked member, a deleted page's locked element, a mind map's locked branch); resizing one box writes and checks that box only, not its locked content.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/engine_locks.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: engine_locks}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

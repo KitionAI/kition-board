@@ -1,0 +1,22 @@
+format: 1
+id: board.agent.ids/receipts
+feature: board.agent.ids
+intent: >-
+  Through the agent's tools (kition-kits with the kition-board executable), a receipt names exactly the element a run changed, by the id board_query lists and the command answered, with each field before and after; a created element is named by the id board_query then lists.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/premise.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: premise
+      filter: a_receipt_names_exactly_the_changed_element_by_its_id_with_before_and_after
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+tags: [headless]
+since: "2026-11-17"

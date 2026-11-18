@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-engine-derived
+feature: board.elements
+intent: A bound end's stored point follows a text without a stored size after a new font size, text or mark; alignment answers only what it moved (a connector bound at both ends follows its elements); distribution keeps the selection's extent; an agent's command without `page` is refused when the page it works in was deleted, not landed on the first page.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/engine_derived.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: engine_derived}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

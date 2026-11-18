@@ -1,0 +1,56 @@
+format: 1
+id: board.agent.context/two-pages-one-run
+feature: board.agent.context
+intent: >-
+  The board has two pages, Plan and Retro. In one board_run the agent adds a sticky note inside a
+  frame on Retro (the run's target page) and renames a frame on Plan (by its id, through `on`);
+  each edit lands on its own page and nothing else changes. Nothing depends on the page an editor
+  shows.
+layer: eval
+source:
+  kind: synthetic
+  from: 'a two-page board the board engine wrote'
+  license: owned
+input: [input/retro.kboard]
+steps:
+  - task:
+      prompt: >-
+        retro.kboard has two pages. On the Retro page, add a sticky note "Wins" inside the
+        "Went well" frame, next to "Demo" without overlapping it, and on the Plan page rename the
+        "Sprint" frame to "Sprint 12", in one board_run call. Change nothing else.
+      max_turns: 20
+  - query: { path: retro.kboard, args: { follow: pages.0.elements, fields: [kind, text, parent, shapeStyle, position] }, as: plan }
+  - query: { path: retro.kboard, args: { follow: pages.1.elements, fields: [kind, text, parent, shapeStyle, position] }, as: retro }
+  - check: { path: retro.kboard, as: diagnostics }
+expected:
+  - actual: out:retro
+    compare: values
+    value:
+      total: 3
+      objects:
+        any: { fields.shapeStyle: sticky, fields.text.0.insert: Wins, fields.parent: 01a1cef6-5adf-70ae-a855-bed7df6b4dd8 }
+  - actual: out:plan
+    compare: values
+    value:
+      total: 4
+      objects:
+        any: { fields.kind: frame, fields.text.0.insert: Sprint 12 }
+  - actual: out:diagnostics
+    compare: diagnostics
+    value: { absent: [board.outside-frame, board.overlap], max_errors: 0 }
+  - actual: out:plan
+    compare: values
+    collateral: true
+    value:
+      objects:
+        any: { fields.kind: shape, fields.text.0.insert: Build, fields.position.x: 420 }
+solution:
+  - tool: board_run
+    args:
+      path: retro.kboard
+      target: { page: 2 }
+      steps:
+        - { command: element.create, params: { elements: [{ kind: shape, shapeStyle: sticky, parent: 01a1cef6-5adf-70ae-a855-bed7df6b4dd8, position: [260, 80], size: [160, 120], text: Wins }] } }
+        - { command: element.setText, on: [01a1cef6-5ade-703b-9d65-4d56573cbb49], params: { text: Sprint 12 } }
+since: "2026-11-17"
+timeout_s: 600

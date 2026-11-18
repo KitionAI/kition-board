@@ -1,0 +1,14 @@
+[package]
+name = "kition-board-text"
+description = "The Board kit's text metrics: the fonts the host gives the engine (addFont), line measurement and wrapping that match what a browser draws from the same font files."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+ttf-parser = { workspace = true }

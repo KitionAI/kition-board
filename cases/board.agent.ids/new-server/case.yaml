@@ -1,0 +1,22 @@
+format: 1
+id: board.agent.ids/new-server
+feature: board.agent.ids
+intent: >-
+  Page and element ids from an earlier board_inspect and board_query name the same pages and elements after a rename, a move, a save and a new server; board_batch, the commands and the receipts take and give the same ids.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/premise.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: premise
+      filter: ids_from_an_earlier_query_name_the_same_elements_and_pages_after_a_new_server_opens_the_saved_file
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+tags: [headless]
+since: "2026-11-17"

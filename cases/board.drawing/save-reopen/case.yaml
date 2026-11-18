@@ -1,0 +1,17 @@
+format: 1
+id: board.drawing/save-reopen
+feature: board.drawing
+intent: >-
+  A freehand stroke made with stroke.create keeps its points and colour through a .kboard save and reopen, and a second save.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/round_trip.rs (frames_and_strokes_survive_save_and_reopen)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: round_trip, filter: frames_and_strokes_survive_save_and_reopen }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

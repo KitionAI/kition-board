@@ -1,0 +1,22 @@
+format: 1
+id: board.agent.context/tool-refusals
+feature: board.agent.context
+intent: >-
+  A page the board lacks, a page by id where the tools take a number, another kit's part, a time, on for a command without targets, on beside the targets parameter, and an unknown element are refused before anything changes.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/premise.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: premise
+      filter: a_page_the_board_lacks_a_time_or_a_stray_on_is_refused
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+tags: [headless]
+since: "2026-11-17"

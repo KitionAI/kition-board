@@ -1,0 +1,22 @@
+format: 1
+id: regressions/issue-coedit-local-edit-left-a-repair
+feature: board.collab.live
+intent: >-
+  A command never leaves a state the repair (rules V1 to V9) would change: moving a group's last
+  members into a frame removes the emptied group in the same undo step, so the replica that made
+  the edit agrees with every other replica and with its own copy reopened after a crash.
+layer: unit
+dimension: collab
+source:
+  kind: issue
+  from: found by the convergence fuzz while making board co-editing live; a recovered replica had no emptied group, the live one kept it
+  license: owned
+input: []
+steps:
+  - cargo-test:
+      package: kition-board-kit
+      test: a_local_edit_that_empties_a_group_leaves_nothing_to_repair
+expected:
+  - actual: out:cargo-test
+    compare: exit
+since: "2026-11-17"

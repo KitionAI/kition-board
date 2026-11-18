@@ -1,0 +1,23 @@
+format: 1
+id: regressions/issue-focus-escape-always-taken
+feature: board.platform.display-modes
+intent: >-
+  Escape cancels the gesture in progress, else clears the selection, else returns from a drawing
+  tool to Select, and only an Escape with none of these leaves Focus (KitPointer 4.4). The canvas
+  took every Escape, cleared or not, so Focus could not be left by key (kition-sdk's mode smoke
+  failed "Escape leaves Focus" in all three modes). The overview (minimap) stayed
+  in Focus.
+layer: gate
+source:
+  kind: probe
+  from: kit display modes work, web/tests/modes.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/modes.mjs, chromium]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-17"
+timeout_s: 300
+requires: [chromium]

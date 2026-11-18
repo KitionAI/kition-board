@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-map-premises
+feature: board.agent.guard
+intent: A mind-map edit must hold its node values, not merely the page list holding those nodes, while an unrelated label edit must apply.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/map_premises.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: map_premises}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

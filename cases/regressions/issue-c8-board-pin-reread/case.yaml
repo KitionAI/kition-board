@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-pin-reread
+feature: board.agent.guard
+intent: A clean board whose file another writer saved imports the file's difference into its live replica, keeping the agent's undo, the colleague's edit, the shown page and the next save's base; a reread that deleted the shown page, or a file of another board, changes nothing.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/reread.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: reread}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

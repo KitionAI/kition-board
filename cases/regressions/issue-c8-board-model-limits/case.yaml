@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-model-limits
+feature: board.agent.environment
+intent: Model batches enforce the same scalar bounds as engine commands and reject changing an element's kind atomically.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/env.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: env}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

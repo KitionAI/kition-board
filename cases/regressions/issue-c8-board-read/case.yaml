@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-read
+feature: board.agent.guard
+intent: Every write command's declaration holds what an independent reading of its handler found it reads, row by row on one board; a locked element refuses a mark and alternative text.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/declarations_independent.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: declarations_independent}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

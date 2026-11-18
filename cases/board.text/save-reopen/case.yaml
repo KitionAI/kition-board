@@ -1,0 +1,17 @@
+format: 1
+id: board.text/save-reopen
+feature: board.text
+intent: >-
+  Bold, italic and link marks set with text.mark on a CJK and emoji text survive a .kboard save and reopen, and a second save.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/round_trip.rs (text_marks_survive_save_and_reopen)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: round_trip, filter: text_marks_survive_save_and_reopen }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

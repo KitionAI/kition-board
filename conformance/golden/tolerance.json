@@ -1,0 +1,5 @@
+{
+  "maxChannelDelta": 2,
+  "maxDifferentPixels": 2900,
+  "note": "The engine's own raster (resvg) draws the preview with the fonts the kit ships; anti-aliased edges and glyphs may differ by a step between platforms and SIMD paths, on at most 0.5% of the 1024 x 576 picture's pixels."
+}

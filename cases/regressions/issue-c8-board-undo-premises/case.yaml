@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-undo-premises
+feature: board.agent.guard
+intent: "An agent's edit.undo and edit.redo declare the objects of the step they take back or put back, and no other object, so the guard refuses a stale undo only when a colleague changed one of them."
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/undo_premises.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: undo_premises}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

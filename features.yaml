@@ -1,0 +1,240 @@
+format: 1
+kit: board
+updated: "2026-11-17"
+gate_budget_s: 600
+protected: ["conformance/golden/**"]
+features:
+  - id: board.agent.observe
+    title: An agent reads the flow and answers on the board
+    dimension: [ai]
+    priority: P0
+    status: has
+    requirements: [AX13]
+    cases: [board.agent.observe/frame-title]
+    since: "2026-11-17"
+  - id: board.agent.act
+    title: An agent extends a flow chart (make, then connect)
+    dimension: [ai]
+    priority: P0
+    status: has
+    requirements: [AX13]
+    cases: [board.agent.act/ship-step, regressions/issue-deterministic-save]
+    since: "2026-11-17"
+  - id: board.agent.recover
+    title: An agent fixes what the check reports
+    dimension: [ai]
+    priority: P0
+    status: has
+    requirements: [AX13]
+    cases: [board.agent.recover/disconnected-flow, regressions/issue-unknown-params]
+    since: "2026-11-17"
+  - id: board.agent.draft
+    title: "An agent's draft of a board is a replica of it, pictures included (draft: true; board_draft_ready, board_draft_reopen)"
+    dimension: [ai, collab]
+    priority: P1
+    status: has
+    paths: [bindings/wasm/src/collab.rs]
+    requirements: [AX13]
+    cases: [regressions/issue-draft-replica-blobs]
+    since: "2026-11-17"
+  - id: board.agent.preview
+    title: "An agent's preview of a board is drawn by the engine with the fonts the kit ships (board_inspect preview: true)"
+    dimension: [ai, fidelity]
+    priority: P1
+    status: has
+    commands: [file.render]
+    paths: [bindings/headless/build.rs, bindings/headless/src/lib.rs, bindings/headless/src/main.rs, bindings/wasm/src/render.rs, crates/render/scene/src/**]
+    requirements: [AX13]
+    cases: [board.agent.preview/render-explicit-view, board.agent.preview/render-named-view, regressions/issue-golden-preview, regressions/issue-headless-shipped-fonts]
+    since: "2026-11-17"
+  - id: board.agent.context
+    title: No agent call depends on or leaves behind the page the editor shows; commands say what they read and the parameter on fills
+    dimension: [ai]
+    priority: P0
+    status: has
+    commands: [file.render, page.activate, page.create, element.create]
+    paths: [bindings/wasm/src/context.rs, bindings/wasm/src/lib.rs, crates/engine/model/src/acts.rs, kit.json]
+    requirements: [AX13]
+    cases: [board.agent.context/check-context, board.agent.context/editor-state-hidden, board.agent.context/explicit-targets, board.agent.context/failed-run, board.agent.context/headless-run, board.agent.context/published-commands, board.agent.context/reads-declared, board.agent.context/refused-contexts, board.agent.context/tool-refusals, board.agent.context/two-pages-one-run, board.agent.context/two-pages-run, regressions/issue-c8-board-page-context]
+    since: "2026-11-17"
+  - id: board.agent.ids
+    title: One id space for pages and elements that survives reopening; receipts and the guard between agents name them
+    dimension: [ai, conversion]
+    priority: P0
+    status: has
+    paths: [crates/kdm/kdm-model/model/schema.json, crates/kdm/kdm-model/src/file.rs, bindings/headless/tests/premise.rs]
+    requirements: [AX13]
+    cases: [board.agent.ids/cascade-receipt, board.agent.ids/guard-conflicts, board.agent.ids/guard-others, board.agent.ids/new-server, board.agent.ids/receipts, board.agent.ids/saved-receipts, regressions/issue-c8-board-object-params, regressions/issue-c8-board-premises, regressions/issue-c8-board-spatial]
+    since: "2026-11-17"
+  - id: board.agent.conversation
+    title: An agent builds on the board over a conversation
+    dimension: [ai]
+    priority: P1
+    status: has
+    requirements: [AX13]
+    cases: [board.agent.conversation/backlog-frame]
+    since: "2026-11-17"
+  - id: board.agent.guard
+    title: Independent file writers preserve per-call premises
+    dimension: [ai, collab, data-safety]
+    priority: P0
+    status: partial
+    paths: [crates/engine/model/src/premises.rs, crates/engine/model/src/acts.rs, crates/kdm/kdm-model/model/schema.json, bindings/headless/tests/outside.rs, bindings/headless/tests/mixed.rs, bindings/headless/tests/land12.rs, bindings/headless/tests/gaps12.rs, bindings/headless/tests/matrix3.rs, bindings/wasm/tests/declarations_independent.rs, bindings/headless/tests/independent.rs, bindings/wasm/tests/undo_premises.rs, bindings/wasm/src/lib.rs, bindings/wasm/tests/reread.rs]
+    gap: "Measured on kition-sdk 2ce294a1 (the kit pins f5ea478): the SDK permits stale numeric/implicit page destinations and deleted page gaps; raw z-index writes and deletion coverage hold (their waiting_for_sdk tests pass). Scoped hierarchy facts and z-order windows give false refusals; removed/moved derived dependencies can report changed instead of deleted/relocated. waiting_for_sdk tests keep their necessity expectations. Undo and redo hold the objects and fields of the step they take back or put back. All 83 independent reading rows run on flat and nested boards."
+    cases: [board.agent.guard/outside-tables, regressions/issue-c8-board-pin-reread, regressions/issue-c8-board-index-gap, regressions/issue-c8-board-map-premises, regressions/issue-c8-board-page-copy, regressions/issue-c8-board-land12, regressions/issue-c8-board-deleted-gap12, regressions/issue-c8-board-read, regressions/issue-c8-board-read-writers, regressions/issue-c8-board-3-address, regressions/issue-c8-board-3-derived, regressions/issue-c8-board-3-nested, regressions/issue-c8-board-3-ungroup-lock, regressions/issue-c8-board-3-dependencies, regressions/issue-c8-board-3-named, regressions/issue-c8-board-undo-premises]
+    since: "2026-11-17"
+  - id: board.agent.environment
+    title: Offline environment tasks use board words and valid model values
+    dimension: [ai, data-safety]
+    priority: P1
+    status: partial
+    paths: [crates/kdm/kdm-model/model/schema.json, crates/engine/model/src/spec.rs, bindings/wasm/src/lib.rs, bindings/headless/tests/env.rs, bindings/headless/tests/limits12.rs, bindings/wasm/tests/batch12.rs]
+    gap: "Seed 7 gives 100 verified tasks but no creates. Element.kind is a creation-only register a raw batch create gives (limits12); whether Page replay comparison treats fresh UUIDs as the same objects on the pinned kition-sdk is not measured. Rich-text scalars and derived fields replay."
+    cases: [regressions/issue-c8-board-model-limits, regressions/issue-c8-board-numeric12, regressions/issue-c8-board-batch12]
+    since: "2026-11-17"
+  - id: board.platform.brand
+    title: The embedded editor uses the canonical kit palette
+    dimension: [platform]
+    priority: P1
+    status: has
+    paths: [kit.json]
+    cases: [regressions/issue-release-kit-brand]
+    since: "2026-11-17"
+  - id: board.platform.display-modes
+    title: "The editor in every display mode: Menus by default, Single line and Classic open on Edit, Focus shows only the board and leaves on Escape"
+    dimension: [function, platform]
+    priority: P1
+    status: has
+    paths: [kit.json, web/src/main.tsx, web/src/App.tsx, web/src/canvas/BoardCanvas.tsx, web/tests/modes.mjs]
+    cases: [board.platform.display-modes/mode-smoke, regressions/issue-focus-escape-always-taken]
+    since: "2026-11-17"
+  - id: board.collab.live
+    title: People co-edit a board live (shapes, text, connectors, frames, cards, groups, z-order) and converge
+    dimension: [collab, data-safety]
+    priority: P1
+    status: partial
+    paths: [crates/engine/model/src/lib.rs, crates/kdm/kdm-model/src/validate.rs, bindings/wasm/tests/convergence.rs, web/src/board/sync.ts, web/src/canvas/BoardCanvas.tsx]
+    gap: >-
+      The engine side is done: every edit is a KDM change with stable ids, imports repair
+      deterministically, and the convergence suite and the board's own scenarios pass on 2 to 5
+      replicas. Not yet: presence (the editor does not list `presence`, so cursors and selections
+      are not shared or drawn), a gesture or text box over an element another person deletes is
+      not cancelled before its commit fails, and there is no two-editor browser check (no
+      workspace host in web/tests).
+    cases: [board.collab.live/converges, regressions/issue-coedit-local-edit-left-a-repair]
+    since: "2026-11-17"
+  - id: board.elements
+    title: "Create, select, move, resize, rotate, style, group, stack and lock elements"
+    dimension: [function, data-safety]
+    priority: P0
+    status: has
+    commands: [element.duplicate, element.delete, element.paste, element.create, element.update, element.move, element.resize, element.rotate, element.style, element.getStyle, element.setText, element.group, element.ungroup, element.reorder, element.lock, clipboard.copy]
+    paths: [crates/engine/check/src/lib.rs, bindings/wasm/examples/checks.rs, crates/engine/model/src/elements.rs, bindings/wasm/src/lib.rs]
+    cases: [board.elements/save-reopen-append, regressions/issue-c8-board-engine-locks, regressions/issue-c8-board-engine-structure, regressions/issue-c8-board-engine-paste, regressions/issue-c8-board-engine-derived]
+    since: "2026-11-17"
+  - id: board.text
+    title: "Text on the board: marks on a text run"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [text.mark]
+    cases: [board.text/save-reopen, regressions/issue-2]
+    since: "2026-11-17"
+  - id: board.frames
+    title: "Frames that hold and fit elements"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [frame.create, frame.fit]
+    paths: [crates/engine/check/src/lib.rs, bindings/wasm/examples/sample.rs, bindings/wasm/examples/checks.rs]
+    cases: [board.frames/save-reopen]
+    since: "2026-11-17"
+  - id: board.drawing
+    title: "Freehand strokes"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [stroke.create]
+    cases: [board.drawing/save-reopen, regressions/issue-3]
+    since: "2026-11-17"
+  - id: board.connectors
+    title: "Connectors bound to elements, with labels and waypoints"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [connector.create, connector.bind, connector.setLabel, connector.setWaypoints]
+    paths: [crates/engine/check/src/lib.rs, crates/engine/model/src/elements.rs, bindings/wasm/examples/sample.rs, bindings/wasm/examples/checks.rs]
+    cases: [board.connectors/save-reopen]
+    since: "2026-11-17"
+  - id: board.cards
+    title: "Cards that link to a file or a web page, and links retargeted when files move"
+    dimension: [function]
+    priority: P1
+    status: partial
+    commands: [card.create, card.setTarget, links.retarget]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/files.rs, crates/engine/model/src/elements.rs, crates/engine/check/src/lib.rs]
+    gap: "Link cards (card.create with `url`) survive save and reopen (bindings/wasm/tests/round_trip.rs); file cards need a lent file and are covered by the command tests only, not by a round trip."
+    since: "2026-11-17"
+  - id: board.images
+    title: "Pictures on the board, with alternative text"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [image.insert, image.setAlt]
+    paths: [crates/engine/model/src/elements.rs, crates/engine/check/src/lib.rs, bindings/wasm/src/lib.rs, bindings/wasm/src/files.rs]
+    gap: "Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs."
+    cases: [board.images/save-reopen]
+    since: "2026-11-17"
+  - id: board.layout
+    title: "Align, distribute and stack elements"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [layout.align, layout.distribute, layout.stack]
+    paths: [crates/engine/check/src/lib.rs]
+    cases: [board.layout/save-reopen]
+    since: "2026-11-17"
+  - id: board.mindmap
+    title: "Mind maps: lay out, add children and siblings, collapse, set direction"
+    dimension: [function]
+    priority: P1
+    status: has
+    commands: [layout.mindmap, mindmap.addChild, mindmap.addSibling, mindmap.collapse, mindmap.setDirection]
+    cases: [board.mindmap/save-reopen]
+    since: "2026-11-17"
+  - id: board.pages
+    title: "Pages: create, rename, duplicate, delete, reorder, switch"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [page.create, page.rename, page.duplicate, page.delete, page.move, page.activate]
+    paths: [bindings/wasm/src/lib.rs]
+    cases: [board.pages/save-reopen]
+    since: "2026-11-17"
+  - id: board.templates
+    title: "Insert a template"
+    dimension: [function]
+    priority: P2
+    status: partial
+    commands: [template.insert]
+    gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
+    since: "2026-11-17"
+  - id: board.export
+    title: "Export the board"
+    dimension: [conversion]
+    priority: P1
+    status: partial
+    commands: [file.export]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/scene.rs, crates/render/scene/src/export.rs]
+    gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
+    cases: [regressions/issue-1, regressions/issue-agent-export]
+    since: "2026-11-17"
+  - id: board.history
+    title: "Undo and redo"
+    dimension: [function]
+    priority: P1
+    status: partial
+    commands: [edit.undo, edit.redo]
+    paths: [bindings/wasm/src/lib.rs]
+    gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
+    since: "2026-11-17"

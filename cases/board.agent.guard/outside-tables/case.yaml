@@ -1,0 +1,14 @@
+format: 1
+id: board.agent.guard/outside-tables
+feature: board.agent.guard
+intent: Independent writers exercise field, index, point and structural premises under a fixed necessary-conflict rule, and fifty unrelated changes distinguish premise from epoch.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/mixed.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: outside}
+  - cargo-test: {package: kition-board, test: mixed}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

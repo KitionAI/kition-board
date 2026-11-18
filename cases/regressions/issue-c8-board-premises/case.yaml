@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-premises
+feature: board.agent.ids
+intent: Property and geometry commands hold their real inputs, including descendants and other connector endpoints, without holding unrelated fields.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/places.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: places}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

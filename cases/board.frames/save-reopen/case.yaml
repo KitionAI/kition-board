@@ -1,0 +1,17 @@
+format: 1
+id: board.frames/save-reopen
+feature: board.frames
+intent: >-
+  A frame made with frame.create around a shape and a stroke, then fitted with frame.fit, keeps its title, size and children through a .kboard save and reopen, and a second save.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/round_trip.rs (frames_and_strokes_survive_save_and_reopen)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: round_trip, filter: frames_and_strokes_survive_save_and_reopen }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

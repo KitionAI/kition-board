@@ -1,0 +1,21 @@
+format: 1
+id: board.agent.context/published-commands
+feature: board.agent.context
+intent: >-
+  The agent's commands publish the editor state they read (x-khp-reads: part) and the element parameter a step's on fills (x-khp-role: targets), and file.render publishes the view members it draws.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/context.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: context
+      filter: the_agents_commands_say_what_they_read_and_the_view_the_render_takes
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

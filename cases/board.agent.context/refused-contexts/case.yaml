@@ -1,0 +1,21 @@
+format: 1
+id: board.agent.context/refused-contexts
+feature: board.agent.context
+intent: >-
+  A page or element the board lacks, a page number out of range, or another kit's part is invalid-params naming where ids come from; a time or a selection (a board keeps none) is not available; the editor never moves.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/context.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: context
+      filter: a_context_the_board_lacks_is_invalid_params_and_says_where_ids_come_from
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

@@ -1,0 +1,21 @@
+format: 1
+id: board.agent.preview/render-explicit-view
+feature: board.agent.preview
+intent: >-
+  file.render (agent.render) is a function of the board and the call: the shown page neither changes the bytes nor is changed by it, rendering changes nothing, and the same call answers the same bytes, also after a save and reopen.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/render.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board-kit
+      test: render
+      filter: it_never_reads_or_moves_the_shown_page_and_answers_the_same_bytes
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

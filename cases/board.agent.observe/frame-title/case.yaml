@@ -1,0 +1,42 @@
+format: 1
+id: board.agent.observe/frame-title
+feature: board.agent.observe
+intent: >-
+  The agent reads the flow inside a frame (which node the connector leaves and which it reaches)
+  and names the frame after it, changing nothing else.
+layer: eval
+source:
+  kind: synthetic
+  from: repo:conformance/basic.kboard
+  license: Apache-2.0
+  note: A copy of the conformance fixture the board engine writes.
+input: [input/plan.kboard]
+steps:
+  - task:
+      prompt: >-
+        In plan.kboard, the frame holds a small flow chart. Rename the frame to "<first step> to
+        <last step>", using the step names in the order the connector runs.
+      max_turns: 20
+  - query: { path: plan.kboard, args: { follow: pages.0.elements, fields: [kind, text, parent, shapeStyle, position, start, end] }, as: after }
+expected:
+  - actual: out:after
+    compare: values
+    value:
+      objects.0.fields.text.0.insert: Plan to Build
+  - actual: out:after
+    compare: values
+    collateral: true
+    value:
+      total: 4
+      objects.0.fields.kind: frame
+      objects.1.fields.text.0.insert: Plan
+      objects.1.fields.position.x: 60
+      objects.2.fields.text.0.insert: Build
+      objects.2.fields.position.x: 420
+      objects.3.fields.start.binding.target: 01a18a90-f63e-7428-86a6-6e44f54b183d
+      objects.3.fields.end.binding.target: 01a18a90-f63e-7428-86a6-6e459211c5e1
+solution:
+  - tool: board_run
+    args: { path: plan.kboard, steps: [{ command: element.setText, params: { id: 01a18a90-f63d-74f3-bebb-52aee9e169c1, text: Plan to Build } }] }
+since: "2026-11-17"
+timeout_s: 600

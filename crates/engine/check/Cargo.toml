@@ -1,0 +1,20 @@
+[package]
+name = "kition-board-check"
+description = "The Board kit's check (board_check): twelve diagnostic codes for broken references, missing pictures, overflowing labels and flow-chart problems."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+kition-kit = { workspace = true }
+kition-board-kdm = { workspace = true }
+kition-board-scene = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+kition-board-model = { workspace = true }

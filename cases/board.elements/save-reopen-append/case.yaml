@@ -1,0 +1,18 @@
+format: 1
+id: board.elements/save-reopen-append
+feature: board.elements
+intent: >-
+  Elements made with element.create survive a save and a reopen: the reopened board keeps the
+  saved snapshot, and each later save appends only the new edits to the file it opened.
+layer: unit
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/blobs.rs (40 shapes, then one more after each reopen)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: blobs, filter: saves_append_to_the_file_the_document_opened }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

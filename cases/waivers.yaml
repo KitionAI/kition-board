@@ -1,0 +1,5 @@
+# Waivers for board: maintainer-approved, dated exceptions to rows of the Kition kit requirements table.
+# Format and rules: docs/quality.md. The board has no waivers.
+kit: board
+format: 1
+waivers: []

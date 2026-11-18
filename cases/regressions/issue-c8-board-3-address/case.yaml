@@ -1,0 +1,14 @@
+format: 1
+id: regressions/issue-c8-board-3-address
+feature: board.agent.guard
+intent: UUID, container, bound-end, page, destination-point and clipboard addresses refuse exactly the changes their result depends on, and every applied saved board contains both writers' edits.
+layer: gate
+timeout_s: 60
+source: {kind: synthetic, from: bindings/headless/tests/matrix3.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: matrix3, filter: address_matrix}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

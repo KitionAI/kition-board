@@ -1,0 +1,21 @@
+format: 1
+id: board.agent.context/editor-state-hidden
+feature: board.agent.context
+intent: >-
+  What an agent reads of a board (board_inspect's details) is the same whatever page the editor shows: the shown page and its area are editor state (EDITOR_STATE), and every page is listed with its id, name, element count and area.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/context.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: context
+      filter: what_an_agent_reads_of_the_board_leaves_out_the_page_the_editor_shows
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

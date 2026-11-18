@@ -1,0 +1,21 @@
+format: 1
+id: board.agent.context/check-context
+feature: board.agent.context
+intent: >-
+  The editor-state hooks pass kition-sdk's check_context with a context that really moves the editor (another page): no revision, dirty state, undo step or content changes, and the state is put back.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/context.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test:
+      package: kition-board
+      test: context
+      filter: the_editor_state_hooks_pass_the_sdks_contract_check
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

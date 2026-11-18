@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-3-ungroup-lock
+feature: board.agent.guard
+intent: Ungrouping refuses a locked member before changing any parent or deleting a group; a colleague locking a member invalidates an observed ungroup.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/matrix3.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: matrix3, filter: ungroup_}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"

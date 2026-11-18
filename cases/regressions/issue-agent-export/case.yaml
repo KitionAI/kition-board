@@ -1,0 +1,23 @@
+format: 1
+id: regressions/issue-agent-export
+feature: board.export
+intent: >-
+  An agent exports a board as PNG, SVG and PDF (KHP A35, A41; Kition platform K5, K21): kit.json
+  names `file.export` in `agent.export` with `data: base64`, the command every `exports` format
+  runs, so `board_export` exists; `kit.initialize` reports the formats and `document.export`
+  writes the same files. Each is valid in its own reader (a PNG that decodes and is not one colour,
+  an SVG that parses, a one-page PDF), and exporting never edits the board. Before, kit.json had no
+  `agent.export`, so there was no `board_export`.
+layer: gate
+source:
+  kind: probe
+  from: "agent readiness review (no agent.export)"
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board, test: export }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-17"

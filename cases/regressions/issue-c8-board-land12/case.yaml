@@ -1,0 +1,13 @@
+format: 1
+id: regressions/issue-c8-board-land12
+feature: board.agent.guard
+intent: Unrelated creation, keys and link metadata do not refuse writes, while changed memberships, link paths, equal-area winners and page insertion gaps do.
+layer: gate
+source: {kind: synthetic, from: bindings/headless/tests/land12.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board, test: land12}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-17"
