@@ -51,7 +51,8 @@ This repository is Kition's `kit.board` kit. The engine is Kition's own, in Rust
   task card id. No host paths, user names, or secrets in tracked files.
 - Code moved or ported from Kition or another kit names its source in the commit message that
   brings it in; there is no change ledger.
-- No CI workflows in this repository.
+- No CI workflows in this repository besides the Package workflow (`.github/workflows/package.yml`),
+  which Kition's reusable workflow runs to publish the kit's package.
 
 ## Never crash
 
