@@ -47,7 +47,7 @@ const alone = window.setTimeout(() => {
 }, 3000)
 
 // The editor opens in Menus, a whiteboard's display mode (`ui.display`).
-void connectHost({ id: 'kit.board', version: '0.1.0', capabilities: ['ai', 'replica'], ui: KIT_UI, display: manifest.ui.display }).then((host) => {
+void connectHost({ id: 'kit.board', version: '0.1.1', capabilities: ['ai', 'replica'], ui: KIT_UI, display: manifest.ui.display }).then((host) => {
   window.clearTimeout(alone)
   // No StrictMode: its doubled effects would open the document twice, in two engine workers.
   root.render(<App host={host} />)

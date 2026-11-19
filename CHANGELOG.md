@@ -3,6 +3,11 @@
 Changes to Kition Board, newest first. A version is the kit package version in `kit.json`;
 each package is published with a `package-v<version>` tag.
 
+## 0.1.1
+
+- The board follows the host's dark scheme: in a dark host the canvas, the default ink and the minimap are drawn dark (lines and text at WCAG AA), and they repaint when the host switches scheme, without a reload.
+- An agent can edit an open board: the editor reads the schema of the board's model description, whose text marks are named by key (kition-sdk 1637bf8; the editor now builds on `@kition/kit-editor`, `@kition/kdm`, `@kition/kit-host`, `@kition/kit-ui-protocol` and `@kition/kit-dev-host` 0.5.1). Before, every agent step on an open board failed with "the schema does not parse".
+
 ## 0.1.0
 
 First public release of the source, under the Apache License 2.0. It contains:

@@ -872,7 +872,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64",
  "image",
@@ -889,7 +889,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-check"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "kition-board-kdm",
  "kition-board-model",
@@ -900,7 +900,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-kboard"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-kdm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "kition-board-kboard",
  "kition-board-text",
@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-kit"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64",
  "image",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-model"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "kition-board-kboard",
  "kition-board-kdm",
@@ -949,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-scene"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "kition-board-kdm",
  "kition-board-model",
@@ -963,7 +963,7 @@ dependencies = [
 
 [[package]]
 name = "kition-board-text"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ttf-parser",
 ]
@@ -2714,7 +2714,7 @@ checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde_json",
 ]
