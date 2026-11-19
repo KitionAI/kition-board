@@ -13,11 +13,11 @@
     "test:flow": "node tests/flow.mjs chromium && node tests/flow.mjs webkit"
   },
   "dependencies": {
-    "@kition/kdm": "^0.1.0",
-    "@kition/kit-dev-host": "^0.1.0",
-    "@kition/kit-host": "^0.1.0",
-    "@kition/kit-ui-protocol": "^0.1.0",
-    "@kition/kit-editor": "^0.1.0",
+    "@kition/kdm": "^0.5.1",
+    "@kition/kit-dev-host": "^0.5.1",
+    "@kition/kit-host": "^0.5.1",
+    "@kition/kit-ui-protocol": "^0.5.1",
+    "@kition/kit-editor": "^0.5.1",
     "@kition/tessera-icons": "^0.1.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
