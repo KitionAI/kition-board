@@ -260,9 +260,34 @@ try {
   await until(async () => (await frame.evaluate(() => window.kitBoard?.shown().length ?? 0)) === 6)
   step('the saved board reopens with every element', (await elementCount()) === 6 && (await board(() => window.kitBoard.shown().length)) === 6)
 
-  // The editor's own UI, on a page of its own at a known view (100%, world origin at the canvas corner).
-  await ai([{ command: 'page.create', params: { name: 'Tools', activate: true } }])
-  await until(async () => (await board(() => window.kitBoard.shown().length)) === 0)
+  // An agent's step runs in an editor state of its own and never moves the person's page (Kit UI
+  // protocol 2.9): `page.create { activate }` makes the page and puts the run's next steps there.
+  const personPage = async () => (await inspect()).page
+  const pageBefore = await personPage()
+  const agentRun = await ai([
+    { command: 'page.create', params: { name: 'Agent', activate: true } },
+    { command: 'element.create', params: { elements: [{ kind: 'shape', position: { x: 0, y: 0 }, size: { w: 40, h: 40 } }] } },
+  ])
+  const agentPage = agentRun.completed[0].result.page
+  const agentMade = agentRun.completed[1].result.created[0]
+  const agentPageElements = async () => (await inspect()).pages.find((listed) => listed.id === agentPage)?.elements
+  await page.waitForTimeout(300)
+  step(
+    "an agent's page.create { activate } leaves the person's page, and its next step goes to the new page",
+    (await personPage()) === pageBefore && (await board(() => window.kitBoard.shown().length)) === 6 && !(await board(() => window.kitBoard.shown())).includes(agentMade) && (await agentPageElements()) === 1,
+    `${await personPage()} vs ${pageBefore}, ${await board(() => window.kitBoard.shown().length)} shown, ${await agentPageElements()} on the agent's page`,
+  )
+  // The editor's own UI, on a page of its own at a known view (100%, world origin at the canvas corner):
+  // the person's New page (View) shows the page it makes.
+  /** The person's New page, from the View tab. */
+  const newPage = async () => {
+    await kit.getByTestId('ribbon-tab-View').click()
+    await kit.getByTestId('board-cmd-page.create').click()
+    await kit.getByTestId('ribbon-tab-Edit').click()
+  }
+  await newPage()
+  await until(async () => (await personPage()) !== pageBefore && (await board(() => window.kitBoard.shown().length)) === 0)
+  step('New page shows the page it makes', ![pageBefore, agentPage].includes(await personPage()) && (await board(() => window.kitBoard.shown().length)) === 0, `${await personPage()}, ${await board(() => window.kitBoard.shown().length)} shown`)
   await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
   /** Copies `ids` and answers their stored elements. */
   const storedOf = async (ids) => {
@@ -673,8 +698,12 @@ try {
 
   // 10. The pan budget: 5,000 elements on a new page, panned for 120 frames (spike S2, S2-2).
   const before5000 = await elementCount()
+  // The person's New page; the agent's paste goes to the page the person shows.
+  const toolsPage = await personPage()
+  await newPage()
+  await until(async () => (await personPage()) !== toolsPage && (await board(() => window.kitBoard.shown().length)) === 0)
   const t0 = Date.now()
-  await ai([{ command: 'page.create', params: { name: 'Perf', activate: true } }, { command: 'element.paste', params: { payload: bigPayload() } }])
+  await ai([{ command: 'element.paste', params: { payload: bigPayload() } }])
   const pasteMs = Date.now() - t0
   await until(async () => (await board(() => window.kitBoard.shown().length)) > 10, 600)
   const showMs = Date.now() - t0 - pasteMs

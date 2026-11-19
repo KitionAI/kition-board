@@ -162,11 +162,13 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
   }, [change.revision, sync, t])
 
   const { commands, byId } = editor
-  // Menu rows that work on the selection run on it; the rest open their dialog.
+  // Menu rows that work on the selection run on it; New page shows the page it makes (the editor
+  // has no other way to reach it); the rest open their dialog.
   const onCommand = useCallback(
     (id: string) => {
       const ids = selectionRef.current
-      if (ids.length && idsOnly(byId.get(id))) void editor.run(id, { ids })
+      if (id === 'page.create') void editor.run(id, { activate: true })
+      else if (ids.length && idsOnly(byId.get(id))) void editor.run(id, { ids })
       else void editor.run(id)
     },
     [byId, editor, selectionRef],

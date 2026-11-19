@@ -217,7 +217,7 @@ features:
     status: has
     commands: [page.create, page.rename, page.duplicate, page.delete, page.move, page.activate]
     paths: [bindings/wasm/src/lib.rs]
-    cases: [board.pages/save-reopen]
+    cases: [board.pages/save-reopen, regressions/issue-new-page-shown]
     since: "2026-11-17"
   - id: board.templates
     title: "Insert a template"
