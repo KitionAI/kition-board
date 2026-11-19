@@ -1,0 +1,28 @@
+format: 1
+id: board.pages/switcher
+feature: board.pages
+intent: >-
+  The person reaches every page from the page tabs under the canvas: Add page makes a page and
+  shows it, a click or the keyboard (arrows, Home, End, Enter, Escape) switches without marking the
+  file unsaved, changing its revision or adding an undo step, a double-click or F2 renames (Escape
+  leaves the name), the menu duplicates (and the copy is reached), moves and deletes the page (not
+  the last one); Undo and Redo of each restore the page and show a page that is there (after an
+  undone Add page, the page the person was on). The selection stays on its page, each page keeps
+  its view, the minimap draws the shown page at once, and an agent's run never moves the person
+  (its delete of their page leaves them on its neighbour).
+layer: gate
+source:
+  kind: synthetic
+  from: web/tests/pages.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/pages.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/pages.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-19"
+timeout_s: 300
+requires: [chromium, webkit]

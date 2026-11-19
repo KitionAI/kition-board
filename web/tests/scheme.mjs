@@ -1,7 +1,7 @@
 // The board follows the host's color scheme, through the development host: node tests/scheme.mjs
 // [chromium|webkit]. Opens the sample board in the dark scheme and checks that the canvas is the
 // dark paper, the default ink is drawn light (and reads at WCAG AA on it), and the minimap is drawn
-// dark; then switches the host to light and back without a reload and checks that the canvas and
+// dark, and the page tabs are dark and readable; then switches the host to light and back without a reload and checks that the canvas and
 // the minimap repaint each time and no element moves. Needs the engine and fonts built into public/
 // (pnpm run engine). Run it with no HTTP proxy set. SHOT=<dir> writes screenshots of both schemes.
 import { chromium, webkit } from 'playwright'
@@ -77,12 +77,27 @@ try {
   step('the canvas, the default ink and the minimap are dark', await paints('dark'), JSON.stringify(await colours()))
   const dark = await colours()
   step('the default ink reads at WCAG AA on the dark paper', contrast(rgb(dark.ink), rgb(dark.background)) >= 4.5, contrast(rgb(dark.ink), rgb(dark.background)).toFixed(2))
+  /** The page tabs' colours: the bar, and the shown tab's text on its background. */
+  const tabs = () =>
+    frame.evaluate(() => {
+      const bar = document.querySelector('[data-testid="board-pages"]')
+      const shown = document.querySelector('[data-testid="board-pages"] [role=tab][aria-selected=true]')
+      return { bar: bar ? getComputedStyle(bar).backgroundColor : '', tab: shown ? getComputedStyle(shown).backgroundColor : '', text: shown ? getComputedStyle(shown).color : '' }
+    })
+  const darkTabs = await tabs()
+  step(
+    'the page tabs are dark and the shown page reads at WCAG AA',
+    luminance(rgb(darkTabs.bar)) < 0.1 && rgb(darkTabs.tab).length === 3 && contrast(rgb(darkTabs.text), rgb(darkTabs.tab)) >= 4.5,
+    JSON.stringify(darkTabs),
+  )
   const placed = await places()
   if (shots) await page.screenshot({ path: `${shots}/board-dark-${which}.png` })
 
   await page.evaluate(() => window.devHost.setScheme('light'))
   step('switched live to light, the canvas, the ink and the minimap repaint light', await paints('light'), JSON.stringify(await colours()))
   step('nothing moves', JSON.stringify(await places()) === JSON.stringify(placed))
+  const lightTabs = await tabs()
+  step('the page tabs repaint light', luminance(rgb(lightTabs.bar)) > 0.8 && contrast(rgb(lightTabs.text), rgb(lightTabs.tab)) >= 4.5, JSON.stringify(lightTabs))
   if (shots) await page.screenshot({ path: `${shots}/board-light-${which}.png` })
 
   await page.evaluate(() => window.devHost.setScheme('dark'))

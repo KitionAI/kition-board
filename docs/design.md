@@ -391,7 +391,7 @@ Conventions: every command has an id, title, menu path or none, shortcut or none
 | | `layout.mindmap` | `{ root }` | |
 | Mind maps | `mindmap.addChild`, `mindmap.addSibling`, `mindmap.collapse`, `mindmap.setDirection` | `{ node, … }` | |
 | Pages | `page.create`, `page.rename`, `page.duplicate`, `page.delete`, `page.move` | | |
-| | `page.activate` | `{ page }` | `mutates: false`, editor; the active page is view state (M2) |
+| | `page.activate` | `{ page }` | `mutates: false`, editor; the active page is view state (M2). When the shown page goes (a delete, an undo, an agent's step, a co-editor), the editor shows the page the person came from to a page they made with `page.create { activate }`, else the page before it (or the one that took its place); a redo or an undo that brings it back shows it again. The editor's page tabs under the canvas run these commands |
 | Clipboard | `clipboard.copy` | `{ ids }` → payload (`application/x-kition-board+json`) | `mutates: false` |
 | | `element.paste` | `{ page, payload, at? }` | |
 | Templates | `template.insert` | `{ page, template: mindmap \| flowchart \| roadmap \| kanban \| retrospective \| storyboard, at? }` | |

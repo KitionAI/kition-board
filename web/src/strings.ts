@@ -140,6 +140,16 @@ const enUS: Catalog = {
   'shape.arrow-up': 'Up arrow',
   'shape.arrow-down': 'Down arrow',
   'shape.line': 'Line',
+  'pages': 'Pages',
+  'addPage': 'Add page',
+  'pageMenu': 'Page options',
+  'pageName': 'Page name',
+  'renamePage': 'Rename',
+  'duplicatePage': 'Duplicate',
+  'movePageLeft': 'Move left',
+  'movePageRight': 'Move right',
+  'deletePage': 'Delete page',
+  'deleteLastPage': 'Delete page (a board keeps one page)',
 }
 
 const zhCN: Catalog = {
@@ -281,6 +291,16 @@ const zhCN: Catalog = {
   'shape.arrow-up': '上箭头',
   'shape.arrow-down': '下箭头',
   'shape.line': '直线',
+  'pages': '页面',
+  'addPage': '添加页面',
+  'pageMenu': '页面选项',
+  'pageName': '页面名称',
+  'renamePage': '重命名',
+  'duplicatePage': '创建副本',
+  'movePageLeft': '左移',
+  'movePageRight': '右移',
+  'deletePage': '删除页面',
+  'deleteLastPage': '删除页面（白板至少保留一页）',
 }
 
 export const CATALOGS: Record<string, Catalog> = { 'en-US': enUS, 'zh-CN': zhCN }

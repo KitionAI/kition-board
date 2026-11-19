@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test:flow": "node tests/flow.mjs chromium && node tests/flow.mjs webkit"
+    "test:flow": "node tests/flow.mjs chromium && node tests/flow.mjs webkit",
+    "test:pages": "node tests/pages.mjs chromium && node tests/pages.mjs webkit"
   },
   "dependencies": {
     "@kition/kdm": "^0.5.1",

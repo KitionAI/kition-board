@@ -365,3 +365,96 @@
   font-size: 13px;
   font-weight: 600;
 }
+
+/*
+ * The page tabs under the canvas (panels/PageTabs.tsx), as the kit family's part tabs (kition-sheet's
+ * sheet tabs): the host's theme tokens, so they follow its scheme.
+ */
+.board-pages {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: 30px;
+  padding: 0 8px;
+  border-top: 1px solid var(--kit-border);
+  background: var(--kit-surface-muted);
+  color: var(--kit-text);
+}
+
+.board-page-strip {
+  display: flex;
+  align-self: stretch;
+  align-items: stretch;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.board-page-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.board-page-tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 0 12px;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--kit-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  outline: none;
+}
+
+.board-page-tab:hover {
+  color: var(--kit-text);
+}
+
+.board-page-tab:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--kit-primary);
+}
+
+.board-page-tab[aria-selected='true'] {
+  border-bottom-color: var(--kit-primary);
+  background: var(--kit-surface);
+  color: var(--kit-text);
+  font-weight: 600;
+}
+
+.board-page-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-page-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--kit-text-muted);
+  cursor: pointer;
+}
+
+.board-page-arrow:hover {
+  background: var(--kit-surface-muted);
+  color: var(--kit-text);
+}
+
+.board-page-rename {
+  align-self: center;
+  min-width: 48px;
+  height: 24px;
+}

@@ -216,8 +216,8 @@ features:
     priority: P0
     status: has
     commands: [page.create, page.rename, page.duplicate, page.delete, page.move, page.activate]
-    paths: [bindings/wasm/src/lib.rs]
-    cases: [board.pages/save-reopen, regressions/issue-new-page-shown]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/context.rs, web/src/panels/PageTabs.tsx, web/src/canvas/BoardCanvas.tsx, web/src/canvas/Minimap.tsx]
+    cases: [board.pages/save-reopen, board.pages/switcher, board.pages/shown-page, regressions/issue-new-page-shown, regressions/issue-deleted-shown-page]
     since: "2026-11-17"
   - id: board.templates
     title: "Insert a template"

@@ -288,13 +288,24 @@ export function BoardCanvas(props: Props) {
     }
   }, [applyView, contentBox, show, sync])
 
+  // Another page: the selection does not come along, and each page keeps its own view (where it
+  // was left; a page not shown yet shows its content, and an empty one opens where the view is).
+  const pageViews = useRef(new Map<string, Pick<Viewport, 'x' | 'y' | 'zoom'>>())
   useEffect(() => {
     const layer = layerRef.current
     if (layer && layer.pageId !== page) {
+      const v = viewport.current
+      if (layer.pageId) pageViews.current.set(layer.pageId, { x: v.x, y: v.y, zoom: v.zoom })
       layer.showPage(page)
       onSelection([])
+      const kept = page ? pageViews.current.get(page) : undefined
+      if (kept) applyView(kept)
+      else {
+        const box = contentBox()
+        if (box) show(box)
+      }
     }
-  }, [onSelection, page])
+  }, [applyView, contentBox, onSelection, page, show])
 
   /** Runs one engine command, then shows its change; `done` drops the gesture's preview in the same frame. */
   const commit = useCallback(
@@ -1096,7 +1107,7 @@ export function BoardCanvas(props: Props) {
           }} /> : null}
       {/* The overview is the frame's chrome: Focus shows only the board. */}
       <FrameChrome>
-        <Minimap area={props.area} revision={props.revision} render={props.render} viewport={store} onCenter={(x, y) => applyView({ x: x - viewport.current.width / viewport.current.zoom / 2, y: y - viewport.current.height / viewport.current.zoom / 2 })} label={t('minimap')} />
+        <Minimap area={props.area} page={page} revision={props.revision} render={props.render} viewport={store} onCenter={(x, y) => applyView({ x: x - viewport.current.width / viewport.current.zoom / 2, y: y - viewport.current.height / viewport.current.zoom / 2 })} label={t('minimap')} />
       </FrameChrome>
     </div>
   )

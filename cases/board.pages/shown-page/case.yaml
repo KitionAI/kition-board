@@ -1,0 +1,22 @@
+format: 1
+id: board.pages/shown-page
+feature: board.pages
+intent: >-
+  The page the editor shows is view state: page.activate changes no revision, leaves a saved
+  board saved and is no undo step. When the shown page goes (the person deletes it, an undo takes
+  back the person's page.create { activate }, an agent's step or a co-editor deletes it) the
+  editor shows a page that is there: the page the person came from to a page they made, else the
+  page before it (or the one that took its place), kept when pages move afterwards; a redo or an
+  undo that brings the page back shows it again.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/shown_page.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: shown_page }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-19"

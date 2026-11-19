@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   EditorFrame,
+  FrameChrome,
   IconButton,
   KitEditorProvider,
   KitElement,
@@ -31,17 +32,19 @@ import { graphOf } from './board/mindmap'
 import { DownloadIcon as Download, LayoutTemplateIcon as LayoutTemplate } from '@kition/tessera-icons/react'
 import { CardSection, LinkDialog, relativePath, type CardState } from './panels/Cards'
 import { ExportDialog } from './panels/ExportDialog'
+import { PageTabs, type PageTab } from './panels/PageTabs'
 import { TemplateGallery } from './panels/TemplateGallery'
 import { MindMapSection, type MindNodeState } from './panels/MindMapSection'
 import { StylePanel, type StyleTarget } from './panels/StylePanel'
 import { HIGHLIGHT_STYLE, PICTURE_EXTENSIONS, TOOLS, railId, type Tool } from './tools'
 
 /** What the editor reads from the engine's `inspect()`. */
-type BoardState = { elements: number; pages: number; page: string | null; area: DocumentArea | null }
+type BoardState = { elements: number; pages: PageTab[]; page: string | null; area: DocumentArea | null }
 
 function describe(info: KitEngineInfo): BoardState {
-  const inspected = info.inspected as { elements?: number; pages?: unknown[]; page?: string | null; area?: DocumentArea }
-  return { elements: inspected.elements ?? 0, pages: Array.isArray(inspected.pages) ? inspected.pages.length : 1, page: inspected.page ?? null, area: inspected.area ?? null }
+  const inspected = info.inspected as { elements?: number; pages?: { id?: unknown; name?: unknown }[]; page?: string | null; area?: DocumentArea }
+  const pages = Array.isArray(inspected.pages) ? inspected.pages.flatMap((page) => (typeof page.id === 'string' ? [{ id: page.id, name: typeof page.name === 'string' ? page.name : '' }] : [])) : []
+  return { elements: inspected.elements ?? 0, pages, page: inspected.page ?? null, area: inspected.area ?? null }
 }
 
 const MENU_ORDER = ['Edit', 'Insert', 'Arrange', 'View']
@@ -387,6 +390,10 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     [scheme],
   )
 
+  // The page tabs, kept while the pages' ids and names stay (the board's other changes do not draw them again).
+  const pages = useStable(state?.pages ?? [])
+  const focusCanvas = useCallback(() => canvasApi.current?.focus(), [])
+
   // The frame's rail, actions and panel, kept as the same elements between changes of the
   // board, so a commit does not render them again (the commit budget, S2-1).
   const rail = useMemo(() => (readOnly ? null : <ToolRail tools={tools} active={activeTool} onSelect={selectRail} />), [activeTool, readOnly, selectRail, tools])
@@ -431,7 +438,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       onKeyDown={(event) => canvasApi.current?.keyDown(event.nativeEvent) ?? false}
       status={
         <span data-testid="board-status">
-          {state ? t('summary', { elements: state.elements, pages: state.pages }) : ''}
+          {state ? t('summary', { elements: state.elements, pages: Math.max(1, state.pages.length) }) : ''}
           {selection.length ? ` · ${t('selected', { count: selection.length })}` : ''}
         </span>
       }
@@ -466,6 +473,11 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
           <div className="kui-message kui-muted">{t('opening')}</div>
         )}
       </div>
+      {state && state.pages.length ? (
+        <FrameChrome>
+          <PageTabs pages={pages} shown={state.page} onDone={focusCanvas} />
+        </FrameChrome>
+      ) : null}
       {linkDialog ? <LinkDialog initial={linkDialog} onDone={placeLink} onClose={() => setLinkDialog(null)} /> : null}
       {exporting ? <ExportDialog frame={exportFrame} onClose={() => setExporting(false)} /> : null}
       {templates ? <TemplateGallery onPick={insertTemplate} onClose={() => setTemplates(false)} /> : null}

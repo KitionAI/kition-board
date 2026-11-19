@@ -59,8 +59,21 @@ pub struct BoardDocument {
     /// What the file holds after the last `save`, taken as the base by `mark_saved` once the host
     /// has stored those bytes (edits made in between stay unsaved).
     saving: Mutex<Option<FileBase>>,
-    /// The page the editor shows (view state, `inspect().page`).
+    /// The page the editor shows (view state, `inspect().page`). It keeps naming a page another
+    /// writer, an undo or a delete removed (an agent's command there is refused, and a redo or an
+    /// undo that brings the page back shows it again); meanwhile the editor shows `fallback`.
     active_page: Option<ObjectId>,
+    /// The index among the pages of the page shown when the board last changed: where the
+    /// neighbour of a page that goes is found.
+    shown_at: usize,
+    /// The page shown while `active_page` names a page that is gone: the page the person came
+    /// from when they made it (`came_from`), else its neighbour (the page before it, or the one
+    /// that took its place when it was first). Kept by id, so a later move of pages does not
+    /// change what the person sees.
+    fallback: Option<ObjectId>,
+    /// The page the person showed when their `page.create { activate }` made the page they show
+    /// now: an undo of that creation takes them back there. Cleared when they show another page.
+    came_from: Option<ObjectId>,
     revision: u64,
     saved: u64,
     /// The appearance revisions `elementSvg` handed out.
@@ -86,6 +99,12 @@ struct RasterKey {
 
 fn extension(name: &str) -> String {
     std::path::Path::new(name).extension().map(|ext| ext.to_string_lossy().to_ascii_lowercase()).unwrap_or_default()
+}
+
+/// Where the page shown instead of a page at index `at` that went is found: the page before it,
+/// or, for the first page, the page that took its place.
+const fn neighbour(at: usize) -> usize {
+    at.saturating_sub(1)
 }
 
 /// Bytes are opened as a board only under a `.kboard` name.
@@ -116,6 +135,9 @@ impl BoardDocument {
             detached: Vec::new(),
             saving: Mutex::new(None),
             active_page: None,
+            shown_at: 0,
+            fallback: None,
+            came_from: None,
             revision: 0,
             saved: 0,
             revisions: Mutex::new(Revisions::default()),
@@ -147,13 +169,47 @@ impl BoardDocument {
             return Err(format!("not-found: no page {page}"));
         }
         self.active_page = Some(id);
+        self.came_from = None;
+        self.settle();
         Ok(json!({ "page": page }))
     }
 
-    /// The page the editor shows: the active page while it exists, else the first.
+    /// The page the editor shows: the active page while it exists, else the page shown in its
+    /// place ([`Self::settle`]), else the first.
     pub fn active_page(&self) -> Option<&PageView> {
         let model = self.session.model();
-        self.active_page.as_ref().and_then(|id| model.page(id)).or_else(|| model.pages().first())
+        self.active_page
+            .as_ref()
+            .and_then(|id| model.page(id))
+            .or_else(|| self.fallback.as_ref().and_then(|id| model.page(id)))
+            .or_else(|| model.pages().get(neighbour(self.shown_at)))
+            .or_else(|| model.pages().first())
+    }
+
+    /// After the board or the shown page changed: notes where the shown page is, and when the
+    /// active page is gone (deleted by the person, an undo, another writer or an agent), chooses
+    /// the page shown instead. View state only: no edit, no revision.
+    pub(crate) fn settle(&mut self) {
+        let pages = self.session.model().pages();
+        let index = |id: &ObjectId| pages.iter().position(|page| page.id == *id);
+        if let Some(at) = self.active_page.as_ref().and_then(index) {
+            self.shown_at = at;
+            self.fallback = None;
+            return;
+        }
+        if self.active_page.is_none() {
+            self.shown_at = 0;
+            self.fallback = None;
+            return;
+        }
+        if let Some(at) = self.fallback.as_ref().and_then(index) {
+            self.shown_at = at;
+            return;
+        }
+        let back = self.came_from.as_ref().and_then(index);
+        let at = back.unwrap_or_else(|| neighbour(self.shown_at).min(pages.len().saturating_sub(1)));
+        self.fallback = pages.get(at).map(|page| page.id.clone());
+        self.shown_at = at;
     }
 
     /// What the file holds (the base of the next save).
@@ -166,6 +222,7 @@ impl BoardDocument {
         if *damage != Damage::None {
             self.revision += 1;
         }
+        self.settle();
     }
 
     /// Logs the blobs the store gained since it held `before` hashes, at the replica's version now.
@@ -441,6 +498,7 @@ impl KitSessionDocument for BoardDocument {
         let kept = self.active_page.clone();
         let result = self.run_command(command, params, origin);
         self.active_page = kept;
+        self.settle();
         result
     }
 
@@ -518,7 +576,13 @@ impl BoardDocument {
                 })?;
                 self.changed(&damage);
                 if command == "page.create" && params.get("activate").and_then(Value::as_bool) == Some(true) {
+                    let shown = self.active_page().map(|page| page.id.clone());
                     self.active_page = value.get("page").and_then(Value::as_str).map(ObjectId::from_string);
+                    // An agent's run keeps its own editor state; only the person goes back.
+                    if origin.kind != kition_kit::kdm::OriginKind::Agent {
+                        self.came_from = shown;
+                    }
+                    self.settle();
                 }
                 Ok(value)
             }

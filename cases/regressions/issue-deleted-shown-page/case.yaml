@@ -1,0 +1,20 @@
+format: 1
+id: regressions/issue-deleted-shown-page
+feature: board.pages
+intent: >-
+  When the page the person shows was deleted (by them, by an undo of the page they made, by an
+  agent's step or by a co-editor) the editor fell back to the board's first page, wherever the
+  person was, and an agent's run that deleted it put back no page at all (the first again). It now
+  shows the page the person came from to a page they made, else the deleted page's neighbour.
+layer: gate
+source:
+  kind: issue
+  from: task board-page-switcher, bindings/wasm/tests/shown_page.rs
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: shown_page, filter: deleting }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-19"

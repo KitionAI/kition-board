@@ -60,25 +60,49 @@ impl BoardDocument {
         }
     }
 
-    /// The editor state ([`KitDocument::editor_state`]): the page the editor shows.
+    /// The editor state ([`KitDocument::editor_state`]): the page the editor shows (`page`), and
+    /// what chooses the page shown in its place once it is gone (`at`, the shown page's index;
+    /// `fallback` and `cameFrom` while there are any, [`BoardDocument::settle`]).
     ///
     /// [`KitDocument::editor_state`]: kition_kit::KitDocument::editor_state
     pub(crate) fn editor_snapshot(&self) -> Value {
-        json!({ "page": self.active_page.as_ref().map(ObjectId::as_str) })
+        let mut state = serde_json::Map::new();
+        state.insert("page".into(), json!(self.active_page.as_ref().map(ObjectId::as_str)));
+        state.insert("at".into(), json!(self.shown_at));
+        if let Some(fallback) = &self.fallback {
+            state.insert("fallback".into(), json!(fallback.as_str()));
+        }
+        if let Some(came_from) = &self.came_from {
+            state.insert("cameFrom".into(), json!(came_from.as_str()));
+        }
+        Value::Object(state)
     }
 
-    /// Puts back what [`Self::editor_snapshot`] answered; a page the run deleted is dropped (the
-    /// editor then shows the first page). No edit.
+    /// Puts back what [`Self::editor_snapshot`] answered. When the run deleted the page, the editor
+    /// shows the page the person came from to it, else its neighbour (the page before it, or the
+    /// one that took its place). No edit.
     pub(crate) fn put_back(&mut self, saved: &Value) -> Result<(), String> {
         let state = saved
             .as_object()
-            .filter(|state| state.keys().all(|key| key == "page"))
+            .filter(|state| state.keys().all(|key| ["page", "at", "fallback", "cameFrom"].contains(&key.as_str())))
             .ok_or_else(|| format!("{saved} is not the editor state this kit answered"))?;
-        self.active_page = match state.get("page") {
-            None | Some(Value::Null) => None,
-            Some(Value::String(id)) => Some(ObjectId::from_string(id)).filter(|id| self.model().page(id).is_some()),
-            Some(other) => return Err(format!("{other} is not the editor state's page")),
+        let id = |key: &str| match state.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(id)) => Ok(Some(ObjectId::from_string(id))),
+            Some(other) => Err(format!("{other} is not the editor state's {key}")),
         };
+        let page = id("page")?;
+        let fallback = id("fallback")?;
+        let came_from = id("cameFrom")?;
+        let at = match state.get("at") {
+            None => 0,
+            Some(at) => at.as_u64().and_then(|at| usize::try_from(at).ok()).ok_or_else(|| format!("{at} is not the editor state's at"))?,
+        };
+        self.active_page = page;
+        self.shown_at = at;
+        self.fallback = fallback;
+        self.came_from = came_from;
+        self.settle();
         Ok(())
     }
 
@@ -111,6 +135,7 @@ impl BoardDocument {
         }
         if let Some(page) = page {
             self.active_page = Some(page);
+            self.settle();
         }
         Ok(())
     }
