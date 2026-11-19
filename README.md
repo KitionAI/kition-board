@@ -173,7 +173,7 @@ is [agent/guide.md](agent/guide.md).
 
 ## Maturity
 
-Version 0.1.1 · KHP 1.0, conformance level `basic`.
+Version 0.1.2 · KHP 1.0, conformance level `basic`.
 
 | Works today | Partly there | Not yet |
 | --- | --- | --- |

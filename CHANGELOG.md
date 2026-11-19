@@ -3,6 +3,13 @@
 Changes to Kition Board, newest first. A version is the kit package version in `kit.json`;
 each package is published with a `package-v<version>` tag.
 
+## 0.1.2
+
+- A person reaches every page of a board: page tabs under the canvas show the pages and the one shown; a click or Enter switches (the file stays saved, and Undo does not take back a switch), and Add page, rename (double-click or F2), duplicate, move left or right and delete (not the last page) are in the tabs and their menu, each one undo step. Each page keeps its own view and the selection stays on its page.
+- View > New page shows the page it makes.
+- When the page shown goes (deleted by the person, by an Undo of a page they made, by an agent or by a co-editor), the editor shows the page the person came from, else the page before it, instead of jumping to the first page; Redo, or an Undo that brings the page back, shows it again. An agent's step still never moves the person's page.
+- The minimap draws the page shown at once when the person switches pages.
+
 ## 0.1.1
 
 - The board follows the host's dark scheme: in a dark host the canvas, the default ink and the minimap are drawn dark (lines and text at WCAG AA), and they repaint when the host switches scheme, without a reload.
