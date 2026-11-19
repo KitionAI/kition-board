@@ -12,7 +12,8 @@
     "module": "kition_board_kit",
     "class": "BoardDocument",
     "contract": 2,
-    "crate": "kition-board-kit"
+    "crate": "kition-board-kit",
+    "editorState": ["/page", "/area"]
   },
   "formats": [
     {
