@@ -1,0 +1,23 @@
+format: 1
+id: board.platform.color-scheme/follows-host
+feature: board.platform.color-scheme
+intent: >-
+  The board follows the host's color scheme, through the development host: opened in dark, the
+  canvas is the dark paper (#1e1e1e), the default ink is drawn light and reads at WCAG AA on it,
+  and the minimap is drawn dark; switched to light and back without a reload, the canvas, the ink
+  and the minimap repaint each time and no element moves.
+layer: gate
+dimension: platform
+source:
+  kind: synthetic
+  from: web/tests/scheme.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/scheme.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-19"
+timeout_s: 300
+requires: [webkit]

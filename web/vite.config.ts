@@ -15,7 +15,12 @@ export default defineConfig({
     alias: [{ find: /^loro-crdt$/, replacement: 'loro-crdt/browser' }],
   },
   // loro-crdt stays unbundled, so its WebAssembly is found next to it.
-  optimizeDeps: { exclude: ['@kition/kit-editor', '@kition/kit-host', '@kition/kit-ui-protocol', '@kition/kit-dev-host', '@kition/kdm', 'loro-crdt'] },
+  // kit-editor's own CommonJS dependency (React's useSyncExternalStore shim) is pre-bundled, or the
+  // development server hands the page a module without its named export.
+  optimizeDeps: {
+    exclude: ['@kition/kit-editor', '@kition/kit-host', '@kition/kit-ui-protocol', '@kition/kit-dev-host', '@kition/kdm', 'loro-crdt'],
+    include: ['@kition/kit-editor > use-sync-external-store/shim'],
+  },
   worker: { format: 'es' },
   server: {
     port: 5191,

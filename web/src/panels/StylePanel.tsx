@@ -35,7 +35,8 @@ function ColorRow({ field, role, value, palette, onPick, label }: { field: Style
           key={swatch.token}
           type="button"
           className="board-swatch"
-          style={{ background: role === 'stroke' ? swatch.stroke : swatch.fill }}
+          // The token's colour in the host's scheme (app.css's --kb-* properties), the engine's light one behind it.
+          style={{ background: `var(--kb-${role}-${swatch.token}, ${role === 'stroke' ? swatch.stroke : swatch.fill})` }}
           aria-pressed={value === swatch.token}
           aria-label={t(`color.${swatch.token}`)}
           title={t(`color.${swatch.token}`)}

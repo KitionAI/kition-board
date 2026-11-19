@@ -5,6 +5,13 @@
 //! Tokens are written as CSS custom properties with the default colour behind them
 //! (`var(--kb-stroke-purple, #5645d4)`), so a theme restyles fragments without fetching them again
 //! (design note 4.2). The raster writes the default colours themselves.
+//!
+//! **Schemes.** The tokens have a second set of colours for the host's dark scheme ([`DARK_PALETTE`],
+//! [`DARK_PAPER`], ...): the editor's stylesheet (`web/src/app.css`) gives the `--kb-*` properties
+//! these values under `[data-color-scheme='dark']`, and the minimap's raster writes them
+//! ([`Colors::Dark`]). A token is the board's colour for "this hue, readable on the board", so a
+//! scheme restyles it; a `#rrggbb` colour is the file's own and is never restyled. Nothing about the
+//! scheme is stored, and every export, preview and thumbnail is drawn light ([`Colors::Literal`]).
 
 use kition_board_kdm::{Element, Kind};
 use serde_json::Value;
@@ -16,8 +23,45 @@ use crate::svg::num;
 pub enum Colors {
     /// `var(--kb-…, #default)`: the editor's fragments.
     Css,
-    /// `#default`: the raster and exports.
+    /// `#default`: the raster and exports (the light scheme).
     Literal,
+    /// The dark scheme's colours, literal: the editor's minimap in the host's dark scheme.
+    Dark,
+}
+
+/// The host's color scheme (Kit UI protocol `KitTheme.colorScheme`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Scheme {
+    #[default]
+    Light,
+    Dark,
+}
+
+impl Scheme {
+    /// `"light"` or `"dark"`; anything else is not a scheme.
+    pub fn parse(name: &str) -> Option<Scheme> {
+        match name {
+            "light" => Some(Scheme::Light),
+            "dark" => Some(Scheme::Dark),
+            _ => None,
+        }
+    }
+
+    /// How a raster in this scheme writes colours.
+    pub fn colors(self) -> Colors {
+        match self {
+            Scheme::Light => Colors::Literal,
+            Scheme::Dark => Colors::Dark,
+        }
+    }
+
+    /// The board's background in this scheme.
+    pub fn paper(self) -> &'static str {
+        match self {
+            Scheme::Light => PAPER.1,
+            Scheme::Dark => DARK_PAPER,
+        }
+    }
 }
 
 /// Whether a colour paints lines and text or fills.
@@ -40,10 +84,40 @@ pub const PALETTE: [(&str, &str, &str); 9] = [
     ("white", "#ffffff", "#ffffff"),
 ];
 
+/// The nine tokens in the dark scheme, in [`PALETTE`]'s order: lines and text lightened so each
+/// reads at WCAG AA (4.5:1) on [`DARK_PAPER`], fills darkened to a tint of the hue so the ink's
+/// text reads on them. `white` is the paper's colour, as it is in the light scheme.
+pub const DARK_PALETTE: [(&str, &str, &str); 9] = [
+    ("ink", "#e8e8e6", "#3a3a3c"),
+    ("gray", "#a5adb5", "#2c3034"),
+    ("purple", "#a99cf5", "#302a55"),
+    ("green", "#5fc274", "#1f3a27"),
+    ("orange", "#f5925a", "#45291a"),
+    ("red", "#f47a7a", "#4a2425"),
+    ("yellow", "#f5b544", "#3f3416"),
+    ("blue", "#6cb2ee", "#1c3149"),
+    ("white", "#1e1e1e", "#1e1e1e"),
+];
+
 /// The page behind labels, the muted text and the soft surface of placeholders.
 pub const PAPER: (&str, &str) = ("--kb-paper", "#ffffff");
 pub const MUTED: (&str, &str) = ("--kb-muted", "#6b6b6b");
 pub const SURFACE: (&str, &str) = ("--kb-surface", "#f6f5f4");
+/// [`PAPER`], [`MUTED`] and [`SURFACE`] in the dark scheme (Kition's dark paper, as the note kit's).
+pub const DARK_PAPER: &str = "#1e1e1e";
+pub const DARK_MUTED: &str = "#a0a0a0";
+pub const DARK_SURFACE: &str = "#2a2a2c";
+
+/// Each `--kb-*` property and its colour in the dark scheme: what `web/src/app.css` sets under
+/// `[data-color-scheme='dark']`.
+pub fn dark_properties() -> Vec<(String, &'static str)> {
+    let mut out = vec![(PAPER.0.to_owned(), DARK_PAPER), (MUTED.0.to_owned(), DARK_MUTED), (SURFACE.0.to_owned(), DARK_SURFACE)];
+    for (name, stroke, fill) in DARK_PALETTE {
+        out.push((format!("--kb-stroke-{name}"), stroke));
+        out.push((format!("--kb-fill-{name}"), fill));
+    }
+    out
+}
 
 fn is_hex(value: &str) -> bool {
     value.len() == 7 && value.starts_with('#') && value.chars().skip(1).all(|ch| ch.is_ascii_hexdigit())
@@ -54,6 +128,13 @@ pub fn named(color: (&str, &str), colors: Colors) -> String {
     match colors {
         Colors::Css => format!("var({}, {})", color.0, color.1),
         Colors::Literal => color.1.to_owned(),
+        Colors::Dark => match color.0 {
+            "--kb-paper" => DARK_PAPER,
+            "--kb-muted" => DARK_MUTED,
+            "--kb-surface" => DARK_SURFACE,
+            _ => color.1,
+        }
+        .to_owned(),
     }
 }
 
@@ -64,13 +145,18 @@ pub fn paint(value: Option<&str>, role: Role, fallback: &str, colors: Colors) ->
     }
     let token = value.filter(|value| PALETTE.iter().any(|(name, _, _)| name == value)).unwrap_or(fallback);
     let (name, stroke, fill) = PALETTE.iter().find(|(name, _, _)| *name == token).copied().unwrap_or(PALETTE[0]);
-    let (prefix, default) = match role {
-        Role::Stroke => ("stroke", stroke),
-        Role::Fill => ("fill", fill),
+    let pick = |(_, stroke, fill): (&str, &'static str, &'static str)| match role {
+        Role::Stroke => stroke,
+        Role::Fill => fill,
     };
+    let default = pick((name, stroke, fill));
     match colors {
-        Colors::Css => format!("var(--kb-{prefix}-{name}, {default})"),
+        Colors::Css => {
+            let prefix = if role == Role::Stroke { "stroke" } else { "fill" };
+            format!("var(--kb-{prefix}-{name}, {default})")
+        }
         Colors::Literal => default.to_owned(),
+        Colors::Dark => DARK_PALETTE.iter().find(|(dark, _, _)| *dark == name).copied().map_or(default, pick).to_owned(),
     }
 }
 
@@ -183,6 +269,70 @@ mod tests {
         assert_eq!(paint(Some("chartreuse"), Role::Stroke, "gray", Colors::Literal), "#868e96", "unknown values fall back");
         assert_eq!(paint(None, Role::Stroke, "nonsense", Colors::Literal), "#1e1e1e");
         assert_eq!(named(PAPER, Colors::Css), "var(--kb-paper, #ffffff)");
+    }
+
+    /// WCAG relative luminance of `#rrggbb`.
+    fn luminance(hex: &str) -> f64 {
+        let channel = |at: usize| {
+            let c = f64::from(u8::from_str_radix(&hex[at..at + 2], 16).unwrap()) / 255.0;
+            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        };
+        0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)
+    }
+
+    /// WCAG contrast ratio of two `#rrggbb` colours.
+    fn contrast(a: &str, b: &str) -> f64 {
+        let (a, b) = (luminance(a), luminance(b));
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
+    #[test]
+    fn dark_lines_and_text_meet_wcag_aa_on_the_dark_paper() {
+        for (name, stroke, fill) in DARK_PALETTE {
+            assert!(is_hex(stroke) && is_hex(fill), "{name}");
+            if name == "white" {
+                // The paper's own colour, in both schemes.
+                assert_eq!((stroke, fill), (DARK_PAPER, DARK_PAPER));
+                continue;
+            }
+            let ratio = contrast(stroke, DARK_PAPER);
+            assert!(ratio >= 4.5, "{name} lines and text on the dark paper: {ratio:.2}");
+            // A label in the default ink on a shape filled with this token.
+            let ink = contrast(DARK_PALETTE[0].1, fill);
+            assert!(ink >= 4.5, "ink text on the dark {name} fill: {ink:.2}");
+        }
+        assert!(contrast(DARK_MUTED, DARK_PAPER) >= 4.5 && contrast(DARK_MUTED, DARK_SURFACE) >= 4.5, "muted text");
+        assert!(luminance(DARK_PAPER) <= 0.1, "the dark paper is dark");
+        // Same tokens, same order as the light palette.
+        assert_eq!(PALETTE.map(|(name, _, _)| name), DARK_PALETTE.map(|(name, _, _)| name));
+    }
+
+    #[test]
+    fn the_dark_scheme_restyles_tokens_and_keeps_the_files_own_colours() {
+        assert_eq!(paint(Some("ink"), Role::Stroke, "ink", Colors::Dark), "#e8e8e6");
+        assert_eq!(paint(None, Role::Fill, "white", Colors::Dark), DARK_PAPER);
+        assert_eq!(paint(Some("#336699"), Role::Stroke, "ink", Colors::Dark), "#336699", "a file's own colour is never restyled");
+        assert_eq!(named(PAPER, Colors::Dark), DARK_PAPER);
+        assert_eq!(named(MUTED, Colors::Dark), DARK_MUTED);
+        assert_eq!(named(SURFACE, Colors::Dark), DARK_SURFACE);
+        // The light colours stay what they were.
+        assert_eq!(paint(Some("ink"), Role::Stroke, "ink", Colors::Literal), "#1e1e1e");
+        assert_eq!(Scheme::Light.colors(), Colors::Literal);
+        assert_eq!((Scheme::parse("dark"), Scheme::parse("light"), Scheme::parse("sepia")), (Some(Scheme::Dark), Some(Scheme::Light), None));
+    }
+
+    /// The editor's stylesheet gives the `--kb-*` properties the dark palette under
+    /// `[data-color-scheme='dark']`, value for value.
+    #[test]
+    fn the_editor_stylesheet_mirrors_the_dark_palette() {
+        let css = include_str!("../../../../web/src/app.css");
+        let start = css.find("[data-color-scheme='dark'] .board-canvas").expect("a dark block in app.css");
+        let block = &css[start..start + css[start..].find('}').unwrap()];
+        for (property, value) in dark_properties() {
+            let line = format!("{property}: {value};");
+            assert!(block.contains(&line), "app.css's dark block lacks `{line}`");
+        }
+        assert_eq!(block.matches("--kb-").count(), dark_properties().len(), "app.css's dark block sets only the palette's properties");
     }
 
     #[test]

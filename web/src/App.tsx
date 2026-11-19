@@ -22,6 +22,7 @@ import {
 } from '@kition/kit-editor'
 import { BoardCanvas, type BoardCanvasApi } from './canvas/BoardCanvas'
 import type { DocumentArea } from './canvas/Minimap'
+import { useColorScheme } from './colorScheme'
 import { BoardSync, type BoardEngine } from './board/sync'
 import { engineManifest } from './engine'
 import { CATALOGS } from './strings'
@@ -373,10 +374,16 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     if (mindNode) canvasApi.current?.grow(mindNode.id, sibling)
   }, [mindNode])
 
-  const render = useCallback((x: number, y: number, scale: number, width: number, height: number) => {
-    const open = latest.current.doc
-    return open ? open.render(x, y, scale, width, height) : Promise.resolve(new Uint8Array())
-  }, [])
+  // The minimap is the engine's raster in the host's color scheme (a view concern: never saved);
+  // a new scheme is a new callback, so the minimap draws itself again.
+  const scheme = useColorScheme()
+  const render = useCallback(
+    (x: number, y: number, scale: number, width: number, height: number) => {
+      const open = latest.current.doc
+      return open ? open.invoke<Uint8Array>('renderScheme', scheme, x, y, scale, width, height) : Promise.resolve(new Uint8Array())
+    },
+    [scheme],
+  )
 
   // The frame's rail, actions and panel, kept as the same elements between changes of the
   // board, so a commit does not render them again (the commit budget, S2-1).

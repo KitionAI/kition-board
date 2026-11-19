@@ -21,6 +21,38 @@
   --kb-paper: #ffffff;
 }
 
+/*
+ * The host's dark scheme (kit-editor marks the root with data-color-scheme): the board has no page,
+ * so its canvas, the default ink and every colour token follow the scheme (and the style panel's
+ * swatches show the colours they paint). These are the engine's
+ * dark palette (crates/render/scene/src/style.rs, DARK_PALETTE and DARK_*), value for value; a test
+ * there reads this block. A file's own #rrggbb colours are literal in the fragments and never change.
+ */
+[data-color-scheme='dark'] .board-canvas,
+[data-color-scheme='dark'] .board-style {
+  --kb-paper: #1e1e1e;
+  --kb-muted: #a0a0a0;
+  --kb-surface: #2a2a2c;
+  --kb-stroke-ink: #e8e8e6;
+  --kb-fill-ink: #3a3a3c;
+  --kb-stroke-gray: #a5adb5;
+  --kb-fill-gray: #2c3034;
+  --kb-stroke-purple: #a99cf5;
+  --kb-fill-purple: #302a55;
+  --kb-stroke-green: #5fc274;
+  --kb-fill-green: #1f3a27;
+  --kb-stroke-orange: #f5925a;
+  --kb-fill-orange: #45291a;
+  --kb-stroke-red: #f47a7a;
+  --kb-fill-red: #4a2425;
+  --kb-stroke-yellow: #f5b544;
+  --kb-fill-yellow: #3f3416;
+  --kb-stroke-blue: #6cb2ee;
+  --kb-fill-blue: #1c3149;
+  --kb-stroke-white: #1e1e1e;
+  --kb-fill-white: #1e1e1e;
+}
+
 .board-svg {
   position: absolute;
   inset: 0;
@@ -50,7 +82,7 @@
 }
 
 .board-handle {
-  fill: #ffffff;
+  fill: var(--kb-paper, #ffffff);
   stroke: var(--kit-primary, #966e00);
 }
 
@@ -98,8 +130,8 @@
   padding: 4px 6px;
   border: 1px solid var(--kit-primary, #966e00);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #1e1e1e;
+  background: color-mix(in srgb, var(--kb-paper, #ffffff) 96%, transparent);
+  color: var(--kb-stroke-ink, #1e1e1e);
   font-family: 'Inter', 'Droid Sans Fallback', sans-serif;
   line-height: 1.25;
   outline: none;
@@ -113,7 +145,7 @@
   overflow: hidden;
   border: 1px solid var(--kit-border, #e5e3df);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--kb-paper, #ffffff);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   cursor: pointer;
 }
@@ -235,7 +267,7 @@
 }
 
 .board-mind-collapse .board-mind-dot {
-  fill: #ffffff;
+  fill: var(--kb-paper, #ffffff);
   stroke: var(--kit-primary, #966e00);
 }
 

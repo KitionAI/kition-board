@@ -23,7 +23,7 @@ use resvg::{tiny_skia, usvg};
 use serde_json::{Value, json};
 
 use crate::fragment::{Lod, Options, Pictures, fragment};
-use crate::style::Colors;
+use crate::style::{Colors, Scheme};
 use crate::svg::num;
 
 /// Space around the content, in board units.
@@ -97,9 +97,15 @@ pub fn picture(model: &BoardModel, page: &PageView, view: Rect, width: u32, heig
 
 /// The page as one SVG document over `area`.
 pub fn page_svg(model: &BoardModel, page: &PageView, area: &Area, blobs: &dyn BlobSource) -> String {
+    page_svg_in(Scheme::Light, model, page, area, blobs)
+}
+
+/// [`page_svg`] in `scheme`: its paper and its token colours (the editor's minimap in the dark
+/// scheme). The same elements in the same places; only colours differ.
+pub fn page_svg_in(scheme: Scheme, model: &BoardModel, page: &PageView, area: &Area, blobs: &dyn BlobSource) -> String {
     let (w, h) = (f64::from(area.width) * area.unit, f64::from(area.height) * area.unit);
     let view = Rect::new(area.x, area.y, area.x + w, area.y + h);
-    scene_svg(model, page, view, (f64::from(area.width), f64::from(area.height)), Some("#ffffff"), blobs, &|_| true)
+    scene_svg_with(scheme.colors(), model, page, view, (f64::from(area.width), f64::from(area.height)), Some(scheme.paper()), blobs, &|_| true)
 }
 
 /// The elements of `page` that `include` takes, as one SVG document showing `view` (board
@@ -114,7 +120,21 @@ pub fn scene_svg(
     blobs: &dyn BlobSource,
     include: &dyn Fn(&Element) -> bool,
 ) -> String {
-    let options = Options { colors: Colors::Literal, lod: Lod::Full, pictures: Pictures::Inline, blobs };
+    scene_svg_with(Colors::Literal, model, page, view, size, background, blobs, include)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scene_svg_with(
+    colors: Colors,
+    model: &BoardModel,
+    page: &PageView,
+    view: Rect,
+    size: (f64, f64),
+    background: Option<&str>,
+    blobs: &dyn BlobSource,
+    include: &dyn Fn(&Element) -> bool,
+) -> String {
+    let options = Options { colors, lod: Lod::Full, pictures: Pictures::Inline, blobs };
     let mut out = format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="{} {} {} {}">"#,
         num(size.0),
@@ -186,12 +206,20 @@ pub struct Raster {
 impl Raster {
     /// Parses the page's SVG.
     pub fn build(model: &BoardModel, page: Option<&PageView>, blobs: &dyn BlobSource) -> Result<Raster, String> {
+        Raster::build_in(Scheme::Light, model, page, blobs)
+    }
+
+    /// [`Raster::build`] in `scheme` (the editor's minimap follows the host's scheme; everything
+    /// else is drawn light).
+    pub fn build_in(scheme: Scheme, model: &BoardModel, page: Option<&PageView>, blobs: &dyn BlobSource) -> Result<Raster, String> {
         let area = area(model, page);
         let svg = match page {
-            Some(page) => page_svg(model, page, &area, blobs),
+            Some(page) => page_svg_in(scheme, model, page, &area, blobs),
             None => format!(
-                r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}"><rect width="100%" height="100%" fill="#ffffff"/></svg>"##,
-                area.width, area.height
+                r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}"><rect width="100%" height="100%" fill="{}"/></svg>"##,
+                area.width,
+                area.height,
+                scheme.paper()
             ),
         };
         let options = usvg::Options { fontdb: fonts(), font_family: "sans-serif".to_owned(), ..usvg::Options::default() };

@@ -19,6 +19,8 @@ const HEIGHT = 128
 
 export function Minimap({ area, revision, render, viewport: store, onCenter, label }: { area: DocumentArea | null; revision: number; render: (x: number, y: number, scale: number, width: number, height: number) => Promise<Uint8Array>; viewport: ViewportStore; onCenter: (x: number, y: number) => void; label: string }) {
   const canvas = useRef<HTMLCanvasElement>(null)
+  // A new `render` is a new color scheme: drawn at once, with the canvas, not after a burst settles.
+  const drawnWith = useRef(render)
   const viewport = useSyncExternalStore(store.subscribe, store.get)
   const scale = area ? Math.min(WIDTH / area.width, HEIGHT / area.height) : 1
   const width = area ? Math.max(1, Math.round(area.width * scale)) : WIDTH
@@ -28,6 +30,8 @@ export function Minimap({ area, revision, render, viewport: store, onCenter, lab
     if (!area) return undefined
     let current = true
     // Changes come in bursts (a drag's commit, an agent's steps): draw once they settle.
+    const schemeChanged = drawnWith.current !== render
+    drawnWith.current = render
     const timer = window.setTimeout(() => {
       void render(0, 0, scale, width, height)
         .then((rgba) => {
@@ -38,7 +42,7 @@ export function Minimap({ area, revision, render, viewport: store, onCenter, lab
           target.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0)
         })
         .catch(() => undefined)
-    }, 400)
+    }, schemeChanged ? 0 : 400)
     return () => {
       current = false
       window.clearTimeout(timer)

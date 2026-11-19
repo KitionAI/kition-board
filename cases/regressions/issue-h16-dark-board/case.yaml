@@ -1,0 +1,24 @@
+format: 1
+id: regressions/issue-h16-dark-board
+feature: board.platform.color-scheme
+intent: >-
+  In Kition's dark scheme the board's minimap is drawn on the dark paper with the colour tokens'
+  dark colours (`renderScheme`), the default ink light enough to read, a file's own `#rrggbb`
+  colours kept, and every element in the same pixels as in the light scheme; the contract's
+  `render`, `file.render` and `file.export` stay light and byte for byte what they were, and
+  asking for the dark minimap moves neither the revision nor the saved state. Before, the board
+  had one light palette: in a dark host the whole endless canvas and its minimap were white
+  (Kition's host matrix row H16: median luminance 1.000).
+layer: gate
+source:
+  kind: issue
+  from: "Kition host matrix row H16 (e2e/interaction/board.spec.ts), task dark-surface-board-sheet"
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: color_scheme }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-19"

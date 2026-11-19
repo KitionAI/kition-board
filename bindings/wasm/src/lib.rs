@@ -67,6 +67,9 @@ pub struct BoardDocument {
     revisions: Mutex<Revisions>,
     /// The raster of the shown page, kept until the board, the page, the fonts or the blobs change.
     raster: Mutex<Option<(RasterKey, Arc<Raster>)>>,
+    /// The editor's minimap in the host's dark scheme (`renderScheme`), kept like the raster; a
+    /// view concern only: it is never saved, and every other picture is drawn light.
+    dark_raster: Mutex<Option<(RasterKey, Arc<Raster>)>>,
     /// The document frame of the shown page, kept like the raster (`inspect`, `width` and `height`
     /// each ask for it after every command).
     area: Mutex<Option<(RasterKey, kition_board_scene::Area)>>,
@@ -117,6 +120,7 @@ impl BoardDocument {
             saved: 0,
             revisions: Mutex::new(Revisions::default()),
             raster: Mutex::new(None),
+            dark_raster: Mutex::new(None),
             area: Mutex::new(None),
         }
     }

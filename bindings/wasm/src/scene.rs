@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use kition_board_kdm::Kind;
 use kition_board_model::fields::{STYLE_FIELDS, uses};
-use kition_board_scene::style::{PALETTE, field_default};
+use kition_board_scene::style::{PALETTE, Scheme, field_default};
 use kition_board_scene::{Area, Raster, area};
 use kition_board_text::{Family, LABEL_SIZE, REGULAR, Style, layout};
 use kition_kit::kdm::ObjectId;
@@ -66,6 +66,34 @@ impl BoardDocument {
             *cache = Some((key, raster.clone()));
         }
         Ok(raster)
+    }
+
+    /// The shown page's raster in `scheme`: the light one is [`Self::raster`]; the dark one is kept
+    /// beside it, so the minimap and the previews do not draw each other's.
+    fn raster_in(&self, scheme: Scheme) -> Result<Arc<Raster>, String> {
+        if scheme == Scheme::Light {
+            return self.raster();
+        }
+        let key = self.raster_key();
+        if let Ok(cache) = self.dark_raster.lock()
+            && let Some((at, raster)) = cache.as_ref()
+            && *at == key
+        {
+            return Ok(raster.clone());
+        }
+        let raster = Arc::new(Raster::build_in(scheme, self.session.model(), self.active_page(), &self.blobs)?);
+        if let Ok(mut cache) = self.dark_raster.lock() {
+            *cache = Some((key, raster.clone()));
+        }
+        Ok(raster)
+    }
+
+    /// `renderScheme(scheme, x, y, scale, width, height)`: the contract's `render` in the host's
+    /// color scheme (`light` or `dark`), for the editor's minimap. The same pixels' coverage as
+    /// `render`; the tokens and the paper in the scheme's colours (`kition_board_scene::style`).
+    pub fn render_scheme(&self, scheme: &str, x: f64, y: f64, scale: f64, width: u32, height: u32) -> Result<Vec<u8>, String> {
+        let scheme = Scheme::parse(scheme).ok_or_else(|| format!("invalid-params: the scheme is light or dark, not `{scheme}`"))?;
+        self.raster_in(scheme)?.render(x, y, scale, width, height)
     }
 
     /// `elementSvg(request)`: see `kition_board_scene::cache::Revisions::answer`.
@@ -242,6 +270,11 @@ mod web {
         #[wasm_bindgen(js_name = elementSvg)]
         pub fn element_svg(&self, request: &str) -> Result<String, JsError> {
             self.0.element_svg(request).map_err(|error| JsError::new(&error))
+        }
+
+        #[wasm_bindgen(js_name = renderScheme)]
+        pub fn render_scheme(&self, scheme: &str, x: f64, y: f64, scale: f64, width: u32, height: u32) -> Result<Vec<u8>, JsError> {
+            self.0.render_scheme(scheme, x, y, scale, width, height).map_err(|error| JsError::new(&error))
         }
 
         #[wasm_bindgen(js_name = textMetrics)]
