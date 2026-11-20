@@ -297,3 +297,56 @@ fn card_badges_read_in_both_schemes() {
         assert!(board.svg(&id).contains(r#"stroke="var(--kb-paper, #ffffff)" stroke-width="1.5""#), "{}", board.svg(&id));
     }
 }
+
+/// The `fill` of a fragment's label (`<text … fill="…"`).
+fn label_fill(svg: &str) -> String {
+    let at = svg.find("<text ").unwrap();
+    let rest = &svg[at..];
+    let start = rest.find(r#" fill=""#).unwrap() + 7;
+    rest[start..start + rest[start..].find('"').unwrap()].to_owned()
+}
+
+/// A sticky note's text is chosen for contrast against the sticky's own fill, not the scheme: a
+/// pastel sticky in a file's own `#rrggbb` (never restyled) reads dark in the dark scheme too, a
+/// deep one reads light in the light scheme, and token fills, which the scheme restyles with the
+/// text, keep the ink as they were.
+#[test]
+fn sticky_text_reads_on_the_stickys_own_fill_in_both_schemes() {
+    let mut board = Board::new();
+    let pastels = ["#fff9b1", "#fde4e4", "#e5f0fb", "#e6f4ea", "#ffffff"];
+    let deep = ["#1e1e1e", "#5645d4", "#2f2f6f"];
+    for fill in pastels.into_iter().chain(deep) {
+        let id = board
+            .create(json!({ "kind": "shape", "shapeStyle": "sticky", "position": [0, 0], "size": [200, 200], "text": "Read me", "fillColor": fill }));
+        let element = board.model().element(&ObjectId::from_string(&id)).unwrap();
+        for colors in [Colors::Css, Colors::Literal, Colors::Dark] {
+            let svg = fragment(board.model(), element, &Options { colors, lod: Lod::Full, pictures: Pictures::Reference, blobs: &board.blobs }).svg;
+            let text = label_fill(&svg);
+            // A literal colour: the editor's stylesheet must not restyle it away from the fill.
+            assert!(text.starts_with('#') && text.len() == 7, "{fill} in {colors:?}: {text}");
+            let ratio = hex_contrast(&text, fill);
+            assert!(ratio >= 4.5, "text {text} on the sticky's {fill} in {colors:?}: {ratio:.2}");
+            // The ink of one scheme or the other, never a colour of its own.
+            assert!([crate::style::PALETTE[0].1, crate::style::DARK_PALETTE[0].1].contains(&text.as_str()), "{text}");
+            // The outline stays the ink the scheme gives it.
+            if colors == Colors::Css {
+                assert!(svg.contains(r#"stroke="var(--kb-stroke-ink, #1e1e1e)""#), "{svg}");
+            }
+        }
+    }
+    // A light sticky is drawn as before in the light scheme and its exports.
+    let light = board.create(
+        json!({ "kind": "shape", "shapeStyle": "sticky", "position": [0, 0], "size": [200, 200], "text": "Read me", "fillColor": "#fff9b1" }),
+    );
+    let element = board.model().element(&ObjectId::from_string(&light)).unwrap();
+    let svg =
+        fragment(board.model(), element, &Options { colors: Colors::Literal, lod: Lod::Full, pictures: Pictures::Reference, blobs: &board.blobs })
+            .svg;
+    assert_eq!(label_fill(&svg), "#1e1e1e");
+    // Token fills: the scheme restyles the fill and the text together; the text stays the ink token.
+    let token = board.create(json!({ "kind": "shape", "shapeStyle": "sticky", "position": [0, 0], "size": [200, 200], "text": "Read me" }));
+    assert_eq!(label_fill(&board.svg(&token)), "var(--kb-stroke-ink, #1e1e1e)");
+    // A text colour of the file's own is the file's, whatever the fill.
+    let own = board.create(json!({ "kind": "shape", "shapeStyle": "sticky", "position": [0, 0], "size": [200, 200], "text": "Read me", "fillColor": "#fff9b1", "strokeColor": "#336699" }));
+    assert_eq!(label_fill(&board.svg(&own)), "#336699");
+}

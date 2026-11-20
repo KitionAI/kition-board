@@ -1,0 +1,24 @@
+format: 1
+id: regressions/issue-dark-pastel-sticky-text
+feature: board.platform.color-scheme
+intent: >-
+  A shape's label (a sticky note's text above all) is drawn in a colour that reads on the shape's
+  own fill, not on the scheme's paper: on a solid fill in a file's own `#rrggbb`, which no scheme
+  restyles, a token text colour is written as that token's light- or dark-scheme colour, whichever
+  contrasts more with the fill (WCAG AA for the ink on pastel and deep fills), in the editor's
+  fragments, the dark minimap and the light exports alike. Token fills, which the scheme restyles
+  together with the text, and a text colour of the file's own are drawn as before. Before, the
+  dark scheme drew every label in the light ink, so a pastel sticky's text was white on pale yellow.
+layer: gate
+source:
+  kind: issue
+  from: "a host's screenshot run of the board in the dark scheme (pastel sticky notes unreadable), task board-sdk-6b4d471"
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-scene, test: sticky_text_reads_on_the_stickys_own_fill_in_both_schemes }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-20"

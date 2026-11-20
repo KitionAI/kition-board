@@ -84,12 +84,15 @@ try {
   const firstShown = await shownCount()
   step('the tabs show the board\'s pages, the shown one selected', (await settled()) && (await tabs()).length === 1, JSON.stringify(await tabs()))
   step('the tab bar has accessible names', (await kit.getByRole('tablist', { name: 'Pages' }).count()) === 1 && (await kit.getByRole('button', { name: 'Add page' }).count()) === 1)
+  const statusText = () => kit.getByTestId('board-status').textContent()
+  step('the status bar counts one page in the singular', await until(async () => / · 1 page$/.test(await statusText())), await statusText())
 
   // Add page: a new tab, shown; the canvas is empty there.
   await kit.getByTestId('board-page-add').click()
   await until(async () => (await personPage()) !== first)
   const second = await personPage()
   step('Add page makes a page and shows it', (await settled()) && second !== first && (await pageIds()).length === 2 && (await until(async () => (await shownCount()) === 0)))
+  step('and two pages in the plural', await until(async () => / · 2 pages$/.test(await statusText())), await statusText())
 
   // Undo of the new page takes the person back to the page they were on; Redo shows it again.
   await undo()

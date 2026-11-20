@@ -114,7 +114,7 @@ features:
     priority: P1
     status: has
     paths: [crates/render/scene/src/style.rs, crates/render/scene/src/fragment.rs, crates/render/scene/src/raster.rs, bindings/wasm/src/scene.rs, bindings/wasm/tests/color_scheme.rs, web/src/app.css, web/src/colorScheme.ts, web/src/App.tsx, web/tests/scheme.mjs]
-    cases: [board.platform.color-scheme/follows-host, regressions/issue-h16-dark-board, regressions/issue-dark-card-previews]
+    cases: [board.platform.color-scheme/follows-host, regressions/issue-h16-dark-board, regressions/issue-dark-card-previews, regressions/issue-dark-pastel-sticky-text]
     since: "2026-11-19"
   - id: board.platform.document-identity
     title: "A host reads the document id a .kboard carries and forks a copied board into a new document with no history (document.identity, document.fork; Kit Process Protocol 5.6)"
@@ -224,8 +224,8 @@ features:
     priority: P0
     status: has
     commands: [page.create, page.rename, page.duplicate, page.delete, page.move, page.activate]
-    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/context.rs, web/src/panels/PageTabs.tsx, web/src/canvas/BoardCanvas.tsx, web/src/canvas/Minimap.tsx]
-    cases: [board.pages/save-reopen, board.pages/switcher, board.pages/shown-page, regressions/issue-new-page-shown, regressions/issue-deleted-shown-page]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/context.rs, web/src/strings.ts, web/tests/strings.mjs, web/src/panels/PageTabs.tsx, web/src/canvas/BoardCanvas.tsx, web/src/canvas/Minimap.tsx]
+    cases: [board.pages/save-reopen, board.pages/switcher, board.pages/shown-page, regressions/issue-new-page-shown, regressions/issue-deleted-shown-page, regressions/issue-status-plural]
     since: "2026-11-17"
   - id: board.templates
     title: "Insert a template"

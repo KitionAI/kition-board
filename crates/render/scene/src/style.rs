@@ -160,6 +160,41 @@ pub fn paint(value: Option<&str>, role: Role, fallback: &str, colors: Colors) ->
     }
 }
 
+/// WCAG relative luminance of `#rrggbb`; `None` for anything else.
+fn luminance(hex: &str) -> Option<f64> {
+    if !is_hex(hex) {
+        return None;
+    }
+    let channel = |at: usize| {
+        let byte = hex.get(at..at + 2).and_then(|pair| u8::from_str_radix(pair, 16).ok())?;
+        let c = f64::from(byte) / 255.0;
+        Some(if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) })
+    };
+    Some(0.2126 * channel(1)? + 0.7152 * channel(3)? + 0.0722 * channel(5)?)
+}
+
+/// WCAG contrast ratio of two `#rrggbb` colours.
+fn contrast(a: &str, b: &str) -> Option<f64> {
+    let (a, b) = (luminance(a)?, luminance(b)?);
+    Some((a.max(b) + 0.05) / (a.min(b) + 0.05))
+}
+
+/// The text colour on a solid `fill` that is a file's own `#rrggbb` (written literally, so no
+/// scheme restyles it), when the text colour `value` is a token (`fallback` when unset or not a
+/// colour): the token's light- or dark-scheme line colour, whichever contrasts more with the fill,
+/// written literally too. `None` when the fill is a token (the scheme restyles fill and text
+/// together) or the text colour is the file's own.
+pub fn text_on(value: Option<&str>, fallback: &str, fill: &str) -> Option<String> {
+    if !is_hex(fill) || value.is_some_and(is_hex) {
+        return None;
+    }
+    let token = value.filter(|value| PALETTE.iter().any(|(name, _, _)| name == value)).unwrap_or(fallback);
+    let light = PALETTE.iter().find(|(name, _, _)| *name == token).map_or(PALETTE[0].1, |(_, stroke, _)| stroke);
+    let dark = DARK_PALETTE.iter().find(|(name, _, _)| *name == token).map_or(DARK_PALETTE[0].1, |(_, stroke, _)| stroke);
+    let best = if contrast(dark, fill)? > contrast(light, fill)? { dark } else { light };
+    Some((*best).to_owned())
+}
+
 /// A line weight in board units (`s`, `m`, `l`, `xl`; `m` by default).
 pub fn stroke_width(size: Option<&str>) -> f64 {
     match size {
@@ -182,8 +217,13 @@ pub fn dash_array(dash: Option<&str>, width: f64) -> Option<String> {
 /// The resolved look of an element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Look {
-    /// Line and text colour.
+    /// Line colour.
     pub stroke: String,
+    /// The colour of the text drawn on the element (its label): the line colour, except on a
+    /// solid fill in a file's own `#rrggbb`, which no scheme restyles: there a token text colour is
+    /// written as that token's light- or dark-scheme colour, whichever reads better on the fill, so
+    /// a pastel sticky's text stays dark in the dark scheme ([`text_on`]).
+    pub text: String,
     /// `None`: not filled.
     pub fill: Option<String>,
     pub fill_style: String,
@@ -247,8 +287,14 @@ pub fn look(element: &Element, colors: Colors) -> Look {
         _ => stroke_width(text_of(element, "strokeSize")),
     };
     let fill = (fill_style != "none").then(|| paint(text_of(element, "fillColor"), Role::Fill, fill_default, colors));
+    let stroke = paint(text_of(element, "strokeColor"), Role::Stroke, stroke_default, colors);
+    let text = match fill.as_deref() {
+        Some(fill) if fill_style == "solid" => text_on(text_of(element, "strokeColor"), stroke_default, fill).unwrap_or_else(|| stroke.clone()),
+        _ => stroke.clone(),
+    };
     Look {
-        stroke: paint(text_of(element, "strokeColor"), Role::Stroke, stroke_default, colors),
+        stroke,
+        text,
         fill,
         fill_style,
         width,

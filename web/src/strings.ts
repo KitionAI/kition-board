@@ -2,7 +2,11 @@ import type { Catalog } from '@kition/kit-editor'
 
 /** The editor's own strings (`en-US` is required; others fall back to it). */
 const enUS: Catalog = {
-  summary: '{elements} elements · {pages} pages',
+  summary: '{elements} · {pages}',
+  'elementCount.one': '{count} element',
+  'elementCount.other': '{count} elements',
+  'pageCount.one': '{count} page',
+  'pageCount.other': '{count} pages',
   selected: '{count} selected',
   opening: 'Opening the board…',
   openFailed: 'The board did not open',
@@ -153,7 +157,9 @@ const enUS: Catalog = {
 }
 
 const zhCN: Catalog = {
-  summary: '{elements} 个元素 · {pages} 页',
+  summary: '{elements} · {pages}',
+  'elementCount.other': '{count} 个元素',
+  'pageCount.other': '{count} 页',
   selected: '已选 {count} 个',
   opening: '正在打开白板…',
   openFailed: '白板没有打开',
@@ -304,3 +310,27 @@ const zhCN: Catalog = {
 }
 
 export const CATALOGS: Record<string, Catalog> = { 'en-US': enUS, 'zh-CN': zhCN }
+
+/** A kit string lookup (`createKitStrings`). */
+export type Strings = (key: string, values?: Record<string, string | number>) => string
+
+/**
+ * `count` of something in the locale's plural form: the key `<key>.<category>` for the locale's
+ * plural category (`Intl.PluralRules`: `one`, `few`, `other`, ...), else `<key>.other`.
+ */
+export function counted(t: Strings, locale: string, key: string, count: number): string {
+  let category = 'other'
+  try {
+    category = new Intl.PluralRules(locale).select(count)
+  } catch {
+    // An unknown locale tag reads as `other`.
+  }
+  const formKey = `${key}.${category}`
+  const form = t(formKey, { count })
+  return form === formKey ? t(`${key}.other`, { count }) : form
+}
+
+/** The status bar's summary: how many elements and pages, each in its plural form. */
+export function summary(t: Strings, locale: string, elements: number, pages: number): string {
+  return t('summary', { elements: counted(t, locale, 'elementCount', elements), pages: counted(t, locale, 'pageCount', pages) })
+}

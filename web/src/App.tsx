@@ -26,7 +26,7 @@ import type { DocumentArea } from './canvas/Minimap'
 import { useColorScheme } from './colorScheme'
 import { BoardSync, type BoardEngine } from './board/sync'
 import { engineManifest } from './engine'
-import { CATALOGS } from './strings'
+import { CATALOGS, summary } from './strings'
 import type { Style } from './board/style'
 import { graphOf } from './board/mindmap'
 import { DownloadIcon as Download, LayoutTemplateIcon as LayoutTemplate } from '@kition/tessera-icons/react'
@@ -438,7 +438,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       onKeyDown={(event) => canvasApi.current?.keyDown(event.nativeEvent) ?? false}
       status={
         <span data-testid="board-status">
-          {state ? t('summary', { elements: state.elements, pages: Math.max(1, state.pages.length) }) : ''}
+          {state ? summary(t, host.init.locale, state.elements, Math.max(1, state.pages.length)) : ''}
           {selection.length ? ` · ${t('selected', { count: selection.length })}` : ''}
         </span>
       }

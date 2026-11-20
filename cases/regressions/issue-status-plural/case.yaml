@@ -1,0 +1,19 @@
+format: 1
+id: regressions/issue-status-plural
+feature: board.pages
+intent: >-
+  The status bar names the board's elements and pages in the locale's plural form, through the
+  kit's strings in every locale it ships ("1 element · 1 page", "10 elements · 2 pages"; one form
+  in zh-CN), and the editor shows it so as pages are added. Before, it read "10 elements · 1 pages".
+layer: gate
+source:
+  kind: issue
+  from: "a host's screenshot run of the board (status bar), task board-sdk-6b4d471"
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/strings.mjs]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-20"

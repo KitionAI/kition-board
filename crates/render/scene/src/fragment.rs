@@ -206,7 +206,7 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
                 let top = (h - lines.iter().map(|line| line.height).sum::<f64>()) / 2.0;
                 let placed = place_rich(&lines, w, label_pad(w), top, text_of(element, "textAlign").unwrap_or("center"));
                 local = local.union(rich_bounds(&lines, &placed));
-                rich_text_block(&mut out, &lines, &placed, &look.stroke, low);
+                rich_text_block(&mut out, &lines, &placed, &look.text, low);
             } else if shapes::supports_label(shape) && !element.text.is_empty() {
                 let (style, lines) = shape_label(element, w);
                 let top = (h - lines.len() as f64 * style.line_height()) / 2.0;
@@ -219,7 +219,7 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
                         placed.baseline + 0.3 * style.size,
                     ));
                 }
-                text_block(&mut out, &placed, style, &look.stroke, low);
+                text_block(&mut out, &placed, style, &look.text, low);
             }
         }
         Kind::Text => {
