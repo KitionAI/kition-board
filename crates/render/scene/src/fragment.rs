@@ -379,7 +379,12 @@ fn card(out: &mut String, element: &Element, w: f64, h: f64, look: &Look, option
         "link" => "M 19 25 L 25 19 M 18 21 L 16.5 22.5 A 2.5 2.5 0 0 0 21.5 27.5 L 23 26 M 21 18 L 22.5 16.5 A 2.5 2.5 0 0 1 27.5 21.5 L 26 23",
         _ => "M 17 16 H 24 L 27 19 V 28 H 17 Z M 24 16 V 19 H 27",
     };
-    out.push_str(&format!(r##"<path d="{glyph}" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"##));
+    // The glyph is the paper's colour: white on the light scheme's badge, the dark paper on the dark
+    // scheme's lightened one.
+    let glyph_color = style::named(PAPER, options.colors);
+    out.push_str(&format!(
+        r#"<path d="{glyph}" fill="none" stroke="{glyph_color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>"#
+    ));
     let text_width = (w - 52.0).max(8.0);
     let title_style = Style::new(15.0, SEMIBOLD, Family::Sans);
     let detail_style = Style::new(12.0, REGULAR, Family::Sans);

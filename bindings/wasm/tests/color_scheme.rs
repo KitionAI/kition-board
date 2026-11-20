@@ -101,3 +101,41 @@ fn previews_and_exports_are_drawn_light_after_the_dark_minimap() {
     assert_eq!(doc.execute("file.export", json!({ "format": "svg" })).unwrap(), export);
     assert_eq!((doc.revision(), doc.dirty()), (revision, dirty));
 }
+
+/// A board of cards of every kind: a note, a table, a board, a link and another file.
+fn cards() -> BoardDocument {
+    let mut doc = BoardDocument::create("Cards.kboard", 1920, 1080).unwrap();
+    for (index, file) in ["plans/Roadmap.md", "data/Budget.ktable", "Other.kboard", "docs/Spec.pdf"].into_iter().enumerate() {
+        doc.execute("card.create", json!({ "file": file, "position": [index as f64 * 400.0, 0.0] })).unwrap();
+    }
+    doc.execute("card.create", json!({ "url": "https://kition.ai", "title": "Kition", "position": [0, 400] })).unwrap();
+    doc
+}
+
+#[test]
+fn cards_in_the_dark_minimap_have_no_light_parts() {
+    let doc = cards();
+    let (width, height) = (doc.width(), doc.height());
+    let light = doc.render(0.0, 0.0, 1.0, width, height).unwrap();
+    let dark = doc.render_scheme("dark", 0.0, 0.0, 1.0, width, height).unwrap();
+    if let Some(dir) = std::env::var_os("KITION_BOARD_PNG") {
+        let save = |name: &str, rgba: &[u8]| {
+            image::RgbaImage::from_raw(width, height, rgba.to_vec()).unwrap().save(std::path::Path::new(&dir).join(name)).unwrap();
+        };
+        save("cards-light.png", &light);
+        save("cards-dark.png", &dark);
+    }
+    // The light cards have their white paper and their badges' white glyphs.
+    assert!(light.chunks(4).filter(|px| luminance(px) > 0.9).count() > 1000);
+    // The dark cards: their bodies, previews' stand-ins and their badges' glyphs are drawn for the
+    // dark paper, so nothing is lighter than the dark palette's text (#e8e8e6, luminance 0.80).
+    let lit: Vec<usize> = dark.chunks(4).enumerate().filter(|(_, px)| luminance(px) > 0.85).map(|(at, _)| at).collect();
+    assert!(
+        lit.is_empty(),
+        "{} light pixels in the dark cards, the first at {:?}",
+        lit.len(),
+        lit.first().map(|at| (at % width as usize, at / width as usize))
+    );
+    // The light raster is what it was, before and after the dark one.
+    assert_eq!(doc.render(0.0, 0.0, 1.0, width, height).unwrap(), light);
+}

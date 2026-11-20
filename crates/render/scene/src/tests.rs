@@ -252,3 +252,48 @@ fn the_frame_follows_the_content_and_scales_huge_boards() {
     let svg = raster::page_svg(board.model(), &page, &frame, &board.blobs);
     assert!(svg.contains("viewBox=\"-5040 -40"), "{}", &svg[..200]);
 }
+
+/// WCAG contrast of two `#rrggbb` colours.
+fn hex_contrast(a: &str, b: &str) -> f64 {
+    let luminance = |hex: &str| {
+        let channel = |at: usize| {
+            let c = f64::from(u8::from_str_radix(&hex[at..at + 2], 16).unwrap()) / 255.0;
+            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        };
+        0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)
+    };
+    let (a, b) = (luminance(a), luminance(b));
+    (a.max(b) + 0.05) / (a.min(b) + 0.05)
+}
+
+#[test]
+fn card_badges_read_in_both_schemes() {
+    let mut board = Board::new();
+    let card = |board: &mut Board, params: Value| board.run("card.create", params)["created"][0].as_str().unwrap().to_owned();
+    let cards = [
+        ("purple", card(&mut board, json!({ "file": "plans/Roadmap.md", "position": [0, 0] }))),
+        ("green", card(&mut board, json!({ "file": "data/Budget.ktable", "position": [0, 0] }))),
+        ("orange", card(&mut board, json!({ "file": "Other.kboard", "position": [0, 0] }))),
+        ("blue", card(&mut board, json!({ "url": "https://kition.ai", "position": [0, 0] }))),
+        ("gray", card(&mut board, json!({ "file": "docs/Spec.pdf", "position": [0, 0] }))),
+    ];
+    for (token, id) in cards {
+        let element = board.model().element(&ObjectId::from_string(&id)).unwrap();
+        for (colors, palette, glyph) in
+            [(Colors::Literal, crate::style::PALETTE, "#ffffff"), (Colors::Dark, crate::style::DARK_PALETTE, crate::style::DARK_PAPER)]
+        {
+            let svg = fragment(board.model(), element, &Options { colors, lod: Lod::Full, pictures: Pictures::Reference, blobs: &board.blobs }).svg;
+            let badge = palette.iter().find(|(name, _, _)| *name == token).unwrap().1;
+            assert!(svg.contains(&format!(r#"rx="5" fill="{badge}""#)), "{token} badge in {colors:?}: {svg}");
+            // The glyph is the paper's colour: white on the light badge, the dark paper on the dark
+            // scheme's lightened one, and it reads there (3:1, a graphic).
+            assert!(svg.contains(&format!(r#"fill="none" stroke="{glyph}" stroke-width="1.5""#)), "{token} glyph in {colors:?}: {svg}");
+            if colors == Colors::Dark {
+                let ratio = hex_contrast(glyph, badge);
+                assert!(ratio >= 3.0, "the {token} badge's glyph in the dark scheme: {ratio:.2}");
+            }
+        }
+        // The editor's fragment writes the paper's property, light by default.
+        assert!(board.svg(&id).contains(r#"stroke="var(--kb-paper, #ffffff)" stroke-width="1.5""#), "{}", board.svg(&id));
+    }
+}

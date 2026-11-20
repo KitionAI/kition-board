@@ -1,0 +1,24 @@
+format: 1
+id: regressions/issue-dark-card-previews
+feature: board.platform.color-scheme
+intent: >-
+  In the host's dark scheme a card is drawn for the dark paper throughout: its body, the stand-in
+  for its preview (a note's lines, a table's or board's preview slot) and its kind's badge glyph,
+  which is drawn in the paper's colour on the badge (dark on the dark scheme's light badge, white on
+  the light scheme's), so the badge reads in both and no light part of a card is left in the dark
+  minimap. The light raster, `render`, `file.render` and exports are byte for byte what they were.
+  Before, the badge glyph was a fixed #ffffff, light on the dark scheme's lightened badge.
+layer: gate
+source:
+  kind: issue
+  from: "Kition host matrix row H16 leftovers (light patches in a dark board), task note-and-dark-leftovers"
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: color_scheme }
+  - cargo-test: { package: kition-board-scene, test: card_badges_read_in_both_schemes }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-19"

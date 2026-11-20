@@ -109,12 +109,12 @@ features:
     cases: [board.platform.display-modes/mode-smoke, regressions/issue-focus-escape-always-taken]
     since: "2026-11-17"
   - id: board.platform.color-scheme
-    title: "The board follows the host's color scheme: in dark, the canvas, the default ink, the colour tokens, the selection handles and the minimap are drawn for a dark surface, live, nothing moving; a file's own colours, exports, previews and thumbnails stay as they are"
+    title: "The board follows the host's color scheme: in dark, the canvas, the default ink, the colour tokens, the selection handles, the cards (their bodies, preview stand-ins and badge glyphs) and the minimap are drawn for a dark surface, live, nothing moving; a file's own colours, exports, previews and thumbnails stay as they are"
     dimension: [platform]
     priority: P1
     status: has
-    paths: [crates/render/scene/src/style.rs, crates/render/scene/src/raster.rs, bindings/wasm/src/scene.rs, bindings/wasm/tests/color_scheme.rs, web/src/app.css, web/src/colorScheme.ts, web/src/App.tsx, web/tests/scheme.mjs]
-    cases: [board.platform.color-scheme/follows-host, regressions/issue-h16-dark-board]
+    paths: [crates/render/scene/src/style.rs, crates/render/scene/src/fragment.rs, crates/render/scene/src/raster.rs, bindings/wasm/src/scene.rs, bindings/wasm/tests/color_scheme.rs, web/src/app.css, web/src/colorScheme.ts, web/src/App.tsx, web/tests/scheme.mjs]
+    cases: [board.platform.color-scheme/follows-host, regressions/issue-h16-dark-board, regressions/issue-dark-card-previews]
     since: "2026-11-19"
   - id: board.collab.live
     title: People co-edit a board live (shapes, text, connectors, frames, cards, groups, z-order) and converge
