@@ -1,0 +1,21 @@
+format: 1
+id: board.platform.document-identity/no-replica
+feature: board.platform.document-identity
+intent: >-
+  Through the real kition-board process: an empty .kboard (made for the kit before it saved a
+  board) carries no identity, and its fork is the same bytes with no docId; bytes that are not a
+  board are refused as unsupported_format by both document.identity and document.fork, never
+  answered with no identity, and the fork writes nothing.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/headless/tests/identity.rs (an_unsaved_board_has_no_identity_and_bytes_that_are_no_board_are_refused)
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board, test: identity, filter: an_unsaved_board_has_no_identity_and_bytes_that_are_no_board_are_refused }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-20"

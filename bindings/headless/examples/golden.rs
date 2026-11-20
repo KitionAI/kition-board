@@ -26,7 +26,9 @@ fn main() {
     std::fs::create_dir_all(&root).unwrap();
     let root = std::fs::canonicalize(root).unwrap();
     std::fs::copy(repo.join("conformance/basic.kboard"), root.join("basic.kboard")).unwrap();
-    let mut kit = Headless::<BoardDocument>::with_replica_port(KitInfo::from_manifest(include_str!("../../../kit.json"), &[], &[]).unwrap());
+    let mut kit = Headless::<BoardDocument>::with_replica_port(
+        KitInfo::from_manifest(include_str!("../../../kit.json"), &[], kition_board_kit::EDITOR_STATE).unwrap(),
+    );
     let folder = HostFolder::new(&root).unwrap();
     kit.set_host(folder.host());
     let opened = kit.open(OpenRequest { file: &folder.file("basic.kboard").unwrap(), read_only: true, create: None }).unwrap();

@@ -36,7 +36,9 @@ fn issue_draft_replica_blobs_a_board_opens_from_its_exported_replica_with_its_pi
     board.execute("image.insert", json!({ "data": PICTURE, "mime": "image/png", "position": [0, 0] })).unwrap();
     std::fs::write(root.join("Plan.kboard"), board.save(None).unwrap()).unwrap();
 
-    let mut kit = Headless::<BoardDocument>::with_replica_port(KitInfo::from_manifest(include_str!("../../../kit.json"), &[], &[]).unwrap());
+    let mut kit = Headless::<BoardDocument>::with_replica_port(
+        KitInfo::from_manifest(include_str!("../../../kit.json"), &[], kition_board_kit::EDITOR_STATE).unwrap(),
+    );
     let folder = HostFolder::new(&root).unwrap();
     kit.set_host(folder.host());
     let file = kit.open(OpenRequest { file: &folder.file("Plan.kboard").unwrap(), read_only: false, create: None }).unwrap().id;

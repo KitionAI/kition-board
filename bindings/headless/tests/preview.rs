@@ -29,7 +29,9 @@ fn the_preview_of_basic_is_the_golden_preview_within_the_stated_tolerance() {
     std::fs::create_dir_all(&root).unwrap();
     let root = std::fs::canonicalize(root).unwrap();
     std::fs::copy(repo().join("conformance/basic.kboard"), root.join("basic.kboard")).unwrap();
-    let mut kit = Headless::<BoardDocument>::with_replica_port(KitInfo::from_manifest(include_str!("../../../kit.json"), &[], &[]).unwrap());
+    let mut kit = Headless::<BoardDocument>::with_replica_port(
+        KitInfo::from_manifest(include_str!("../../../kit.json"), &[], kition_board_kit::EDITOR_STATE).unwrap(),
+    );
     let folder = HostFolder::new(&root).unwrap();
     kit.set_host(folder.host());
     let opened = kit.open(OpenRequest { file: &folder.file("basic.kboard").unwrap(), read_only: true, create: None }).unwrap();

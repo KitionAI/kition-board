@@ -3,6 +3,11 @@
 Changes to Kition Board, newest first. A version is the kit package version in `kit.json`;
 each package is published with a `package-v<version>` tag.
 
+## 0.1.4
+
+- A host tells a board file's document id (`document.identity`) and makes a copied board a new document (`document.fork`): the fork keeps the pages, elements and their ids, and carries a new id and none of the source's history (Kit Process Protocol section 5.6, kition-sdk 44d500b). Two copies of the same `.kboard` were one document until now.
+- The headless program speaks Kit Process Protocol version 1 (`headless.protocol` is `kition-kit/1`), as hosts on kition-sdk from bb1b07b require.
+
 ## 0.1.3
 
 - In the dark scheme a card's badge glyph is drawn in the paper's colour, so cards have no light part left.

@@ -79,11 +79,7 @@ fn damaged(error: impl std::fmt::Display) -> KitError {
 /// `newer-version: …` for files it does not open.
 pub fn open_file(bytes: &[u8], actor: ActorId) -> Result<OpenedFile> {
     let parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
-    let mut replica = Replica::load(schema(), &parts.snapshot, actor).map_err(|error| match error {
-        kition_kit::kdm::KdmError::NewerSchema { .. } => KitError::new(format!("newer-version: {error}")),
-        kition_kit::kdm::KdmError::Schema(_) => KitError::new(format!("not-a-board: {error}")),
-        other => damaged(other),
-    })?;
+    let mut replica = load(&parts.snapshot, actor)?;
     for change in &parts.changes {
         replica.import_changes(change).map_err(damaged)?;
     }
@@ -105,6 +101,56 @@ pub fn open_file(bytes: &[u8], actor: ActorId) -> Result<OpenedFile> {
         extra: parts.extra,
     };
     Ok(OpenedFile { replica, base, blobs: parts.blobs, detached })
+}
+
+/// The replica a `.kboard` file embeds, as one KDM snapshot (`document.identity`, KitModel M7a):
+/// `snapshot.bin` with the listed change entries imported, or `None` for an empty file (one made
+/// for the kit before it saved a board there). Answers `not-a-board: …`, `damaged: …` or
+/// `newer-version: …` for other bytes, as [`open_file`] does; never repairs, never writes.
+pub fn embedded_replica(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
+    let mut replica = load(&parts.snapshot, ActorId::random())?;
+    for change in &parts.changes {
+        replica.import_changes(change).map_err(damaged)?;
+    }
+    let doc_id = replica.doc_id().to_string();
+    if !parts.meta.doc_id.is_empty() && parts.meta.doc_id != doc_id {
+        return Err(damaged(format!("meta.json names document {}, the snapshot {doc_id}", parts.meta.doc_id)));
+    }
+    if parts.changes.is_empty() {
+        return Ok(Some(parts.snapshot));
+    }
+    Ok(Some(replica.snapshot()?))
+}
+
+/// `bytes` (a `.kboard` file) holding the document `snapshot` instead of its own (`document.fork`,
+/// KitModel M7a): `snapshot.bin` is `snapshot`, there are no change entries, `meta.json`'s copies of
+/// the docId and the snapshot version are the snapshot's, and the blobs are the ones its state
+/// references (what a save writes, design note 2.3), so no earlier identity or history stays in
+/// the file. Everything else (the title, `app`, entries this build does not know) is kept.
+pub fn replace_replica(bytes: &[u8], snapshot: &[u8]) -> Result<Vec<u8>> {
+    let mut parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
+    let replica = load(snapshot, ActorId::random())?;
+    let referenced = BoardModel::read(&replica)?.image_hashes();
+    parts.blobs.retain(|hash, _| referenced.contains(hash));
+    parts.meta.doc_id = replica.doc_id().to_string();
+    parts.meta.snapshot.version = kboard::base64_encode(&replica.version().encode());
+    parts.snapshot = snapshot.to_vec();
+    parts.changes.clear();
+    kboard::write(&parts).map_err(|error| KitError::new(error.to_string()))
+}
+
+/// A board snapshot loaded as a replica of `actor`: `newer-version: …`, `not-a-board: …` or
+/// `damaged: …` when it does not load.
+fn load(snapshot: &[u8], actor: ActorId) -> Result<Replica> {
+    Replica::load(schema(), snapshot, actor).map_err(|error| match error {
+        kition_kit::kdm::KdmError::NewerSchema { .. } => KitError::new(format!("newer-version: {error}")),
+        kition_kit::kdm::KdmError::Schema(_) => KitError::new(format!("not-a-board: {error}")),
+        other => damaged(other),
+    })
 }
 
 /// Runs the repair (V1–V9) in a `system` transaction labelled `repair`, written only when there is

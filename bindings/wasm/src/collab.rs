@@ -148,7 +148,14 @@ impl kition_kit::session::model::ReplicaPort for BoardDocument {
         <BoardModel as kition_kit::session::KitModel>::schema()
     }
 
+    /// The changes since `since`; with an empty `since`, every change. A board forked as a new
+    /// document (`document.fork`, KitModel M7a) is a shallow replica (M16a), whose changes since
+    /// the empty version leave out its root state and so do not load; it answers its (shallow)
+    /// snapshot instead, which loads as the whole board.
     fn model_export(&mut self, since: &[u8]) -> Result<Vec<u8>, String> {
+        if since.is_empty() && self.session.replica().is_shallow() {
+            return kition_kit::session::__snapshot(self);
+        }
         kition_kit::session::__export_changes(self, since)
     }
 

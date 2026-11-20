@@ -54,7 +54,7 @@ fn issue_agent_export_every_declared_format_exports_through_the_agent_export_com
     let formats: Vec<&str> = manifest["exports"].as_array().unwrap().iter().map(|entry| entry["extension"].as_str().unwrap()).collect();
     assert_eq!(formats, ["png", "svg", "pdf"]);
 
-    let mut kit = Headless::<BoardDocument>::with_replica_port(KitInfo::from_manifest(MANIFEST, &[], &[]).unwrap());
+    let mut kit = Headless::<BoardDocument>::with_replica_port(KitInfo::from_manifest(MANIFEST, &[], kition_board_kit::EDITOR_STATE).unwrap());
     assert_eq!(kit.capabilities()["formats"]["export"], json!(formats), "kit.initialize reports the exports");
     let root = std::env::temp_dir().join(format!("kition-board-export-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);

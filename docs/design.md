@@ -229,6 +229,7 @@ There is no thumbnail in the file: it would be rewritten on every save and dupli
 - **Compaction:** when the change entries together exceed a quarter of `snapshot.bin`, or there are more than 200 of them, a save writes a fresh snapshot and no change entries. Blobs the replica's retained state does not reference are dropped only at compaction.
 - **Crash safety:** the host writes atomically (temp file + rename); the engine never edits the file in place.
 - **External changes:** a file changed on disk while open is merged: the new file is opened as a replica and its changes are imported.
+- **Identity and forks** (Kit Process Protocol 5.6, KitModel M7a; `kition_board_kdm::file::embedded_replica` and `replace_replica`, served as `document.identity` and `document.fork`): the file embeds its replica, so a byte copy is the same document. Its identity is the docId of `snapshot.bin` with the listed changes imported (`meta.json`'s copy must agree, or the file is damaged); an empty file has none. A fork writes the SDK's copy under a new docId (no history) as `snapshot.bin`, no change entries, `meta.json`'s `docId` and `snapshot.version` set to the copy's, and the blobs its state references; the title, `app` and unknown entries are kept. Cards' `target.docId` name other documents and stay as they are.
 
 ### 2.4 Limits and damaged files (Q7, E2)
 
