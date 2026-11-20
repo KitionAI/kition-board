@@ -3,6 +3,11 @@
 Changes to Kition Board, newest first. A version is the kit package version in `kit.json`;
 each package is published with a `package-v<version>` tag.
 
+## 0.1.3
+
+- In the dark scheme a card's badge glyph is drawn in the paper's colour, so cards have no light part left.
+- `kit.json` declares the engine's editor state (`engine.editorState`), so a host that does not run the engine's Rust code reads `inspect()` without it.
+
 ## 0.1.2
 
 - A person reaches every page of a board: page tabs under the canvas show the pages and the one shown; a click or Enter switches (the file stays saved, and Undo does not take back a switch), and Add page, rename (double-click or F2), duplicate, move left or right and delete (not the last page) are in the tabs and their menu, each one undo step. Each page keeps its own view and the selection stays on its page.
