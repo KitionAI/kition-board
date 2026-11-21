@@ -17,6 +17,10 @@ const origin = `http://127.0.0.1:${server.httpServer.address().port}`
 const browser = await (which === 'webkit' ? webkit : chromium).launch()
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
 const page = await context.newPage()
+// The editor's shortcuts take Cmd where the page says it runs on a Mac (kit-editor reads
+// navigator.platform), else Ctrl. Playwright's ControlOrMeta follows the machine running the test
+// instead, and its WebKit says Mac on Linux too, so the test asks the page.
+const mod = (await page.evaluate(() => /Mac|iPhone|iPad/i.test(navigator.platform))) ? 'Meta' : 'Control'
 context.setDefaultTimeout(10000)
 const errors = []
 let failures = 0
@@ -62,11 +66,11 @@ try {
   const settled = () => until(inStep)
   const undo = async () => {
     await kit.getByTestId('board-canvas').focus()
-    await page.keyboard.press('ControlOrMeta+z')
+    await page.keyboard.press(`${mod}+z`)
   }
   const redo = async () => {
     await kit.getByTestId('board-canvas').focus()
-    await page.keyboard.press('ControlOrMeta+Shift+z')
+    await page.keyboard.press(`${mod}+Shift+z`)
   }
   const menu = async (id, item) => {
     await tab(id).click({ button: 'right' })
@@ -102,7 +106,7 @@ try {
 
   // Saved, then switching back and forth: the file stays saved, the revision stays, no undo step.
   await kit.getByTestId('board-canvas').focus()
-  await page.keyboard.press('ControlOrMeta+s')
+  await page.keyboard.press(`${mod}+s`)
   await until(async () => !(await lastChange()).dirty)
   const saved = await lastChange()
   step('the board is saved before switching', !saved.dirty, JSON.stringify(saved))
@@ -135,7 +139,7 @@ try {
 
   // The selection stays on its page, and each page keeps its own view.
   await kit.getByTestId('board-canvas').focus()
-  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.press(`${mod}+a`)
   step('a selection on the first page', await until(async () => (await board(() => window.kitBoard.selection().length)) === firstShown))
   /** The minimap's picture, as a checksum of its pixels. */
   const minimap = () =>

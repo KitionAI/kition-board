@@ -11,9 +11,16 @@ const which = process.argv[2] ?? 'chromium'
 const server = await createServer({ configFile: new URL('../vite.config.ts', import.meta.url).pathname, server: { port: 0, host: '127.0.0.1' }, logLevel: 'error' })
 await server.listen()
 const origin = `http://127.0.0.1:${server.httpServer.address().port}`
-const browser = await (which === 'webkit' ? webkit : chromium).launch()
+// Headless Chromium on Linux hints glyphs and rounds every advance to a whole pixel, so its text is
+// not the unhinted text the engine lays out (and macOS draws). Without hinting its advances are the
+// font's own, as on macOS.
+const browser = await (which === 'webkit' ? webkit.launch() : chromium.launch({ args: process.platform === 'linux' ? ['--font-render-hinting=none'] : [] }))
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
+// The editor's shortcuts take Cmd where the page says it runs on a Mac (kit-editor reads
+// navigator.platform), else Ctrl. Playwright's ControlOrMeta follows the machine running the test
+// instead, and its WebKit says Mac on Linux too, so the test asks the page.
+const mod = (await page.evaluate(() => /Mac|iPhone|iPad/i.test(navigator.platform))) ? 'Meta' : 'Control'
 // A missing element fails its step in seconds, not after Playwright's half minute per try.
 context.setDefaultTimeout(10000)
 const errors = []
@@ -249,10 +256,10 @@ try {
   step('a plain Enter commits', (await kit.getByTestId('board-text-editor').count()) === 0)
 
   // 8. Undo the label, then save and reopen.
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => !(await board((id) => document.querySelector(`[data-id="${id}"]`)?.textContent ?? '', drawn)).includes('Hello board'))
   step('undo takes back one gesture', !(await board((id) => document.querySelector(`[data-id="${id}"]`)?.textContent ?? '', drawn)).includes('Hello board'))
-  await page.keyboard.press('ControlOrMeta+s')
+  await page.keyboard.press(`${mod}+s`)
   await until(async () => (await page.evaluate(() => window.devHost.files.get('Sample.kboard')?.version ?? 0)) > 1)
   step('saves through the host', (await page.evaluate(() => window.devHost.files.get('Sample.kboard')?.version ?? 0)) > 1)
   await page.evaluate(async () => window.devHost.open('Sample.kboard', window.devHost.files.get('Sample.kboard').bytes))
@@ -345,7 +352,7 @@ try {
   await drag(await screen(410, 60), await screen(410, 200), 24)
   await until(async () => (await elementCount()) === count - 1)
   step('the eraser deletes what it passes, in one command', (await elementCount()) === count - 1 && !(await board(() => window.kitBoard.shown())).includes(highlight))
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => (await elementCount()) === count)
   step('one undo brings the erased stroke back', (await elementCount()) === count && (await board(() => window.kitBoard.shown())).includes(highlight))
 
@@ -353,7 +360,7 @@ try {
   // The page pins Classic (`?modes=classic`); let the person enter Focus too.
   await page.evaluate(() => window.devHost.configure({ modes: { allowed: ['classic', 'focus'], default: 'classic' } }))
   await kit.getByTestId('board-canvas').focus()
-  await page.keyboard.press('ControlOrMeta+Backslash')
+  await page.keyboard.press(`${mod}+Backslash`)
   await until(async () => (await kit.getByTestId('board-focus-bar').count()) === 1)
   const focusRail = await kit.locator('.kui-tool-rail').count()
   const focusName = await kit.getByTestId('board-focus-tool').textContent()
@@ -381,7 +388,7 @@ try {
   await until(async () => (await storedOf([star]))[0]?.fillColor === 'purple')
   const purpleDrawn = await board((id) => document.querySelector(`[data-id="${id}"]`)?.innerHTML.includes('--kb-fill-purple') ?? false, star)
   step('a fill colour is one element.style, drawn by the engine', (await storedOf([star]))[0]?.fillColor === 'purple' && purpleDrawn)
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => (await storedOf([star]))[0]?.fillColor == null)
   await until(async () => (await attr('board-style-fillColor-white', 'aria-pressed')) === 'true')
   step('one undo takes the colour back', (await storedOf([star]))[0]?.fillColor == null && (await attr('board-style-fillColor-white', 'aria-pressed')) === 'true')
@@ -455,7 +462,7 @@ try {
     near(l1.size.w, 100 * sx) && near(l1.size.h, 140) && near(r1.position.x, 100 + (310 - 100) * sx - (100 * sx) / 2) && near(r1.size.h, 140),
     `${JSON.stringify(l1.position)} ${JSON.stringify(l1.size)} ${JSON.stringify(r1.position)} ${JSON.stringify(r1.size)}`,
   )
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => near((await storedOf([right]))[0]?.size?.h ?? 0, 70))
   step('one undo takes the whole scale back', near((await storedOf([left]))[0].size.h, 70) && near((await storedOf([right]))[0].size.h, 70))
 
@@ -501,11 +508,11 @@ try {
   step('dragging over a frame shows it as the drop target', dropTargets.length === 1 && dropTargets[0] === frameId, JSON.stringify(dropTargets))
   await until(async () => (await parentOf(left)) === frameId)
   step('a shape dropped into a frame becomes its child', (await parentOf(left)) === frameId)
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => (await parentOf(left)) == null)
   const backAt = (await storedOf([left]))[0].position
   step('one undo takes back the move and the parent', (await parentOf(left)) == null && near(backAt.x, 100) && near(backAt.y, 450), JSON.stringify(backAt))
-  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await page.keyboard.press(`${mod}+Shift+z`)
   await until(async () => (await parentOf(left)) === frameId)
   // Moving the frame takes its child along.
   await ai([{ command: 'element.move', params: { ids: [frameId], delta: [20, 0] } }])
@@ -573,8 +580,8 @@ try {
   const team = await newest(count + 2)
   await typeLabel('Team')
   step('Enter on a branch adds a sibling', (await labelOf(team, 'Team')).includes('Team') && (await elementCount()) === count + 2, `${team} "${await labelOf(team)}" ${await elementCount()} vs ${count + 2} ${JSON.stringify(await board(() => window.kitBoard.trace()))}`)
-  await page.keyboard.press('ControlOrMeta+z')
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => (await elementCount()) === count)
   step('undo takes the sibling (its label, then the node and branch) back', (await elementCount()) === count)
 
@@ -597,7 +604,7 @@ try {
   await kit.getByTestId('board-mind-direction-down').click()
   await until(async () => (await boxOf(goals)).y0 > (await boxOf(mapRoot)).y1)
   step('the panel turns the map to grow down', (await boxOf(goals)).y0 > (await boxOf(mapRoot)).y1 && (await boxOf(risks)).y0 > (await boxOf(mapRoot)).y1)
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => (await boxOf(goals)).x0 > (await boxOf(mapRoot)).x1)
   step('one undo turns it back', (await boxOf(goals)).x0 > (await boxOf(mapRoot)).x1)
   await page.keyboard.press('Escape')
@@ -692,7 +699,7 @@ try {
   await until(async () => (await selected()).length === 1)
   const kanbanFrame = (await selected())[0]
   step('a template is placed whole, its outer frame selected', (await elementCount()) === count + 14 && (await board((id) => document.querySelector(`[data-id="${id}"]`)?.getAttribute('data-kind'), kanbanFrame)) === 'frame', `${(await elementCount()) - count} elements, selected ${JSON.stringify(await selected())}`)
-  await page.keyboard.press('ControlOrMeta+z')
+  await page.keyboard.press(`${mod}+z`)
   await until(async () => (await elementCount()) === count)
   step('one undo takes the template away', (await elementCount()) === count)
 
