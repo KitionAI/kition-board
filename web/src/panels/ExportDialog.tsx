@@ -8,7 +8,7 @@
  * new and the file written through the host instead of a browser download.
  */
 import { useState } from 'react'
-import { Button, Checkbox, Choice, Dialog, toast, useKitEditor } from '@kition/kit-editor'
+import { Button, Checkbox, Choice, Dialog, toast, useKitEditor } from '@kition/sdk/editor'
 
 export type ExportFormat = 'png' | 'svg' | 'pdf'
 

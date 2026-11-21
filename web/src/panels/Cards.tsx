@@ -5,8 +5,8 @@
  * the card.
  */
 import { useState } from 'react'
-import { FileSymlinkIcon as FileSymlink, Link2Icon as Link2, TypeIcon as Type } from '@kition/tessera-icons/react'
-import { Button, Dialog, PanelSection, RibbonButton, useKitEditor } from '@kition/kit-editor'
+import { FileSymlinkIcon as FileSymlink, Link2Icon as Link2, TypeIcon as Type } from '@kition/tessera/icons/react'
+import { Button, Dialog, PanelSection, RibbonButton, useKitEditor } from '@kition/sdk/editor'
 
 /** `path` (a workspace path) as seen from the folder of `from` (the board's workspace path). */
 export function relativePath(from: string, path: string): string {

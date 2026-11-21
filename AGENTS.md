@@ -45,7 +45,7 @@ This repository is Kition's `kit.board` kit. The engine is Kition's own, in Rust
   writes the page replica itself.
 - `bindings/wasm` must keep passing `kition_kit::testing::check_contract`, and `kit.json` must
   pass kition-sdk's `tools/check-manifest.mjs` (`cargo xtask manifest`).
-- The editor (`web/`) draws on `@kition/kit-editor` with the host's theme tokens; files go only
+- The editor (`web/`) draws on `@kition/sdk/editor` with the host's theme tokens; files go only
   through the host. Never run the engine on the page's thread.
 - Code, comments, docs, tests, fixtures, and commit messages are English. Commit messages name the
   task card id. No host paths, user names, or secrets in tracked files.

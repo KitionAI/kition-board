@@ -16,7 +16,7 @@
  * agent previews.
  */
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
-import { FrameChrome, type KitCanvasHandle, type Strings } from '@kition/kit-editor'
+import { FrameChrome, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
 import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rect, rotate, union, type Point, type Rect } from '../board/geometry'
 import { ElementLayer, type Override, type Viewport } from '../board/layer'
 import { controlLanes, graphOf, isMindNode } from '../board/mindmap'

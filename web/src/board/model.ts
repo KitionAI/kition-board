@@ -7,7 +7,7 @@
  * The read side of Kition's `packages/board-editor/src/kdm/boardKdmRead.ts`, for schema v2 and the
  * rules of `crates/kdm/kdm-model/src/view.rs`.
  */
-import type { Replica } from '@kition/kdm'
+import type { Replica } from '@kition/sdk/kdm'
 import { anchorPoint, rect, rectOfPoints, rotatedBounds, union, type Point, type Rect } from './geometry'
 import { hiddenByCollapse, isMindNode } from './mindmap'
 

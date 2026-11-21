@@ -6,9 +6,9 @@
  * Ported from Kition's `packages/board-editor/src/components/WhiteboardTemplateGallery.tsx` (the
  * gallery and its categories).
  */
-import { CalendarRangeIcon as CalendarRange, ClipboardListIcon as ClipboardList, Columns3Icon as Columns3, GitBranchIcon as GitBranch, NetworkIcon as Network, PresentationIcon as Presentation } from '@kition/tessera-icons/react'
-import { Button, Dialog, ICON_STROKE, useKitEditor } from '@kition/kit-editor'
-import { type IconComponent } from '@kition/tessera-icons/react'
+import { CalendarRangeIcon as CalendarRange, ClipboardListIcon as ClipboardList, Columns3Icon as Columns3, GitBranchIcon as GitBranch, NetworkIcon as Network, PresentationIcon as Presentation } from '@kition/tessera/icons/react'
+import { Button, Dialog, ICON_STROKE, useKitEditor } from '@kition/sdk/editor'
+import { type IconComponent } from '@kition/tessera/icons/react'
 
 export const TEMPLATES: ReadonlyArray<{ id: string; icon: IconComponent }> = [
   { id: 'mindmap', icon: Network },

@@ -5,8 +5,8 @@
  * Ported from the mind-map part of Kition's `packages/board-editor/src/components/WhiteboardSelectionToolbar.tsx`
  * (the direction menu) and the actions of `hooks/useWhiteboardMindMapActions.ts`.
  */
-import { ArrowDownIcon as ArrowDown, ArrowLeftIcon as ArrowLeft, ArrowLeftRightIcon as ArrowLeftRight, ArrowRightIcon as ArrowRight, ChevronsDownUpIcon as ChevronsDownUp, ChevronsUpDownIcon as ChevronsUpDown, GitBranchPlusIcon as GitBranchPlus, ListPlusIcon as ListPlus } from '@kition/tessera-icons/react'
-import { PanelSection, RibbonButton, Segmented, useKitEditor } from '@kition/kit-editor'
+import { ArrowDownIcon as ArrowDown, ArrowLeftIcon as ArrowLeft, ArrowLeftRightIcon as ArrowLeftRight, ArrowRightIcon as ArrowRight, ChevronsDownUpIcon as ChevronsDownUp, ChevronsUpDownIcon as ChevronsUpDown, GitBranchPlusIcon as GitBranchPlus, ListPlusIcon as ListPlus } from '@kition/tessera/icons/react'
+import { PanelSection, RibbonButton, Segmented, useKitEditor } from '@kition/sdk/editor'
 import type { Direction } from '../board/mindmap'
 
 export type MindNodeState = { id: string; root: boolean; direction: Direction; collapsed: boolean; branches: number }

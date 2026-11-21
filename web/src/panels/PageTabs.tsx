@@ -11,8 +11,8 @@
  * is shown after an undo or when the shown page goes. A viewer only switches pages.
  */
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { ChevronDownIcon as ChevronDown, PlusIcon as Plus } from '@kition/tessera-icons/react'
-import { ContextMenu, IconButton, MenuItem, MenuSeparator, useKitEditor, useReadOnly, type ContextMenuPoint } from '@kition/kit-editor'
+import { ChevronDownIcon as ChevronDown, PlusIcon as Plus } from '@kition/tessera/icons/react'
+import { ContextMenu, IconButton, MenuItem, MenuSeparator, useKitEditor, useReadOnly, type ContextMenuPoint } from '@kition/sdk/editor'
 
 export type PageTab = { id: string; name: string }
 

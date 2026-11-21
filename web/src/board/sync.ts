@@ -8,7 +8,7 @@
  * revisions the page already has); everything is fetched once at open, in batches of 500, so
  * panning and zooming fetch nothing (spike S2, 5.2).
  */
-import { parseSchema, randomActor, Replica } from '@kition/kdm'
+import { parseSchema, randomActor, Replica } from '@kition/sdk/kdm'
 import schemaJson from '../../../crates/kdm/kdm-model/model/schema.json'
 import type { Rect } from './geometry'
 import { BoardView } from './model'

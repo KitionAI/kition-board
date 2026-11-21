@@ -10,8 +10,8 @@
  * panel and controls; the swatches' colours come from the engine's palette.
  */
 import { useEffect, useState } from 'react'
-import { BanIcon as Ban, CornerDownRightIcon as CornerDownRight, DashDashedIcon as DashDashed, DashDottedIcon as DashDotted, DashSolidIcon as DashSolid, Grid3x3Icon as Grid3X3, MoveUpRightIcon as MoveUpRight, SplineIcon as Spline, SquareIcon as Square, SunMediumIcon as SunMedium, TextAlignCenterIcon as TextAlignCenter, TextAlignEndIcon as TextAlignEnd, TextAlignStartIcon as TextAlignStart } from '@kition/tessera-icons/react'
-import { Choice, NumberField, PanelSection, Segmented, useKitEditor, type Segment } from '@kition/kit-editor'
+import { BanIcon as Ban, CornerDownRightIcon as CornerDownRight, DashDashedIcon as DashDashed, DashDottedIcon as DashDotted, DashSolidIcon as DashSolid, Grid3x3Icon as Grid3X3, MoveUpRightIcon as MoveUpRight, SplineIcon as Spline, SquareIcon as Square, SunMediumIcon as SunMedium, TextAlignCenterIcon as TextAlignCenter, TextAlignEndIcon as TextAlignEnd, TextAlignStartIcon as TextAlignStart } from '@kition/tessera/icons/react'
+import { Choice, NumberField, PanelSection, Segmented, useKitEditor, type Segment } from '@kition/sdk/editor'
 import type { Kind } from '../board/model'
 import { ARROWHEADS, CONNECTOR_TYPES, DASH_STYLES, FONT_FAMILIES, STROKE_SIZES, type Style, type StyleAnswer, type StyleField, type StyleValue, type Swatch } from '../board/style'
 

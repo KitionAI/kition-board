@@ -1,4 +1,4 @@
-/* The board editor's own styles; everything else comes from @kition/kit-editor and the host's theme tokens. */
+/* The board editor's own styles; everything else comes from @kition/sdk/editor and the host's theme tokens. */
 
 .board-body {
   position: relative;

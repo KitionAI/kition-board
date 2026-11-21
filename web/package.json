@@ -14,12 +14,8 @@
     "test:pages": "node tests/pages.mjs chromium && node tests/pages.mjs webkit"
   },
   "dependencies": {
-    "@kition/kdm": "^0.5.1",
-    "@kition/kit-dev-host": "^0.5.1",
-    "@kition/kit-host": "^0.5.1",
-    "@kition/kit-ui-protocol": "^0.5.1",
-    "@kition/kit-editor": "^0.5.1",
-    "@kition/tessera-icons": "^0.1.0",
+    "@kition/sdk": "npm:@kitionstage/sdk@0.5.2-stage.2",
+    "@kition/tessera": "npm:@kitionstage/tessera@0.1.1-stage.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

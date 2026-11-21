@@ -16,7 +16,7 @@ Board in your own app, start with the [README](../README.md).
 | `crates/formats/kboard` | `kition-board-kboard`: the `.kboard` ZIP container, as bytes |
 | `bindings/wasm` | `kition-board-kit`: `BoardDocument` (`KitDocument`, contract 2 session members, extras), the editor's engine |
 | `bindings/headless` | `kition-board`: the same document over the Kit Protocol, the headless executable |
-| `web/` | The kit's editor on `@kition/kit-editor`: the canvas draws the engine's fragments over a page replica and sends each gesture as one engine command (R2c) |
+| `web/` | The kit's editor on `@kition/sdk/editor`: the canvas draws the engine's fragments over a page replica and sends each gesture as one engine command (R2c) |
 | `agent/` | The agent guide and the check catalogue |
 | `conformance/` | One fixture per check code |
 | `cases/` | The test cases of the feature catalogue (`features.yaml`, beside `kit.json`), and `waivers.yaml` |
@@ -32,7 +32,7 @@ Board in your own app, start with the [README](../README.md).
   New files are `Untitled board.kboard`. The details are in [design.md](design.md).
 - **One engine everywhere.** The engine implements kition-sdk's `KitDocument` on a KDM session
   (engine contract 2). It runs in the page as WebAssembly in a Web Worker under the kit's own
-  editor (`web/`, on `@kition/kit-editor`), and headless as `kition-board` for agents, which write
+  editor (`web/`, on `@kition/sdk/editor`), and headless as `kition-board` for agents, which write
   boards through commands ([writing-format.md](writing-format.md)).
 
 ## Build and check
@@ -65,14 +65,16 @@ beside this repository (or `KITION_FONTS_DIR`). On machines where Apple's toolch
 WebAssembly, set `CC_wasm32_unknown_unknown` and `AR_wasm32_unknown_unknown` to an LLVM `clang`
 and `llvm-ar` for the engine build.
 
-By default `pnpm install` in `web/` installs the published `@kition/*` packages from npm, at the
-versions the committed `web/pnpm-lock.yaml` pins, so the editor needs no other checkout. To work
-against local checkouts instead, run `KITION_LINK=1 pnpm install` in `web/`: `web/.pnpmfile.cjs`
-then links `@kition/kdm`, `@kition/kit-dev-host`, `@kition/kit-host`, `@kition/kit-ui-protocol`
-and `@kition/kit-editor` from the kition-sdk checkout and `@kition/tessera-icons` from the
-kition-tessera checkout next to this repository (or the ones `KITION_SDK` and `KITION_TESSERA`
-name), each one whose package is there. The linked install rewrites `web/pnpm-lock.yaml`; do not
-commit that lockfile.
+By default `pnpm install` in `web/` installs the published `@kition/sdk` and `@kition/tessera`
+packages from npm, at the versions the committed `web/pnpm-lock.yaml` pins, so the editor needs no
+other checkout. Until their first release under `@kition` they install from the rehearsal copies by
+npm alias (`npm:@kitionstage/sdk@…`, `npm:@kitionstage/tessera@…` in `web/package.json`), so the code
+imports the final names. To work against local checkouts instead, run `KITION_LINK=1 pnpm install`
+in `web/`: `web/.pnpmfile.cjs` then links `@kition/sdk` from the kition-sdk checkout
+(`packages/sdk`) and `@kition/tessera` from the kition-tessera checkout (`packages/tessera`) next to
+this repository (or the ones `KITION_SDK` and `KITION_TESSERA` name), each one whose package is
+there. Both packages' `exports` point at their built `dist/`, so run `pnpm build` in those two
+folders first. The linked install rewrites `web/pnpm-lock.yaml`; do not commit that lockfile.
 
 ## Take the README pictures
 

@@ -20,7 +20,7 @@ import {
   type KitEngineInfo,
   type Phrases,
   type RailTool,
-} from '@kition/kit-editor'
+} from '@kition/sdk/editor'
 import { BoardCanvas, type BoardCanvasApi } from './canvas/BoardCanvas'
 import type { DocumentArea } from './canvas/Minimap'
 import { useColorScheme } from './colorScheme'
@@ -29,7 +29,7 @@ import { engineManifest } from './engine'
 import { CATALOGS, summary } from './strings'
 import type { Style } from './board/style'
 import { graphOf } from './board/mindmap'
-import { DownloadIcon as Download, LayoutTemplateIcon as LayoutTemplate } from '@kition/tessera-icons/react'
+import { DownloadIcon as Download, LayoutTemplateIcon as LayoutTemplate } from '@kition/tessera/icons/react'
 import { CardSection, LinkDialog, relativePath, type CardState } from './panels/Cards'
 import { ExportDialog } from './panels/ExportDialog'
 import { PageTabs, type PageTab } from './panels/PageTabs'
