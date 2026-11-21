@@ -368,7 +368,8 @@ const DERIVED: &[Row] = &[
 
 // The pin cannot replay a scoped derived predicate: root values are whole-register facts, and
 // a Within window holds every positional field even when only the list index is requested.
-// Keep these cells, with the same oracle, in explicitly failing SDK tests.
+// Keep these cells, with the same oracle, in SDK tests that are ignored until kition-sdk can
+// (`cargo test -p kition-board --test matrix3 -- --ignored`).
 fn sdk_derived(row: &str, role: &str, change: &str) -> bool {
     match row {
         "fit" => matches!((role, change), ("c" | "s", "delete" | "out" | "in") | ("f", "in")),
@@ -419,6 +420,7 @@ async fn derived_results_matrix() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "waits for kition-sdk: scoped derived facts (a frame's or group's membership held per subtree, not as a whole root register), z-order Within windows that hold only the list index, and `deleted`/`relocated` instead of `changed` for a removed or moved derived dependency"]
 async fn waiting_for_sdk_scoped_facts_and_z_windows() {
     derived(true).await;
 }
@@ -474,6 +476,7 @@ async fn page_addresses_matrix() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "waits for kition-sdk: a numeric (`target {page:N}`) or implicit (active page) page context that holds the page the agent observed when another writer inserts, deletes or moves pages before it, and the list gap of a deleted page"]
 async fn waiting_for_sdk_page_context_and_deleted_gap() {
     pages(true).await;
 }
@@ -549,6 +552,7 @@ async fn own_dependencies_matrix() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "waits for kition-sdk: a held member of the command's own group or mind map that another writer deleted or re-parented is refused as `deleted`/`relocated`, not `changed`"]
 async fn waiting_for_sdk_own_dependencies() {
     own_dependencies(true).await;
 }
@@ -672,6 +676,7 @@ async fn named_targets_and_content_extremes_matrix() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "waits for kition-sdk: a content-extreme contributor of default card or image placement that another writer deleted, moved or resized is refused as `deleted`/`relocated`, not `changed`"]
 async fn waiting_for_sdk_content_extreme_reasons() {
     named_targets_and_content_extremes(true).await;
 }
