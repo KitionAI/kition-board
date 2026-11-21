@@ -251,6 +251,7 @@ features:
     priority: P1
     status: partial
     commands: [edit.undo, edit.redo]
-    paths: [bindings/wasm/src/lib.rs]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/tests/undo_cancelled_group.rs]
     gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
+    cases: [regressions/issue-undo-cancelled-group]
     since: "2026-11-17"

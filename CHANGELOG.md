@@ -9,6 +9,7 @@ each package is published with a `package-v<version>` tag.
 - A forked board can start a sync room: the fork records the document's birth, so its replica carries its whole history (sync rule S20), also for a fork of a fork and after edits and saves. Forks made by earlier 0.1.4 development builds record none and are refused as a room's first state; fork them again.
 - In the dark scheme a shape's text reads on its own fill: on a fill in the file's own colour (a pastel sticky note, say) the text is drawn dark or light for contrast with that fill, not light because the scheme is dark.
 - The status bar counts in the singular and plural ("1 element · 1 page", "10 elements · 2 pages"), in every locale.
+- An undo group whose changes come to nothing (a `model.batch` that moves a shape and moves it back, or types in a sticky note and deletes it again) is no Undo step of its own: one Undo takes back the edit before it, as before kition-sdk 6b4d471 (kition-sdk 6672663, KitModel M12).
 - The headless program speaks Kit Process Protocol version 1 (`headless.protocol` is `kition-kit/1`), as hosts on kition-sdk from bb1b07b require.
 
 ## 0.1.3

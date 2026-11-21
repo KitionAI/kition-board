@@ -1,0 +1,18 @@
+format: 1
+id: regressions/issue-undo-cancelled-group
+feature: board.history
+intent: >-
+  An undo group whose changes come to nothing (one model.batch that moves a shape and moves it
+  back, or types in a sticky note and deletes it again) is no step of its own (KitModel M12): one
+  Undo after [a real edit, that group] takes back the real edit, one Redo puts it back, and Undo
+  and Redo are enabled exactly while a step is left. On kition-sdk 6b4d471 the first Undo changed
+  nothing and the real edit was left for the next one; kition-sdk 6672663 passes over such a group.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/undo_cancelled_group.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: undo_cancelled_group}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-20"
