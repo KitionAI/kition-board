@@ -55,6 +55,11 @@ pnpm dev                     # dev.html opens public/sample/Sample.kboard
 pnpm test:flow               # tests/flow.mjs in Chromium and WebKit (proxy variables unset)
 ```
 
+The flow's commit budget is spike S2-1's 16 ms (one frame at 60 Hz), a product target measured on
+a maintainer's machine. On a slower machine, `KITION_BUDGET_SCALE=<n>` (a number ≥ 1) multiplies
+it; it is 1 by default and 2 on GitHub's hosted runners (`GITHUB_ACTIONS=true`), whose 4 shared
+vCPUs measured a 22 ms median. The pan budgets are paced by the display and are not scaled.
+
 The engine build (`web/scripts/build-engine.sh`) copies its fonts from a kition-fonts checkout
 beside this repository (or `KITION_FONTS_DIR`). On machines where Apple's toolchain cannot archive
 WebAssembly, set `CC_wasm32_unknown_unknown` and `AR_wasm32_unknown_unknown` to an LLVM `clang`
