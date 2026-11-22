@@ -500,10 +500,11 @@ try {
   const shapeUndone = await until(async () => (await storedOne(rectangle))?.shapeType === 'rectangle', 50)
   const panelFollows = await until(async () => (await shapeType.inputValue()) === 'rectangle', 30)
   const connectorUndone = await storedOne(shapeConnector)
+  const stillBound = connectorUndone?.start?.binding?.target === rectangle && connectorUndone?.end?.binding?.target === archive
   step(
     'one undo brings the rectangle back',
-    shapeUndone && panelFollows && connectorUndone?.start?.binding?.target === rectangle,
-    `shapeType ${(await storedOne(rectangle))?.shapeType}, panel ${await shapeType.inputValue().catch(() => 'gone')}`,
+    shapeUndone && panelFollows && stillBound,
+    `shape back ${shapeUndone}, panel follows ${panelFollows}, connector bound ${stillBound}; now shapeType ${(await storedOne(rectangle))?.shapeType}, panel ${await shapeType.inputValue().catch(() => 'gone')}, connector ${JSON.stringify([connectorUndone?.start, connectorUndone?.end])}`,
   )
 
   // 12. Cmd/Ctrl+B on "the" in L's label: the bar's Bold is pressed, the commit stores a bold mark

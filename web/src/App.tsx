@@ -329,6 +329,18 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     [editor, styleTarget, tool],
   )
 
+  // The panels below read the selected elements from the page's view, which a pull fills after the
+  // engine's revision moved: once a pull changed a selected element, they read it again (else the
+  // Shape section would show the type from before an undo until something else drew the editor).
+  const [selectedChanged, setSelectedChanged] = useState(0)
+  useEffect(() => {
+    if (!sync) return undefined
+    const stop = sync.subscribe((changed) => {
+      if (selectionRef.current.some((id) => changed.has(id))) setSelectedChanged((n) => n + 1)
+    })
+    return () => void stop()
+  }, [selectionRef, sync])
+
   // The engine's shape library (`shape.previews`), asked for once when the board opened.
   const previews = useMemo(() => (sync && isPreviews(sync.previews) ? sync.previews : null), [sync])
   // Selected plain or flow-chart shapes, none locked, can take another shape from the library.
@@ -345,7 +357,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     return { groups, value: types.size === 1 ? [...types][0] : null }
     // The view changes in place; `change.revision` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [change.revision, previews, readOnly, selection, sync, tool]))
+  }, [change.revision, previews, readOnly, selectedChanged, selection, sync, tool]))
   /**
    * Another shape for the selected shapes: one `element.update` per shape (the engine has no
    * command that sets `shapeType` on several elements at once, so several shapes are as many undo
@@ -373,7 +385,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     return { id, root: graph.root === id, direction: graph.direction, collapsed: element.mindMapCollapsed, branches: graph.map.children.get(id)?.length ?? 0 }
     // The view changes in place; `change.revision` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [change.revision, readOnly, selection, sync]))
+  }, [change.revision, readOnly, selectedChanged, selection, sync]))
   // A single selected card gets its target and caption in the panel.
   const cardState = useStable(useMemo<CardState | null>(() => {
     if (!sync || readOnly || selection.length !== 1) return null
@@ -382,7 +394,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     return { id: element.id, ...element.card }
     // The view changes in place; `change.revision` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [change.revision, readOnly, selection, sync]))
+  }, [change.revision, readOnly, selectedChanged, selection, sync]))
   const retarget = useCallback(async () => {
     if (!cardState) return
     if (cardState.kind === 'link') {
@@ -416,7 +428,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     return element?.kind === 'frame' ? { id: element.id, title: element.text } : null
     // The view changes in place; `change.revision` says when.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [change.revision, selection, sync])
+  }, [change.revision, selectedChanged, selection, sync])
 
   const grow = useCallback((sibling: boolean) => {
     if (mindNode) canvasApi.current?.grow(mindNode.id, sibling)

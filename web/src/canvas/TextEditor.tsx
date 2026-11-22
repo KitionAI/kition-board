@@ -157,6 +157,10 @@ export function TextEditor({
   const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: editing.value.length })
   const [linking, setLinking] = useState<{ start: number; end: number; text: string } | null>(null)
   const [, setTick] = useState(0)
+  // The focus moving between the text box and the link field is not leaving the editor, whatever
+  // the browser says the next focus is.
+  const openingLink = useRef(false)
+  const returning = useRef(false)
   const rich = editing.marks != null
 
   // Focused once the pointer press that opened the box is over: the Text tool opens a new box on
@@ -199,6 +203,7 @@ export function TextEditor({
     if (!box || box.selectionStart >= box.selectionEnd) return
     const { selectionStart: start, selectionEnd: end } = box
     const current = markOver(marks.current.stored, marks.current.pending, 'link', start, end)
+    openingLink.current = true
     setLinking({ start, end, text: current && current !== true ? current.href : '' })
   }
 
@@ -207,7 +212,9 @@ export function TextEditor({
    * focus moves inside the editor, so nothing commits).
    */
   const backToText = (start: number, end: number) => {
+    returning.current = true
     field.current?.focus()
+    returning.current = false
     field.current?.setSelectionRange(start, end)
     readSelection()
     setLinking(null)
@@ -264,7 +271,7 @@ export function TextEditor({
               autoFocus
               onChange={(event) => setLinking({ ...linking, text: event.target.value })}
               onBlur={(event) => {
-                if (leaving(event.relatedTarget)) finish(true)
+                if (!returning.current && leaving(event.relatedTarget)) finish(true)
               }}
               onKeyDown={(event) => {
                 event.stopPropagation()
@@ -316,6 +323,10 @@ export function TextEditor({
           composing.current = false
         }}
         onBlur={(event) => {
+          if (openingLink.current) {
+            openingLink.current = false
+            return
+          }
           if (leaving(event.relatedTarget)) finish(true)
         }}
         onKeyDown={(event) => {

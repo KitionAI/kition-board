@@ -220,3 +220,41 @@ fn previews_carry_the_outline_a_bound_end_meets() {
         assert_eq!(outline(name), Some(json!(corners)), "{name}");
     }
 }
+
+/// The style panel's Shape section (case `board.editing/change-shape`): the person's
+/// `element.update { shapeType }` on a shape an agent drew and joined keeps the connector bound to
+/// it, and the person's one undo brings back the shape and the connector as they were.
+#[test]
+fn a_persons_shape_change_keeps_the_connector_and_one_undo_restores_both() {
+    use kition_kit::kdm::Origin;
+    use kition_kit::session::KitSessionDocument;
+    let agent = Origin::agent("agent:test");
+    let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
+    let made = doc
+        .execute_as(
+            "element.create",
+            json!({ "elements": [
+                { "kind": "shape", "position": [80, 120], "size": [200, 120], "text": "Report" },
+                { "kind": "shape", "position": [480, 120], "size": [160, 100], "text": "Archive" },
+            ] }),
+            &agent,
+        )
+        .unwrap();
+    let (a, b) = (made["created"][0].as_str().unwrap().to_owned(), made["created"][1].as_str().unwrap().to_owned());
+    let joined = doc.execute_as("connector.create", json!({ "from": { "element": a }, "to": { "element": b } }), &agent).unwrap();
+    let connector = joined["created"][0].as_str().unwrap().to_owned();
+    let stored = |doc: &mut BoardDocument, id: &str| -> Value {
+        let payload = doc.execute("clipboard.copy", json!({ "ids": [id] })).unwrap();
+        payload["elements"].as_array().unwrap().iter().find(|element| element["ref"] == id).cloned().unwrap()
+    };
+    let before = stored(&mut doc, &connector);
+    doc.execute("element.update", json!({ "id": a, "set": { "shapeType": "document" } })).unwrap();
+    let changed = stored(&mut doc, &connector);
+    assert_eq!(stored(&mut doc, &a)["shapeType"], json!("document"));
+    assert_eq!((changed["start"]["binding"]["target"].clone(), changed["end"]["binding"]["target"].clone()), (json!(a), json!(b)), "{changed}");
+    assert!(doc.execute("edit.undo", json!({})).unwrap()["done"].as_bool().unwrap());
+    assert_eq!(stored(&mut doc, &a)["shapeType"], json!("rectangle"));
+    let undone = stored(&mut doc, &connector);
+    assert_eq!(undone["start"], before["start"], "the connector's start as before the change: {before} / {undone}");
+    assert_eq!(undone["end"], before["end"], "{before} / {undone}");
+}

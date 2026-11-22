@@ -217,12 +217,13 @@ try {
     await until(async () => (await state()) === wanted, 50)
     redone.push((await state()) === wanted)
   }
-  const distinct = new Set(timeline).size === 5
+  // Nothing before the drawing and after the delete; three different states between.
+  const distinct = timeline[0] === 'none' && timeline[4] === 'none' && new Set(states.slice(0, 3)).size === 3 && !states.slice(0, 3).includes('none')
   const filledMoved = states[2]
   step(
     'undo then redo of create, move, style and delete restore each state',
     distinct && undone.every(Boolean) && redone.every(Boolean) && filledMoved.includes('"fill":"green"'),
-    `states ${JSON.stringify(timeline)}; undone ${JSON.stringify(undone)}, redone ${JSON.stringify(redone)}`,
+    `states distinct ${distinct}, filled green ${filledMoved.includes('"fill":"green"')}: ${JSON.stringify(timeline)}; undone ${JSON.stringify(undone)}, redone ${JSON.stringify(redone)}`,
   )
   // One more undo brings the filled shape back; the board saved then reopens with it.
   await kit.getByTestId('board-undo').click()
