@@ -43,8 +43,13 @@ cargo xtask manifest        # kition-sdk tools/check-manifest.mjs on kit.json
 cargo build --release -p kition-board
 ```
 
-`cargo xtask ci` is the check every change passes ([quality.md](quality.md)). kition-sdk is a git
-dependency pinned by commit in `Cargo.toml`; the toolchain is Rust 1.95 or newer.
+`cargo xtask ci` is the check every change passes ([quality.md](quality.md)), in the kit's CI run
+on GitHub (`.github/workflows/ci.yml` calls Kition's reusable kit CI, which also runs clippy,
+`cargo test --workspace` and every `test:*` script of `web/`). On your machine, run only the fast
+checks: `cargo fmt --all -- --check`, `cargo check -p <touched crates> --all-targets`,
+`cargo xtask wasm` and `pnpm typecheck` in `web/`. A change is done when the CI run of HEAD passes
+and HEAD is on `origin/main` (Kition's `scripts/kit-ci.sh` `push`, `wait`, `land`). kition-sdk is
+a git dependency pinned by commit in `Cargo.toml`; the toolchain is Rust 1.95 or newer.
 
 The editor (`web/`) and its development host:
 

@@ -55,8 +55,9 @@ This repository is Kition's `kit.board` kit. The engine is Kition's own, in Rust
   task card id. No host paths, user names, or secrets in tracked files.
 - Code moved or ported from Kition or another kit names its source in the commit message that
   brings it in; there is no change ledger.
-- No CI workflows in this repository besides the Package workflow (`.github/workflows/package.yml`),
-  which Kition's reusable workflow runs to publish the kit's package.
+- Two workflows, both calling Kition's reusable workflows: CI (`.github/workflows/ci.yml`, the
+  kit CI) and Package (`.github/workflows/package.yml`, which publishes the kit's package). Do not
+  add other workflows, and do not start the Package workflow: releasing is the owner's step.
 
 ## Never crash
 
@@ -70,4 +71,10 @@ This repository is Kition's `kit.board` kit. The engine is Kition's own, in Rust
 
 ## Working here
 
-- `cargo xtask ci` before every commit. Parallel agents: separate `CARGO_TARGET_DIR` per agent.
+- On your machine, run only the fast checks: `cargo fmt --all -- --check`, `cargo check -p
+  <touched crates> --all-targets`, the wasm check (`cargo xtask wasm`) and `pnpm typecheck` in
+  `web/`. The full checks run in the kit's CI run on GitHub: clippy, `cargo test --workspace`,
+  `cargo xtask ci` (fmt, clippy -D warnings, tests including `check_contract`, wasm check) and
+  every `test:*` script of `web/`. A task is done when the CI run of HEAD passes and HEAD is on
+  `origin/main` (Kition's `scripts/kit-ci.sh` `push`, `wait`, `land`).
+- Parallel agents: separate `CARGO_TARGET_DIR` per agent.
