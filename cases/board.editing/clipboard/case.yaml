@@ -1,0 +1,30 @@
+format: 1
+id: board.editing/clipboard
+feature: board.editing
+intent: >-
+  Copy, cut, paste, Alt-drag duplicate and the canvas menu in the editor, through the development
+  host (web/tests/editing.mjs steps 1 to 9): Cmd/Ctrl+C then V pastes one copy, selected, as one
+  element.paste and one undo step; a second paste at the same place is 16 units on; cut removes the
+  selection and paste brings it back; a connector copied with the two shapes it joins is pasted bound
+  to the copies; Alt pressed during a drag leaves the original and makes one copy at the drop (one
+  element.duplicate, one undo step); the canvas menu selects the element it opens on and its Send to
+  back and Bring to front change the page's order; on the empty canvas it offers Paste and Select
+  all; a locked element's menu offers Unlock with Delete and Cut off; a read-only board neither cuts
+  nor pastes, and its menu offers Copy only.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/editing.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

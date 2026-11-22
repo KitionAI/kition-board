@@ -16,7 +16,8 @@
  * agent previews.
  */
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
-import { FrameChrome, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
+import { FrameChrome, toast, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
+import * as clipboard from '../board/clipboard'
 import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rect, rotate, union, type Point, type Rect } from '../board/geometry'
 import { rayAnchor } from '../board/outline'
 import { ElementLayer, type Override, type Viewport } from '../board/layer'
@@ -28,6 +29,7 @@ import type { BoardSync } from '../board/sync'
 import { handleCursor, handlePoint, resized, resizedRotated, scaleOverrides } from '../board/resize'
 import { styleFor, type Style } from '../board/style'
 import { TOOL_KEYS, type Tool } from '../tools'
+import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
 import { TextEditor, type TextEditing } from './TextEditor'
 
@@ -48,6 +50,8 @@ type Props = {
   sync: BoardSync
   page: string | null
   run: (command: string, params: Record<string, unknown>) => Promise<string | null>
+  /** A reading command (`clipboard.copy`), also in a read-only board; answers parsed JSON or null. */
+  query: (command: string, params: Record<string, unknown>) => Promise<unknown>
   tool: Tool
   shapeType: string
   /** What the drawing tools give new elements, and the highlighter its strokes. */
@@ -82,7 +86,11 @@ type EndTarget = { element: string; anchor: [number, number] | null; point: Poin
 
 type Gesture =
   | { type: 'pan'; start: Point; from: Viewport }
-  | { type: 'move'; start: Point; roots: string[]; moving: Set<string>; base: Rect; connectors: string[]; delta: Point; moved: boolean; frames: Array<{ id: string; box: Rect }>; centers: Point[] }
+  /**
+   * Alt pressed during the drag makes copies at the drop instead (one element.duplicate); Alt held
+   * from the press (`altAtStart`) moves without snapping, as before.
+   */
+  | { type: 'move'; start: Point; roots: string[]; moving: Set<string>; base: Rect; connectors: string[]; delta: Point; moved: boolean; frames: Array<{ id: string; box: Rect }>; centers: Point[]; altAtStart: boolean }
   | { type: 'resize'; id: string; handle: Handle; box: Rect; rotation: number; current: Rect }
   | { type: 'scale'; roots: string[]; moving: string[]; handle: Handle; box: Rect; current: Rect }
   | { type: 'rotate'; ids: string[]; origin: Point; start: number; degrees: number }
@@ -120,6 +128,17 @@ function touchedBy(answer: Record<string, unknown> | null): string[] {
   })
 }
 
+/** The ids a command's answer names as made. */
+function createdOf(answer: Record<string, unknown> | null): string[] {
+  const ids = answer?.created
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
+}
+
+/** Whether `target` is a field that keeps its own clipboard. */
+function typingIn(target: EventTarget | null): boolean {
+  return (target as Element | null)?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])') != null
+}
+
 export function BoardCanvas(props: Props) {
   const { sync, page, run, tool, shapeType, onTool, readOnly, selection, onSelection, onZoom, t } = props
   const container = useRef<HTMLDivElement>(null)
@@ -145,6 +164,16 @@ export function BoardCanvas(props: Props) {
   const space = useRef(false)
   const latest = useRef(props)
   latest.current = props
+  const editingNow = useRef(editing)
+  editingNow.current = editing
+  /** Where the pointer is over the canvas (client coordinates), for a paste; null outside it. */
+  const pointer = useRef<Point | null>(null)
+  /** A Cmd/Ctrl+V waiting for the browser's paste event; `handled` once one of the two pasted. */
+  const pasteKey = useRef<{ at: Point; handled: boolean } | null>(null)
+  /** The canvas menu: where it opened (in the board too), and the elements it is on (null: the empty canvas). */
+  const [menu, setMenu] = useState<{ at: Point; world: Point; ids: string[] | null } | null>(null)
+  /** The paste and drop of this render, for the page's listeners and the test hooks. */
+  const clip = useRef<{ paste: (from: clipboard.Carried, at: Point | null) => void; drop: (files: File[], clientX: number, clientY: number) => void }>({ paste: () => undefined, drop: () => undefined })
 
   const store = useMemo<ViewportStore>(
     () => ({
@@ -280,6 +309,8 @@ export function BoardCanvas(props: Props) {
         await commitRef.current('element.move', { ids, delta: [dx, dy] })
         return performance.now() - started
       },
+      paste: (files, text) => clip.current.paste({ files, text: text ?? null, stale: false }, null),
+      drop: (files, clientX, clientY) => clip.current.drop(files, clientX, clientY),
     }
     return () => {
       stop()
@@ -480,9 +511,215 @@ export function BoardCanvas(props: Props) {
     [commit, openText],
   )
 
+  /** Selects what a command made: its outermost elements (a frame's or a group's copy, not what is inside it). */
+  const selectMade = (created: string[]) => {
+    const made = new Set(created)
+    const roots = created.filter((id) => !made.has(sync.view.elements.get(id)?.parent ?? ''))
+    if (roots.length) latest.current.onSelection(roots)
+  }
+
+  /** The board point under the pointer, else the middle of the view. */
+  const pointerWorld = (): Point => {
+    const at = pointer.current
+    if (at) return toWorld(at.x, at.y)
+    const v = viewport.current
+    return { x: v.x + v.width / v.zoom / 2, y: v.y + v.height / v.zoom / 2 }
+  }
+
+  /** The page commands that place something name: the one shown. */
+  const onPage = (): Record<string, unknown> => (latest.current.page ? { page: latest.current.page } : {})
+
+  // The clipboard (design note 4.3): every change is one engine command; a copy changes nothing.
+  const copyIds = (ids: readonly string[]) => {
+    void clipboard.copy(latest.current.query, ids)
+  }
+  const cutIds = (ids: readonly string[]) => {
+    void clipboard.copy(latest.current.query, ids).then((copied) => {
+      if (!copied || latest.current.readOnly) return
+      latest.current.onSelection([])
+      void commit('element.delete', { ids: [...ids] })
+    })
+  }
+  /** Pastes the board payload `from` holds (or the copy kept here) with its top-left at `at`; selects the copies. */
+  const pasteBoard = async (from: clipboard.Carried | null, at: Point) => {
+    const payload = await clipboard.payloadFor(from)
+    if (!payload || latest.current.readOnly) return
+    const place = clipboard.pastePlace(at)
+    selectMade(createdOf(await commit('element.paste', { ...onPage(), payload, at: [place.x, place.y] })))
+  }
+  /** One image.insert per picture, centred on `at` and each further one 24 units on; selects them. */
+  const placePictures = async (files: File[], at: Point, named: boolean) => {
+    const made: string[] = []
+    for (const [index, file] of files.entries()) {
+      const mime = clipboard.pictureMime(file)
+      if (!mime) continue
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        const centre = { x: at.x + index * clipboard.PICTURE_STEP, y: at.y + index * clipboard.PICTURE_STEP }
+        const answer = await latest.current.run('image.insert', { ...onPage(), ...(await clipboard.pictureParams(bytes, mime, named ? file.name : '', centre)) })
+        made.push(...createdOf(answer ? (JSON.parse(answer) as Record<string, unknown>) : null))
+      } catch (error) {
+        // Too large, or not a picture after all: the engine's reason, as the picture tool shows it.
+        toast('error', latest.current.t('pictureFailed'), errorText(error))
+      }
+    }
+    if (!made.length) return
+    await sync.pull(made)
+    latest.current.onSelection(made)
+  }
+  /** A paste's content: pictures win over board text; `at` is where the key was pressed (else the pointer). */
+  const pasteContent = (from: clipboard.Carried, at: Point | null) => {
+    if (latest.current.readOnly) return
+    const place = at ?? pointerWorld()
+    if (from.files.length) void placePictures(from.files, place, false)
+    else void pasteBoard(from, place)
+  }
+  clip.current = {
+    paste: pasteContent,
+    drop: (files, clientX, clientY) => {
+      if (latest.current.readOnly) return
+      const pictures = files.filter((file) => clipboard.pictureMime(file) != null)
+      if (pictures.length) void placePictures(pictures, toWorld(clientX, clientY), true)
+    },
+  }
+
+  // The browser's paste, and pictures dropped from outside. A paste event (Cmd/Ctrl+V on the focused
+  // canvas, or the host's Edit menu) carries the system clipboard without asking for permission;
+  // where a browser sends none, the key's own fallback pastes the copy kept here.
+  useEffect(() => {
+    const box = container.current
+    if (!box) return undefined
+    const onPaste = (event: ClipboardEvent) => {
+      if (latest.current.readOnly || editingNow.current || typingIn(event.target)) return
+      const from = clipboard.carried(event.clipboardData)
+      const key = pasteKey.current
+      pasteKey.current = null
+      event.preventDefault()
+      if (key?.handled) return
+      if (key) key.handled = true
+      clip.current.paste(from, key?.at ?? null)
+    }
+    const onDragOver = (event: DragEvent) => {
+      if (latest.current.readOnly || !Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
+      event.preventDefault()
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+    }
+    const onDrop = (event: DragEvent) => {
+      if (latest.current.readOnly) return
+      const from = clipboard.carried(event.dataTransfer)
+      if (!from.files.length) return
+      event.preventDefault()
+      clip.current.drop(from.files, event.clientX, event.clientY)
+    }
+    box.addEventListener('paste', onPaste)
+    box.addEventListener('dragover', onDragOver)
+    box.addEventListener('drop', onDrop)
+    return () => {
+      box.removeEventListener('paste', onPaste)
+      box.removeEventListener('dragover', onDragOver)
+      box.removeEventListener('drop', onDrop)
+    }
+  }, [])
+
+  /** Cmd/Ctrl+V: the browser's paste event follows the key (and carries pictures); without one, the copy kept here. */
+  const pasteFromKey = () => {
+    const key = { at: pointerWorld(), handled: false }
+    pasteKey.current = key
+    window.setTimeout(() => {
+      if (key.handled) return
+      key.handled = true
+      void pasteBoard(null, key.at)
+      // A paste event later than this is the same key's: it is dropped, then the key is forgotten.
+      window.setTimeout(() => {
+        if (pasteKey.current === key) pasteKey.current = null
+      }, 1000)
+    }, 50)
+  }
+
+  const selectAll = () => {
+    const pageView = sync.view.page(layerRef.current?.pageId ?? sync.view.pages[0]?.id)
+    latest.current.onSelection([...new Set((pageView?.elements ?? []).map((id) => sync.view.selectable(id)))])
+  }
+  const duplicateIds = (ids: readonly string[], offset?: Point, done?: () => void) => {
+    void commit('element.duplicate', { ids: [...ids], ...(offset ? { offset: [offset.x, offset.y] } : {}) }, done).then((answer) => selectMade(createdOf(answer)))
+  }
+  const deleteIds = (ids: readonly string[]) => {
+    latest.current.onSelection([])
+    void commit('element.delete', { ids: [...ids] })
+  }
+  const groupIds = (ids: readonly string[]) => {
+    void commit('element.group', { ids: [...ids] }).then((answer) => {
+      if (typeof answer?.group === 'string') latest.current.onSelection([answer.group])
+    })
+  }
+  const ungroupIds = (ids: readonly string[]) => {
+    const groups = ids.filter((id) => sync.view.elements.get(id)?.kind === 'group')
+    if (groups.length) void commit('element.ungroup', { groupIds: groups })
+  }
+
+  /** A row of the canvas menu, on the elements the menu opened on. */
+  const onMenu = (action: CanvasAction) => {
+    const open = menu
+    setMenu(null)
+    if (!open) return
+    const ids = open.ids ?? []
+    switch (action) {
+      case 'copy':
+        copyIds(ids)
+        break
+      case 'cut':
+        cutIds(ids)
+        break
+      case 'paste':
+        void clipboard.systemText().then((from) => pasteBoard(from, open.world))
+        break
+      case 'duplicate':
+        duplicateIds(ids)
+        break
+      case 'front':
+      case 'forward':
+      case 'backward':
+      case 'back':
+        void commit('element.reorder', { ids, placement: action })
+        break
+      case 'group':
+        groupIds(ids)
+        break
+      case 'ungroup':
+        ungroupIds(ids)
+        break
+      case 'lock':
+      case 'unlock':
+        void commit('element.lock', { ids, locked: action === 'lock' })
+        break
+      case 'delete':
+        deleteIds(ids)
+        break
+      case 'select-all':
+        selectAll()
+        break
+    }
+  }
+
+  const onContextMenu = (event: React.MouseEvent<SVGSVGElement>) => {
+    event.preventDefault()
+    if (editing || gesture.current) return
+    const at = { x: event.clientX, y: event.clientY }
+    const world = toWorld(event.clientX, event.clientY)
+    const hit = elementUnder(event.clientX, event.clientY, null)
+    if (hit) {
+      // A right-click on an element outside the selection selects it first.
+      const id = sync.view.selectable(hit)
+      const ids = selection.includes(id) ? [...selection] : [id]
+      if (!selection.includes(id)) onSelection(ids)
+      setMenu({ at, world, ids })
+    } else if (!readOnly) setMenu({ at, world, ids: null })
+  }
+
   // Pointer handling.
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     note(`down ${tool}${editing ? ' editing' : ''} ${event.button}`)
+    pointer.current = { x: event.clientX, y: event.clientY }
     if (editing) return
     // The canvas takes the keys (tool letters, Delete, Undo) once it is used.
     container.current?.focus({ preventScroll: true })
@@ -567,7 +804,7 @@ export function BoardCanvas(props: Props) {
           const box = v.bounds(v.elements.get(id)!)
           return box ? [center(box)] : []
         }) : []
-        gesture.current = { type: 'move', start: p, roots, moving, base, connectors: v.connectorsOf(moving).filter((item) => !moving.has(item)), delta: { x: 0, y: 0 }, moved: false, frames, centers }
+        gesture.current = { type: 'move', start: p, roots, moving, base, connectors: v.connectorsOf(moving).filter((item) => !moving.has(item)), delta: { x: 0, y: 0 }, moved: false, frames, centers, altAtStart: event.altKey }
         capture()
         return
       }
@@ -620,6 +857,7 @@ export function BoardCanvas(props: Props) {
   }
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    pointer.current = { x: event.clientX, y: event.clientY }
     const g = gesture.current
     if (!g) return
     const p = toWorld(event.clientX, event.clientY)
@@ -643,6 +881,15 @@ export function BoardCanvas(props: Props) {
           snapGuides = snap.guides
         }
         g.delta = delta
+        if (!g.altAtStart && event.altKey) {
+          // The originals stay where they are; a dashed box shows where the copies land.
+          layerRef.current?.setOverrides(new Map())
+          layerRef.current?.setHidden([])
+          setDraft({ type: 'rect', box: offset(g.base, delta.x, delta.y), dashed: true })
+          setGuides(snapGuides)
+          setDrops((now) => (now.length ? [] : now))
+          break
+        }
         const overrides = new Map<string, Override>()
         for (const id of g.moving) overrides.set(id, { dx: delta.x, dy: delta.y })
         layerRef.current?.setOverrides(overrides)
@@ -746,6 +993,11 @@ export function BoardCanvas(props: Props) {
         setDrops([])
         if (!g.moved) {
           clearPreview()
+          break
+        }
+        if (!g.altAtStart && event.altKey) {
+          // Copies at the drop, the originals untouched: one element.duplicate, one undo step.
+          duplicateIds(g.roots, g.delta, clearPreview)
           break
         }
         // A drop into a frame makes the frame the parent, a drop out of one frees it: same command.
@@ -889,9 +1141,18 @@ export function BoardCanvas(props: Props) {
       edit: (id: string) => openText(id),
       focus: () => container.current?.focus({ preventScroll: true }),
       keyDown: (event: KeyboardEvent) => {
-        if (editing) return false
+        // The canvas menu's rows keep their keys (the arrows, Delete), and so does the text box.
+        if (editing || (event.target as Element | null)?.closest?.('[data-testid="board-canvas-menu"]')) return false
         const command = event.metaKey || event.ctrlKey
         const ids = latest.current.selection
+        const key = event.key.toLowerCase()
+        const clipboardKey = command && !event.altKey && !event.shiftKey
+        // Copy works in a read-only board too; with nothing selected the key goes on.
+        if (clipboardKey && key === 'c') {
+          if (!ids.length) return false
+          copyIds(ids)
+          return true
+        }
         if (event.key === ' ' && !command) {
           space.current = true
           return true
@@ -907,36 +1168,36 @@ export function BoardCanvas(props: Props) {
           else return false
           return true
         }
-        if (command && event.key.toLowerCase() === 'a') {
-          const pageView = sync.view.page(layerRef.current?.pageId ?? sync.view.pages[0]?.id)
-          onSelection([...new Set((pageView?.elements ?? []).map((id) => sync.view.selectable(id)))])
+        if (command && key === 'a') {
+          selectAll()
           return true
         }
         if (latest.current.readOnly) return false
+        if (clipboardKey && key === 'x') {
+          if (!ids.length) return false
+          cutIds(ids)
+          return true
+        }
+        // Not taken, so the browser's paste event follows (with what the system clipboard holds).
+        if (clipboardKey && key === 'v') {
+          pasteFromKey()
+          return false
+        }
         // These work on the selection; without one they do nothing (not the engine command's dialog).
         if (event.key === 'Delete' || event.key === 'Backspace') {
           if (!ids.length) return true
-          onSelection([])
-          void commit('element.delete', { ids })
+          deleteIds(ids)
           return true
         }
-        if (command && event.key.toLowerCase() === 'd') {
+        if (command && key === 'd') {
           if (!ids.length) return true
-          void commit('element.duplicate', { ids }).then((answer) => {
-            const created = (answer?.created as string[] | undefined) ?? []
-            if (created.length) onSelection(created)
-          })
+          duplicateIds(ids)
           return true
         }
-        if (command && event.key.toLowerCase() === 'g') {
+        if (command && key === 'g') {
           if (!ids.length) return true
-          if (event.shiftKey) {
-            const groups = ids.filter((id) => sync.view.elements.get(id)?.kind === 'group')
-            if (groups.length) void commit('element.ungroup', { groupIds: groups })
-          } else if (ids.length > 1)
-            void commit('element.group', { ids }).then((answer) => {
-              if (typeof answer?.group === 'string') onSelection([answer.group])
-            })
+          if (event.shiftKey) ungroupIds(ids)
+          else if (ids.length > 1) groupIds(ids)
           return true
         }
         const plainKey = !command && !event.altKey && !event.shiftKey && !event.repeat
@@ -999,10 +1260,38 @@ export function BoardCanvas(props: Props) {
   const mindGraph = useMemo(() => (single && isMindNode(single) && !single.locked ? graphOf(view, single.id) : null), [single, view, tick])
   const lanes = !readOnly && tool === 'select' && single && singleBox && mindGraph ? controlLanes(view, mindGraph, single.id, singleBox, zoom) : []
   const cursor = tool === 'hand' ? 'grab' : tool === 'select' ? 'default' : tool === 'eraser' ? 'cell' : 'crosshair'
+  // What the canvas menu's rows can do, from the elements it opened on (and what is inside them).
+  const menuState = useMemo<CanvasMenuState | null>(() => {
+    if (!menu) return null
+    const elements = (menu.ids ?? []).flatMap((id) => view.elements.get(id) ?? [])
+    const locked = (menu.ids ?? []).some((id) => view.withDescendants(id).some((inside) => view.elements.get(inside)?.locked))
+    return {
+      at: menu.at,
+      on: menu.ids ? 'elements' : 'canvas',
+      readOnly,
+      canPaste: clipboard.holding() || typeof navigator.clipboard?.readText === 'function',
+      locked,
+      allLocked: elements.length > 0 && elements.every((element) => element.locked),
+      several: elements.length > 1,
+      groups: elements.some((element) => element.kind === 'group'),
+    }
+  }, [menu, readOnly, view, tick])
 
   return (
     <div ref={container} className="board-canvas" tabIndex={0} data-testid="board-canvas" data-tool={tool} style={{ cursor }}>
-      <svg className="board-svg" data-testid="board-svg" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onDoubleClick={onDoubleClick}>
+      <svg
+        className="board-svg"
+        data-testid="board-svg"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={() => {
+          pointer.current = null
+        }}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+      >
         <g ref={world}>
           <g ref={elementsRoot} data-testid="board-elements" />
           <g className="board-overlay" data-testid="board-overlay">
@@ -1111,6 +1400,7 @@ export function BoardCanvas(props: Props) {
             setEditing(null)
             container.current?.focus({ preventScroll: true })
           }} /> : null}
+      <CanvasMenu menu={menuState} t={t} onAction={onMenu} onClose={() => setMenu(null)} />
       {/* The overview is the frame's chrome: Focus shows only the board. */}
       <FrameChrome>
         <Minimap area={props.area} page={page} revision={props.revision} render={props.render} viewport={store} onCenter={(x, y) => applyView({ x: x - viewport.current.width / viewport.current.zoom / 2, y: y - viewport.current.height / viewport.current.zoom / 2 })} label={t('minimap')} />
@@ -1147,5 +1437,12 @@ type BoardWindow = Window & {
     textMetrics: (request: string) => Promise<string>
     /** Moves `ids` as a drag's commit does: command sent → change shown, in ms. */
     move: (ids: string[], dx: number, dy: number) => Promise<number>
+    /**
+     * What a paste event on the canvas does with this content, at the pointer (for a browser
+     * whose test cannot construct a ClipboardEvent carrying files; web/tests/editing.mjs says which it used).
+     */
+    paste: (files: File[], text?: string | null) => void
+    /** What a drop of `files` at a client point of the frame does (likewise for a DragEvent). */
+    drop: (files: File[], clientX: number, clientY: number) => void
   }
 }

@@ -1,0 +1,27 @@
+format: 1
+id: board.editing/pictures
+feature: board.editing
+intent: >-
+  Pasted and dropped pictures in the editor, through the development host (web/tests/editing.mjs, the
+  picture steps): a paste on the canvas whose clipboard holds a PNG file becomes one image.insert, an
+  image element whose picture is a blob of the board, drawn by the page; one undo removes it; a PNG
+  file dropped on the canvas becomes one picture centred on the drop point at its natural size. The
+  test dispatches a ClipboardEvent and a DragEvent carrying a DataTransfer with the file, and says
+  when a browser could not construct one and the canvas's own paste or drop hook was used instead.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/editing.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

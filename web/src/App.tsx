@@ -25,6 +25,7 @@ import { BoardCanvas, type BoardCanvasApi } from './canvas/BoardCanvas'
 import type { DocumentArea } from './canvas/Minimap'
 import { useColorScheme } from './colorScheme'
 import { BoardSync, type BoardEngine } from './board/sync'
+import { pictureMime, pictureParams } from './board/clipboard'
 import { engineManifest } from './engine'
 import { CATALOGS, summary } from './strings'
 import type { Style } from './board/style'
@@ -70,14 +71,6 @@ function idsOnly(command: KitCommand | undefined) {
   const schema = command?.schema as Record<string, { required?: boolean }> | null | undefined
   if (!schema || !schema.ids) return false
   return Object.entries(schema).every(([name, field]) => name === 'ids' || !field.required)
-}
-
-const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' }
-
-function base64(bytes: Uint8Array) {
-  let out = ''
-  for (let at = 0; at < bytes.length; at += 0x8000) out += String.fromCharCode(...bytes.subarray(at, at + 0x8000))
-  return btoa(out)
 }
 
 /** `value`, or the earlier one while it is equal (so memos that depend on it hold). */
@@ -238,24 +231,27 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     [editor, linkDialog, middle, place],
   )
 
-  /** Picture: the person picks a workspace picture; its bytes go into the board in the middle of the view. */
+  /**
+   * Picture: the person picks a workspace picture; its bytes go into the board in the middle of the
+   * view, at its natural size (800 at most on its longer side), as a pasted or dropped one does.
+   */
   const insertPicture = useCallback(async () => {
     try {
       const path = await host.pick(t('pickPicture'), PICTURE_EXTENSIONS)
       if (!path) return
       const { bytes } = await host.files.read(path)
-      const data = new Uint8Array(bytes)
-      const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
-      const position = middle(320, 240)
       const name = path.slice(path.lastIndexOf('/') + 1)
-      const answer = await latest.current.run('image.insert', { data: base64(data), mime: MIME[extension] ?? 'application/octet-stream', alt: name, ...(position ? { position } : {}) })
+      const mime = pictureMime({ type: '', name }) ?? 'application/octet-stream'
+      const view = canvas.current?.view()
+      const centre = view ? { x: view.x + view.width / view.zoom / 2, y: view.y + view.height / view.zoom / 2 } : null
+      const answer = await latest.current.run('image.insert', await pictureParams(new Uint8Array(bytes), mime, name, centre))
       const created = answer ? ((JSON.parse(answer) as { created?: string[] }).created ?? []) : []
       await sync?.pull(created)
       if (created.length) onSelection(created)
     } catch (error) {
       toast('error', t('pictureFailed'), message(error))
     }
-  }, [host, middle, onSelection, sync, t])
+  }, [host, onSelection, sync, t])
 
   const tools = useMemo<RailTool[]>(() => TOOLS.map((item) => ({ id: item.id, label: t(item.label), icon: item.icon, shortcut: item.shortcut, group: item.group })), [t])
   const activeTool = railId(tool, shapeType)
@@ -463,6 +459,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
             sync={sync}
             page={state?.page ?? null}
             run={run}
+            query={editor.query}
             tool={tool}
             shapeType={shapeType}
             drawStyle={drawStyle}

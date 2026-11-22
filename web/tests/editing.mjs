@@ -1,0 +1,442 @@
+// Editing on the canvas in a real browser, through the development host: node tests/editing.mjs [chromium|webkit]
+// Starts the Vite dev server itself, opens dev.html (Sample.kboard) in Classic, goes to a page of its
+// own at a known view, and prints PASS or FAIL per step: Cmd/Ctrl+C then V pastes one copy (selected,
+// one undo step), a second paste steps on from the first, cut and paste, a connector pasted with the
+// two shapes it joins stays bound to the copies, Alt pressed during a drag leaves the original and
+// makes a copy at the drop, the canvas menu's order rows, its empty-canvas rows, a locked element's
+// rows (case board.editing/clipboard); a pasted PNG becomes one picture with a blob, one undo takes
+// it away, and a dropped PNG lands centred on the drop point (case board.editing/pictures); and a
+// read-only board neither cuts nor pastes. The harness is web/tests/flow.mjs's.
+// Run with the proxy variables unset: the dev server is on loopback.
+import { chromium, webkit } from 'playwright'
+import { createServer } from 'vite'
+
+const which = process.argv[2] ?? 'chromium'
+const server = await createServer({ configFile: new URL('../vite.config.ts', import.meta.url).pathname, server: { port: 0, host: '127.0.0.1' }, logLevel: 'error' })
+await server.listen()
+const origin = `http://127.0.0.1:${server.httpServer.address().port}`
+// Headless Chromium on Linux hints glyphs unless told not to (as in flow.mjs).
+const browser = await (which === 'webkit' ? webkit.launch() : chromium.launch({ args: process.platform === 'linux' ? ['--font-render-hinting=none'] : [] }))
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const page = await context.newPage()
+// The editor's shortcuts take Cmd where the page says it runs on a Mac (kit-editor reads
+// navigator.platform), else Ctrl. Playwright's ControlOrMeta follows the machine running the test
+// instead, and its WebKit says Mac on Linux too, so the test asks the page.
+const mod = (await page.evaluate(() => /Mac|iPhone|iPad/i.test(navigator.platform))) ? 'Meta' : 'Control'
+// A missing element fails its step in seconds, not after Playwright's half minute per try.
+context.setDefaultTimeout(10000)
+const errors = []
+let failures = 0
+page.on('pageerror', (error) => errors.push(error.message))
+// What reloaded or crashed, for a run that loses the editor's frame.
+const lifecycle = []
+page.on('framenavigated', (navigated) => lifecycle.push(`navigated ${navigated === page.mainFrame() ? 'page' : 'frame'} ${navigated.url().replace(/\?.*$/, '')}`))
+page.on('crash', () => lifecycle.push('page crashed'))
+const warnings = []
+page.on('console', (message) => {
+  if (message.type() === 'warning' || message.type() === 'error') warnings.push(message.text())
+})
+const step = (name, ok, detail = '') => {
+  if (!ok) failures += 1
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` - ${detail}` : ''}`)
+}
+const until = async (check, tries = 100) => {
+  for (let i = 0; i < tries; i += 1) {
+    if (await check().catch(() => false)) return true
+    await page.waitForTimeout(100)
+  }
+  return false
+}
+const ai = (steps) => page.evaluate(async (steps) => window.devHost.connection().ai.run(steps, false), steps)
+const inspect = () => page.evaluate(async () => (await window.devHost.connection().ai.inspect()).details ?? (await window.devHost.connection().ai.inspect()))
+const elementCount = async () => (await inspect()).elements
+const copy = async (ids) => (await ai([{ command: 'clipboard.copy', params: { ids } }])).completed[0].result
+
+/** A 2 × 2 PNG (as in flow.mjs's picture step). */
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGMIc73yH4QZYAwAUnYJuZK5ts8AAAAASUVORK5CYII='
+
+/** A stored element's box, whichever form its position and size take. */
+const boxOf = (element) => {
+  const [x, y] = Array.isArray(element?.position) ? element.position : [element?.position?.x, element?.position?.y]
+  const [w, h] = Array.isArray(element?.size) ? element.size : [element?.size?.w, element?.size?.h]
+  return [x, y, w, h].every(Number.isFinite) ? { x, y, w, h } : null
+}
+const near = (a, b, tolerance = 1) => Number.isFinite(a) && Math.abs(a - b) <= tolerance
+
+try {
+  await page.goto(`${origin}/dev.html?modes=classic`)
+  await page.waitForFunction(() => document.getElementById('status')?.textContent?.includes(' open in '), null, { timeout: 90000 })
+  const kit = page.frameLocator('#kit')
+  const frame = await (await page.$('#kit')).contentFrame()
+  await frame.waitForFunction(() => window.kitBoard != null, null, { timeout: 60000 })
+  await frame.evaluate(() => document.fonts.ready)
+  const board = (fn, arg) => frame.evaluate(fn, arg)
+  const svgBox = async () => kit.getByTestId('board-svg').boundingBox()
+  /** The screen point of world point (x, y). */
+  const screen = async (x, y) => {
+    const box = await svgBox()
+    const v = await board(() => window.kitBoard.viewport())
+    return { x: box.x + (x - v.x) * v.zoom, y: box.y + (y - v.y) * v.zoom }
+  }
+  const drag = async (from, to, steps = 12) => {
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(to.x, to.y, { steps })
+    await page.mouse.up()
+  }
+  const click = async (x, y, options) => {
+    const at = await screen(x, y)
+    await page.mouse.click(at.x, at.y, options)
+  }
+  const personPage = async () => (await inspect()).page
+  /** The person's New page, from the View tab. */
+  const newPage = async () => {
+    await kit.getByTestId('ribbon-tab-View').click()
+    await kit.getByTestId('board-cmd-page.create').click()
+    await kit.getByTestId('ribbon-tab-Edit').click()
+  }
+  /** Copies `ids` and answers their stored elements, in the page's order. */
+  const storedOf = async (ids) => {
+    const payload = await copy(ids)
+    return payload.payload?.elements ?? payload.elements ?? []
+  }
+  const storedOne = async (id) => (await storedOf([id])).find((element) => element.ref === id) ?? null
+  const selected = () => board(() => window.kitBoard.selection())
+  const shown = () => board(() => window.kitBoard.shown())
+  /** The board's element count, noting what the canvas shows now (for `newest`). */
+  let shownBefore = []
+  const mark = async () => {
+    shownBefore = await shown()
+    return elementCount()
+  }
+  /** Once the board holds `count` elements, the ones the canvas shows that it did not at `mark`. */
+  const made = async (count) => {
+    await until(async () => (await elementCount()) === count)
+    let out = []
+    await until(async () => {
+      out = (await shown()).filter((id) => !shownBefore.includes(id))
+      return out.length > 0
+    })
+    return out
+  }
+  const menuRow = (action) => kit.getByTestId(`board-canvas-menu-${action}`)
+  const menuOpen = () => until(async () => (await kit.getByTestId('board-canvas-menu').count()) === 1)
+  const menuRows = () => kit.locator('[data-testid="board-canvas-menu"] [role^="menuitem"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')?.replace('board-canvas-menu-', '')))
+
+  // A page of its own at a known view (100%, world origin at the canvas corner), with a shape A, two
+  // shapes B and C joined by a connector, and a shape D, made by the agent (not the person's undo).
+  const pageBefore = await personPage()
+  await newPage()
+  await until(async () => (await personPage()) !== pageBefore && (await board(() => window.kitBoard.shown().length)) === 0)
+  await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
+  const shownPage = await personPage()
+  const setup = await ai([
+    {
+      command: 'element.create',
+      params: {
+        page: shownPage,
+        elements: [
+          { kind: 'shape', position: { x: 60, y: 60 }, size: { w: 140, h: 90 }, text: 'A' },
+          { kind: 'shape', position: { x: 60, y: 300 }, size: { w: 120, h: 80 }, text: 'B' },
+          { kind: 'shape', position: { x: 300, y: 300 }, size: { w: 120, h: 80 }, text: 'C' },
+          { kind: 'shape', position: { x: 60, y: 480 }, size: { w: 120, h: 80 }, text: 'D' },
+        ],
+      },
+    },
+  ])
+  const [a, b, c, d] = setup.completed[0].result.created
+  const joined = await ai([{ command: 'connector.create', params: { page: shownPage, from: { element: b }, to: { element: c } } }])
+  const connector = joined.completed[0].result.created[0]
+  await until(async () => (await shown()).length === 5)
+
+  // 1. Cmd/Ctrl+C then V: one copy, selected, as one command; one undo takes it away.
+  await click(80, 80)
+  await until(async () => JSON.stringify(await selected()) === JSON.stringify([a]))
+  let count = await mark()
+  await page.keyboard.press(`${mod}+c`)
+  await page.keyboard.press(`${mod}+v`)
+  const [first] = await made(count + 1)
+  await until(async () => JSON.stringify(await selected()) === JSON.stringify([first]))
+  const firstStored = first ? await storedOne(first) : null
+  const firstSelected = await selected()
+  const countPasted = await elementCount()
+  await page.keyboard.press(`${mod}+z`)
+  await until(async () => (await elementCount()) === count && !(await shown()).includes(first))
+  step(
+    'Cmd/Ctrl+C then V pastes one copy, selected, as one command',
+    countPasted === count + 1 && firstStored?.kind === 'shape' && firstStored?.text === 'A' && JSON.stringify(firstSelected) === JSON.stringify([first]) && (await elementCount()) === count && !(await shown()).includes(first),
+    `${count} → ${countPasted} → ${await elementCount()}; selected ${JSON.stringify(firstSelected)}; ${JSON.stringify(firstStored ?? null).slice(0, 160)} ${warnings.slice(-3).join(' | ')}`,
+  )
+
+  // 2. Two pastes in a row, the pointer still: the second 16 units on from the first.
+  count = await mark()
+  await page.keyboard.press(`${mod}+v`)
+  const [second] = await made(count + 1)
+  await until(async () => JSON.stringify(await selected()) === JSON.stringify([second]))
+  count = await mark()
+  await page.keyboard.press(`${mod}+v`)
+  const [third] = await made(count + 1)
+  await until(async () => JSON.stringify(await selected()) === JSON.stringify([third]))
+  const secondBox = boxOf(second ? await storedOne(second) : null)
+  const thirdBox = boxOf(third ? await storedOne(third) : null)
+  step(
+    'a second paste is offset from the first',
+    Boolean(secondBox && thirdBox) && near(thirdBox.x - secondBox.x, 16) && near(thirdBox.y - secondBox.y, 16) && JSON.stringify(await selected()) === JSON.stringify([third]),
+    `${JSON.stringify(secondBox)} then ${JSON.stringify(thirdBox)}`,
+  )
+
+  // 3. Cut the selected copy, then paste it back.
+  count = await elementCount()
+  await page.keyboard.press(`${mod}+x`)
+  const cutGone = await until(async () => (await elementCount()) === count - 1 && !(await shown()).includes(third))
+  const cutSelection = await selected()
+  count = await mark()
+  await page.keyboard.press(`${mod}+v`)
+  const [back] = await made(count + 1)
+  await until(async () => JSON.stringify(await selected()) === JSON.stringify([back]))
+  const backStored = back ? await storedOne(back) : null
+  step(
+    'cut removes the selection and paste brings it back',
+    cutGone && cutSelection.length === 0 && backStored?.kind === 'shape' && backStored?.text === 'A' && JSON.stringify(await selected()) === JSON.stringify([back]),
+    `gone ${cutGone}, selection after the cut ${JSON.stringify(cutSelection)}; ${JSON.stringify(backStored ?? null).slice(0, 160)}`,
+  )
+
+  // 4. B, C and their connector, chosen by a marquee, copied and pasted at an empty place: the copied
+  // connector joins the copied shapes.
+  await page.keyboard.press('Escape')
+  await drag(await screen(40, 270), await screen(440, 400))
+  await until(async () => (await selected()).length === 3)
+  const chosen = (await selected()).slice().sort()
+  await page.keyboard.press(`${mod}+c`)
+  const empty = await screen(600, 60)
+  await page.mouse.move(empty.x, empty.y)
+  count = await mark()
+  await page.keyboard.press(`${mod}+v`)
+  await made(count + 3)
+  await until(async () => (await selected()).length === 3 && !(await selected()).some((id) => chosen.includes(id)))
+  const pasted = await selected()
+  const pastedStored = await storedOf(pasted)
+  const pastedConnector = pastedStored.find((element) => element.kind === 'connector')
+  const pastedShapes = pastedStored.filter((element) => element.kind === 'shape').map((element) => element.ref)
+  const ends = [pastedConnector?.start?.binding?.target, pastedConnector?.end?.binding?.target]
+  step(
+    'paste keeps a connector bound between two copied shapes',
+    JSON.stringify(chosen) === JSON.stringify([b, c, connector].sort()) && pastedShapes.length === 2 && ends.every((target) => pastedShapes.includes(target)) && ends[0] !== ends[1],
+    `chose ${JSON.stringify(chosen)}; pasted ${JSON.stringify(pastedStored.map((element) => [element.ref, element.kind, element.start?.binding?.target, element.end?.binding?.target]))}`,
+  )
+
+  // 5. Alt pressed during a drag of D: D stays, a copy lands at the drop (no snapping with Alt),
+  // one element.duplicate; one undo takes the copy away.
+  await page.keyboard.press('Escape')
+  const dBefore = boxOf(await storedOne(d))
+  const grab = await screen(120, 520)
+  const drawnLeft = () => board((id) => document.querySelector(`[data-id="${id}"]`)?.getBoundingClientRect().left ?? null, d)
+  const leftBefore = await drawnLeft()
+  count = await mark()
+  await page.mouse.move(grab.x, grab.y)
+  await page.mouse.down()
+  await page.mouse.move(grab.x + 20, grab.y + 5, { steps: 4 })
+  await page.keyboard.down('Alt')
+  await page.mouse.move(grab.x + 200, grab.y + 40, { steps: 10 })
+  // During the drag the original is drawn where it is (the preview is a dashed box at the drop).
+  const leftDuring = await drawnLeft()
+  const originalStays = leftBefore != null && near(leftDuring, leftBefore)
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  const [dCopy] = await made(count + 1)
+  const dAfter = boxOf(await storedOne(d))
+  const copyBox = boxOf(dCopy ? await storedOne(dCopy) : null)
+  const copySelected = await until(async () => JSON.stringify(await selected()) === JSON.stringify([dCopy]))
+  const countCopied = await elementCount()
+  await page.keyboard.press(`${mod}+z`)
+  const undone = await until(async () => (await elementCount()) === count && !(await shown()).includes(dCopy))
+  step(
+    'Alt-drag leaves the original and makes a copy at the drop',
+    originalStays && countCopied === count + 1 && JSON.stringify(dAfter) === JSON.stringify(dBefore) && near(copyBox?.x, dBefore.x + 200) && near(copyBox?.y, dBefore.y + 40) && copySelected && undone,
+    `D ${JSON.stringify(dBefore)} → ${JSON.stringify(dAfter)}, drawn at ${leftBefore} then ${leftDuring} during the drag; copy ${dCopy} ${JSON.stringify(copyBox)}; ${count} → ${countCopied}, undone ${undone}`,
+  )
+
+  // 6. The canvas menu on A (not selected: the right-click selects it): Send to back, then Bring to front.
+  await page.keyboard.press('Escape')
+  const order = async () => (await storedOf(await shown())).map((element) => element.ref)
+  await click(68, 68, { button: 'right' })
+  const opened = await menuOpen()
+  const selectedByMenu = JSON.stringify(await selected()) === JSON.stringify([a])
+  await menuRow('back').click()
+  const atBack = await until(async () => (await order())[0] === a)
+  await click(68, 68, { button: 'right' })
+  await menuOpen()
+  await menuRow('front').click()
+  const atFront = await until(async () => (await order()).at(-1) === a)
+  step(
+    'the canvas menu on an element: Send to back, then Bring to front, change the order',
+    opened && selectedByMenu && atBack && atFront,
+    `opened ${opened}, selected by the right-click ${selectedByMenu}, back ${atBack}, front ${atFront}: ${JSON.stringify(await order())}`,
+  )
+
+  // 7. The canvas menu on the empty canvas: Paste and Select all.
+  await click(700, 400, { button: 'right' })
+  await menuOpen()
+  const emptyRows = await menuRows()
+  const pasteOn = !(await menuRow('paste').isDisabled())
+  await menuRow('select-all').click()
+  const everything = await until(async () => (await selected()).length === (await shown()).length && (await shown()).length > 0)
+  step(
+    'the canvas menu on empty canvas offers Paste and Select all',
+    JSON.stringify(emptyRows) === JSON.stringify(['paste', 'select-all']) && pasteOn && everything,
+    `${JSON.stringify(emptyRows)}, paste enabled ${pasteOn}; ${(await selected()).length} of ${(await shown()).length} selected`,
+  )
+
+  // 8. Lock D from its menu (element.lock); once the change is on the page its menu offers Unlock,
+  // and Delete and Cut are off; Unlock gives the Lock row back. (The clipboard payload does not carry
+  // `locked`, so the page's rows are what the step reads.)
+  await page.keyboard.press('Escape')
+  const menuOnD = async () => {
+    await page.keyboard.press('Escape')
+    await click(70, 490, { button: 'right' })
+    return menuOpen()
+  }
+  await menuOnD()
+  const lockRow = (await menuRow('lock').count()) === 1
+  await menuRow('lock').click()
+  const unlockOffered = await until(async () => (await menuOnD()) && (await menuRow('unlock').count()) === 1, 30)
+  const deleteOff = unlockOffered && (await menuRow('delete').isDisabled())
+  const cutOff = unlockOffered && (await menuRow('cut').isDisabled())
+  if (unlockOffered) await menuRow('unlock').click()
+  const unlocked = await until(async () => (await menuOnD()) && (await menuRow('lock').count()) === 1 && !(await menuRow('delete').isDisabled()), 30)
+  await page.keyboard.press('Escape')
+  step(
+    "a locked element's menu offers Unlock, and Delete is disabled",
+    lockRow && unlockOffered && deleteOff && cutOff && unlocked,
+    `lock row ${lockRow}, unlock offered ${unlockOffered}, delete off ${deleteOff}, cut off ${cutOff}, unlocked again ${unlocked}`,
+  )
+
+  // Pictures (case board.editing/pictures). A paste event carrying a PNG file, on the canvas with the
+  // pointer at an empty place; where the browser cannot construct one, the canvas's own paste hook.
+  await page.keyboard.press('Escape')
+  await click(760, 450)
+  await page.waitForTimeout(1200)
+  count = await mark()
+  const pasteWay = await board((png) => {
+    const bytes = Uint8Array.from(atob(png), (ch) => ch.charCodeAt(0))
+    const file = new File([bytes], 'pasted.png', { type: 'image/png' })
+    let data = null
+    try {
+      data = new DataTransfer()
+      data.items.add(file)
+    } catch {
+      data = null
+    }
+    let event = null
+    try {
+      if (data && data.files.length + data.items.length > 0) event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })
+    } catch {
+      event = null
+    }
+    if (event?.clipboardData && event.clipboardData.files.length + event.clipboardData.items.length > 0) {
+      document.querySelector('[data-testid="board-canvas"]').dispatchEvent(event)
+      return 'a ClipboardEvent'
+    }
+    window.kitBoard.paste([file])
+    return 'kitBoard.paste (no ClipboardEvent with files in this browser)'
+  }, PNG)
+  const [picture] = await made(count + 1)
+  const pictureStored = picture ? await storedOne(picture) : null
+  const drawn = picture ? await until(async () => board((id) => Boolean(document.querySelector(`[data-id="${id}"] image[data-blob]`)?.getAttribute('href')), picture), 50) : false
+  step(
+    'a pasted PNG becomes one image element with a blob',
+    (await elementCount()) === count + 1 && pictureStored?.kind === 'image' && typeof pictureStored?.image?.hash === 'string' && pictureStored.image.hash.length > 0 && drawn,
+    `through ${pasteWay}; ${picture} ${JSON.stringify(pictureStored ?? null).slice(0, 200)} drawn ${drawn} ${warnings.slice(-3).join(' | ')}`,
+  )
+  await page.keyboard.press(`${mod}+z`)
+  const pictureGone = await until(async () => (await elementCount()) === count && !(await shown()).includes(picture))
+  step('one undo removes the pasted picture', pictureGone, `${await elementCount()} elements, shown ${(await shown()).includes(picture)}`)
+
+  // A drop of a PNG file at an empty place: centred on the drop point at its natural size (2 × 2).
+  count = await mark()
+  const dropWay = await board(
+    ({ png, x, y }) => {
+      const bytes = Uint8Array.from(atob(png), (ch) => ch.charCodeAt(0))
+      const file = new File([bytes], 'dropped.png', { type: 'image/png' })
+      const svg = document.querySelector('[data-testid="board-svg"]')
+      const box = svg.getBoundingClientRect()
+      const v = window.kitBoard.viewport()
+      const clientX = box.left + (x - v.x) * v.zoom
+      const clientY = box.top + (y - v.y) * v.zoom
+      let data = null
+      try {
+        data = new DataTransfer()
+        data.items.add(file)
+      } catch {
+        data = null
+      }
+      let event = null
+      try {
+        if (data && data.files.length > 0) event = new DragEvent('drop', { dataTransfer: data, clientX, clientY, bubbles: true, cancelable: true })
+      } catch {
+        event = null
+      }
+      if (event?.dataTransfer && event.dataTransfer.files.length > 0) {
+        svg.dispatchEvent(event)
+        return 'a DragEvent'
+      }
+      window.kitBoard.drop([file], clientX, clientY)
+      return 'kitBoard.drop (no DragEvent with files in this browser)'
+    },
+    { png: PNG, x: 900, y: 300 },
+  )
+  const [dropped] = await made(count + 1)
+  const droppedStored = dropped ? await storedOne(dropped) : null
+  const droppedBox = boxOf(droppedStored)
+  step(
+    'a dropped PNG lands at the drop point',
+    droppedStored?.kind === 'image' && near(droppedBox?.w, 2, 0.01) && near(droppedBox?.x + droppedBox?.w / 2, 900, 0.5) && near(droppedBox?.y + droppedBox?.h / 2, 300, 0.5),
+    `through ${dropWay}; ${dropped} ${JSON.stringify(droppedStored ?? null).slice(0, 200)}`,
+  )
+  step('no page errors', errors.length === 0, errors.join(' | '))
+
+  // 9. Read-only: the person may select and copy, but neither cut nor paste; the menu offers Copy only.
+  const viewer = await context.newPage()
+  const viewerErrors = []
+  viewer.on('pageerror', (error) => viewerErrors.push(error.message))
+  await viewer.goto(`${origin}/dev.html?modes=classic&role=viewer`)
+  await viewer.waitForFunction(() => document.getElementById('status')?.textContent?.includes(' open in '), null, { timeout: 90000 })
+  const viewerKit = viewer.frameLocator('#kit')
+  const viewerFrame = await (await viewer.$('#kit')).contentFrame()
+  await viewerFrame.waitForFunction(() => window.kitBoard != null && window.kitBoard.shown().length > 0, null, { timeout: 60000 })
+  const target = await viewerFrame.evaluate(() => document.querySelector('[data-kind=shape]')?.getAttribute('data-id') ?? null)
+  const at = await viewerFrame.evaluate((id) => {
+    const box = window.kitBoard.worldBox(id)
+    const svg = document.querySelector('[data-testid="board-svg"]').getBoundingClientRect()
+    const v = window.kitBoard.viewport()
+    return box ? { x: svg.left + ((box.x0 + box.x1) / 2 - v.x) * v.zoom, y: svg.top + ((box.y0 + box.y1) / 2 - v.y) * v.zoom } : null
+  }, target)
+  const kitFrame = await viewer.locator('#kit').boundingBox()
+  const point = at && kitFrame ? { x: kitFrame.x + at.x, y: kitFrame.y + at.y } : null
+  let readOnlyHeld = false
+  let readOnlyMenu = []
+  let readOnlyDetail = `no shape (${target}) or no point`
+  if (point) {
+    await viewer.mouse.click(point.x, point.y)
+    const picked = await until(async () => JSON.stringify(await viewerFrame.evaluate(() => window.kitBoard.selection())) === JSON.stringify([target]))
+    const before = await viewerFrame.evaluate(() => window.kitBoard.shown())
+    await viewer.keyboard.press(`${mod}+c`)
+    await viewer.keyboard.press(`${mod}+x`)
+    await viewer.keyboard.press(`${mod}+v`)
+    await viewer.waitForTimeout(1500)
+    const after = await viewerFrame.evaluate(() => window.kitBoard.shown())
+    readOnlyHeld = picked && JSON.stringify(after) === JSON.stringify(before) && after.includes(target)
+    await viewer.mouse.click(point.x, point.y, { button: 'right' })
+    await until(async () => (await viewerKit.getByTestId('board-canvas-menu').count()) === 1)
+    readOnlyMenu = await viewerKit.locator('[data-testid="board-canvas-menu"] [role^="menuitem"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')?.replace('board-canvas-menu-', '')))
+    readOnlyDetail = `selected ${picked}; ${before.length} shown before, ${after.length} after; menu ${JSON.stringify(readOnlyMenu)}`
+  }
+  step('read-only: no paste, no cut', readOnlyHeld && JSON.stringify(readOnlyMenu) === JSON.stringify(['copy']) && viewerErrors.length === 0, `${readOnlyDetail} ${viewerErrors.join(' | ')}`)
+} catch (error) {
+  step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)
+} finally {
+  await browser.close()
+  await server.close()
+}
+console.log(failures ? `${which}: ${failures} failed` : `${which}: all passed`)
+process.exit(failures ? 1 : 0)

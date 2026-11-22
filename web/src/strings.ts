@@ -193,6 +193,21 @@ const enUS: Catalog = {
   'movePageRight': 'Move right',
   'deletePage': 'Delete page',
   'deleteLastPage': 'Delete page (a board keeps one page)',
+  'canvasMenu': 'Board options',
+  'menuCopy': 'Copy',
+  'menuCut': 'Cut',
+  'menuPaste': 'Paste',
+  'menuDuplicate': 'Duplicate',
+  'menuFront': 'Bring to front',
+  'menuForward': 'Bring forward',
+  'menuBackward': 'Send backward',
+  'menuBack': 'Send to back',
+  'menuGroup': 'Group',
+  'menuUngroup': 'Ungroup',
+  'menuLock': 'Lock',
+  'menuUnlock': 'Unlock',
+  'menuDelete': 'Delete',
+  'menuSelectAll': 'Select all',
 }
 
 const zhCN: Catalog = {
@@ -385,6 +400,21 @@ const zhCN: Catalog = {
   'movePageRight': '右移',
   'deletePage': '删除页面',
   'deleteLastPage': '删除页面（白板至少保留一页）',
+  'canvasMenu': '白板选项',
+  'menuCopy': '复制',
+  'menuCut': '剪切',
+  'menuPaste': '粘贴',
+  'menuDuplicate': '创建副本',
+  'menuFront': '置于顶层',
+  'menuForward': '上移一层',
+  'menuBackward': '下移一层',
+  'menuBack': '置于底层',
+  'menuGroup': '组合',
+  'menuUngroup': '取消组合',
+  'menuLock': '锁定',
+  'menuUnlock': '解锁',
+  'menuDelete': '删除',
+  'menuSelectAll': '全选',
 }
 
 export const CATALOGS: Record<string, Catalog> = { 'en-US': enUS, 'zh-CN': zhCN }

@@ -163,9 +163,11 @@ features:
     title: "Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label"
     dimension: [function]
     priority: P0
-    status: missing
+    status: partial
+    paths: [web/src/board/clipboard.ts, web/src/canvas/CanvasMenu.tsx, web/src/canvas/BoardCanvas.tsx, web/tests/editing.mjs]
     target: "Miro (web, 2026-11)"
-    gap: "engine commands exist; the editor has no shortcut or menu for them"
+    gap: "Copy, cut, paste, Alt-drag duplicate, the canvas menu and pasted and dropped pictures are built, with their cases not yet through a CI run; Alt duplicates when pressed during a drag, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Still to come: changing a shape's type and the bold, italic and link bar in a label (the next task)."
+    cases: [board.editing/clipboard, board.editing/pictures]
     since: "2026-11-21"
   - id: board.text
     title: "Text on the board: marks on a text run"
