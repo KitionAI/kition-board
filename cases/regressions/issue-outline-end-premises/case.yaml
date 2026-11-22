@@ -1,0 +1,20 @@
+format: 1
+id: regressions/issue-outline-end-premises
+feature: board.agent.guard
+intent: >-
+  Since bound ends meet a shape's outline (design note 1.4), a command that reads such an end reads
+  the shape's shapeType as it reads its box: aligning, distributing, stacking, fitting or turning a
+  connector holds the shapeType of each shape it ends on, and connector.create with one end anchored
+  holds that shape's shapeType, because the other end's anchor faces its outline point. A
+  connector's stored point is a cache: connector.create without anchors and element.update of
+  shapeType (which refreshes the bound ends) hold no more than a position change does. Before this
+  case a colleague's shapeType change landed under such a write unnoticed.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/outline_premises.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: outline_premises}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-22"

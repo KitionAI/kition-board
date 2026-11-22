@@ -61,6 +61,7 @@ impl Needs {
                 for end in [&element.start, &element.end].into_iter().flatten() {
                     if let Some(binding) = &end.binding {
                         self.geometry(model, &binding.target, turn);
+                        self.outline(model, &binding.target);
                     }
                 }
             }
@@ -70,6 +71,14 @@ impl Needs {
                     self.add(id, ["rotation"]);
                 }
             }
+        }
+    }
+    /// A shape's `shapeType`, where a bound end on it is read: the end is where the ray through
+    /// the anchor leaves the shape's outline (`outline_point`, design note 1.4), as its box gives
+    /// where the anchor is. Other kinds end on their box.
+    fn outline(&mut self, model: &BoardModel, id: &ObjectId) {
+        if model.element(id).is_some_and(|element| element.kind == Kind::Shape) {
+            self.add(id, ["shapeType"]);
         }
     }
     /// A command that changes the geometry of `ids` and what they hold: each element's kind and
@@ -278,6 +287,20 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                     }
                 }
             }
+            if command == "connector.create" {
+                // An end given an anchor aims the other end, bound without one, at its outline
+                // point: the other end's anchor is the edge facing it (`aim`).
+                let anchored = |end: &str| params[end].get("anchor").is_some_and(|anchor| !anchor.is_null());
+                for (end, other) in [("from", "to"), ("to", "from")] {
+                    if anchored(end)
+                        && !anchored(other)
+                        && params[other].get("element").is_some_and(Value::is_string)
+                        && let Some(id) = params[end].get("element").and_then(Value::as_str)
+                    {
+                        needs.outline(model, &ObjectId::from_string(id));
+                    }
+                }
+            }
             for id in &targets {
                 let terminal = params["terminal"].as_str().unwrap_or("start");
                 let other = if terminal == "start" { "end" } else { "start" };
@@ -297,6 +320,10 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                     {
                         let end = if other == "start" { &connector.start } else { &connector.end };
                         needs.add(id, [other]);
+                        // The other end's point is on its target's outline, so a shape's
+                        // `shapeType` is read too; it is not held yet (features.yaml,
+                        // board.agent.guard: the connector.bind rows of
+                        // bindings/wasm/tests/declarations_independent.rs pin these premises).
                         if let Some(binding) = end.as_ref().and_then(|end| end.binding.as_ref()) {
                             needs.geometry(model, &binding.target, true);
                         }
