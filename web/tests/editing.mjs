@@ -16,8 +16,9 @@
 // (regressions/issue-mark-offsets); a link typed with HTTPS:// is stored, and so are the marks after
 // it (regressions/issue-link-scheme); Cmd/Ctrl+K pressed again while the link field is open, then a
 // click on the canvas, closes the box (regressions/issue-link-field-blur); Cmd/Ctrl+X and Delete on
-// a locked shape keep it and its selection (regressions/issue-locked-cut-key). The harness is
-// web/tests/flow.mjs's.
+// a locked shape keep it and its selection (regressions/issue-locked-cut-key); a dropped text file
+// gets a notice, inserts nothing and leaves the frame on the board (regressions/issue-file-drop). The
+// harness is web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
@@ -788,6 +789,60 @@ try {
       afterDelete.count === countLocked,
     `lock on the page ${lockShown}, selected ${lockedSelected}; ${countLocked} elements; after the cut ${JSON.stringify(afterCut)}; after Delete ${JSON.stringify(afterDelete)} ${warnings.slice(-3).join(' | ')}`,
   )
+
+  // 19. A text file dropped on the canvas (regressions/issue-file-drop): the canvas takes the
+  // dragover and the drop (their default, opening the file in the frame, is prevented), nothing is
+  // inserted, a notice says only pictures can be dropped, and the frame still shows this board.
+  await page.keyboard.press('Escape')
+  const frameUrl = frame.url()
+  const shownBeforeDrop = await shown()
+  const countBeforeDrop = await elementCount()
+  const textDrop = await board(
+    ({ x, y }) => {
+      const file = new File(['Plain words, not a picture.'], 'notes.txt', { type: 'text/plain' })
+      const svg = document.querySelector('[data-testid="board-svg"]')
+      const box = svg.getBoundingClientRect()
+      const v = window.kitBoard.viewport()
+      const clientX = box.left + (x - v.x) * v.zoom
+      const clientY = box.top + (y - v.y) * v.zoom
+      let data = null
+      try {
+        data = new DataTransfer()
+        data.items.add(file)
+      } catch {
+        data = null
+      }
+      const made = (type) => {
+        try {
+          return data && data.files.length > 0 ? new DragEvent(type, { dataTransfer: data, clientX, clientY, bubbles: true, cancelable: true }) : null
+        } catch {
+          return null
+        }
+      }
+      const over = made('dragover')
+      const drop = made('drop')
+      if (over?.dataTransfer?.files.length && drop?.dataTransfer?.files.length) {
+        const overTaken = !svg.dispatchEvent(over)
+        const dropTaken = !svg.dispatchEvent(drop)
+        return { way: 'DragEvents', overTaken, dropTaken }
+      }
+      window.kitBoard.drop([file], clientX, clientY)
+      return { way: 'kitBoard.drop (no DragEvent with files in this browser; the defaults are not checked)', overTaken: null, dropTaken: null }
+    },
+    { x: 760, y: 450 },
+  )
+  const dropNotice = await until(async () => (await notices('warning')).some((text) => text.includes('Only pictures can be dropped')), 30)
+  await page.waitForTimeout(1000)
+  const stillHere = frame.url() === frameUrl && !frame.isDetached() && (await board(() => window.kitBoard != null))
+  const shownAfterDrop = await shown()
+  const countAfterDrop = await elementCount()
+  const defaultsTaken = textDrop.way === 'DragEvents' ? textDrop.overTaken === true && textDrop.dropTaken === true : true
+  step(
+    'a dropped text file is refused with a notice and the frame keeps the board',
+    defaultsTaken && dropNotice && stillHere && countAfterDrop === countBeforeDrop && JSON.stringify(shownAfterDrop) === JSON.stringify(shownBeforeDrop) && shownAfterDrop.length > 0,
+    `through ${textDrop.way}: dragover taken ${textDrop.overTaken}, drop taken ${textDrop.dropTaken}; notice ${dropNotice} ${JSON.stringify(await notices('warning'))}; frame kept ${stillHere}; ${countBeforeDrop} → ${countAfterDrop} elements, ${shownBeforeDrop.length} → ${shownAfterDrop.length} shown; lifecycle ${lifecycle.slice(-3).join(' | ')}`,
+  )
+  step('no page errors in the review fixes', errors.length === 0, errors.join(' | '))
 } catch (error) {
   step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)
 } finally {

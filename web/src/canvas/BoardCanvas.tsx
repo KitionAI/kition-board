@@ -628,6 +628,8 @@ export function BoardCanvas(props: Props) {
     drop: (files, clientX, clientY) => {
       if (latest.current.readOnly) return
       const pictures = files.filter((file) => clipboard.pictureMime(file) != null)
+      const others = files.filter((file) => clipboard.pictureMime(file) == null)
+      if (others.length) toast('warning', latest.current.t('dropUnsupported'), others.map((file) => file.name).join(', '))
       if (pictures.length) void placePictures(pictures, toWorld(clientX, clientY), true)
     },
   }
@@ -648,17 +650,20 @@ export function BoardCanvas(props: Props) {
       if (key) key.handled = true
       clip.current.paste(from, key?.at ?? null)
     }
+    // Files dragged over the canvas are always taken, so the browser never opens a dropped file in
+    // the editor's frame (its default for a drop nobody takes); a read-only board takes none of them.
+    const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files') || (event.dataTransfer?.files.length ?? 0) > 0
     const onDragOver = (event: DragEvent) => {
-      if (latest.current.readOnly || !Array.from(event.dataTransfer?.types ?? []).includes('Files')) return
+      if (!carriesFiles(event)) return
       event.preventDefault()
-      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+      if (event.dataTransfer) event.dataTransfer.dropEffect = latest.current.readOnly ? 'none' : 'copy'
     }
     const onDrop = (event: DragEvent) => {
-      if (latest.current.readOnly) return
-      const from = clipboard.carried(event.dataTransfer)
-      if (!from.files.length) return
+      if (!carriesFiles(event)) return
       event.preventDefault()
-      clip.current.drop(from.files, event.clientX, event.clientY)
+      if (latest.current.readOnly) return
+      // Pictures are placed; any other file gets a notice (clip.current.drop).
+      clip.current.drop(Array.from(event.dataTransfer?.files ?? []), event.clientX, event.clientY)
     }
     box.addEventListener('paste', onPaste)
     box.addEventListener('dragover', onDragOver)

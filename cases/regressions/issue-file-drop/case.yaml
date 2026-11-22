@@ -1,0 +1,29 @@
+format: 1
+id: regressions/issue-file-drop
+feature: board.editing
+intent: >-
+  A file that is not a picture dropped on the canvas is refused with a notice ("Only pictures can be
+  dropped on the board", naming the file), inserts nothing, and the editor's frame keeps showing
+  the board: the canvas takes every drag that carries files (dragover and drop have their default
+  prevented, in a read-only board too), so the browser never opens the dropped file in the frame
+  (web/tests/editing.mjs step 19). Before, the canvas accepted the dragover of any file but
+  returned from the drop without preventing its default when none was a picture, so the browser's
+  default (navigating the frame to the file) could run and nothing told the person why. Found by
+  the review of c7a161c..b540d9d.
+layer: gate
+dimension: function
+source:
+  kind: issue
+  from: "review of c7a161c..b540d9d (BoardCanvas.tsx onDragOver and onDrop)"
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-22"
+timeout_s: 600
+requires: [chromium, webkit]
