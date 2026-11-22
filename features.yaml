@@ -163,10 +163,10 @@ features:
     title: "Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label"
     dimension: [function]
     priority: P0
-    status: partial
+    status: has
     paths: [web/src/board/clipboard.ts, web/src/canvas/CanvasMenu.tsx, web/src/canvas/BoardCanvas.tsx, web/src/canvas/TextEditor.tsx, web/src/panels/StylePanel.tsx, web/tests/editing.mjs]
     target: "Miro (web, 2026-11)"
-    gap: "Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks. The change-shape and marks cases have not yet been through a CI run."
+    gap: "Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks."
     cases: [board.editing/clipboard, board.editing/pictures, board.editing/change-shape, board.editing/marks]
     since: "2026-11-21"
   - id: board.text
@@ -265,29 +265,26 @@ features:
     title: "Insert a template"
     dimension: [function]
     priority: P2
-    status: partial
+    status: has
     commands: [template.insert]
     paths: [web/src/panels/TemplateGallery.tsx, web/tests/proof.mjs]
-    gap: "The editor case board.templates/editor (web/tests/proof.mjs: each of the six templates from the gallery, one undo step, back with redo, all six after save and reopen) has not yet been through a CI run."
     cases: [board.templates/editor]
     since: "2026-11-17"
   - id: board.export
     title: "Export the board"
     dimension: [conversion]
     priority: P1
-    status: partial
+    status: has
     commands: [file.export]
     paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/scene.rs, crates/render/scene/src/export.rs, web/src/panels/ExportDialog.tsx, web/tests/proof.mjs]
-    gap: "The editor case board.export/editor (web/tests/proof.mjs: PNG, SVG and PDF from the export dialog, written through the host; a library shape drawn as itself in the SVG) has not yet been through a CI run."
     cases: [regressions/issue-1, regressions/issue-agent-export, board.export/editor]
     since: "2026-11-17"
   - id: board.history
     title: "Undo and redo"
     dimension: [function]
     priority: P1
-    status: partial
+    status: has
     commands: [edit.undo, edit.redo]
     paths: [bindings/wasm/src/lib.rs, bindings/wasm/tests/undo_cancelled_group.rs, web/tests/proof.mjs]
-    gap: "The editor case board.history/editor (web/tests/proof.mjs: create, move, style and delete undone and redone one by one with the keys and the frame's buttons, then saved and reopened) has not yet been through a CI run."
     cases: [regressions/issue-undo-cancelled-group, board.history/editor]
     since: "2026-11-17"
