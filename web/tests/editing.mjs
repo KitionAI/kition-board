@@ -11,7 +11,9 @@
 // brings the rectangle back (case board.editing/change-shape); Cmd/Ctrl+B on a selected word stores
 // a bold mark that the engine draws bold, a stored mark shows pressed and survives an edit
 // elsewhere, Cmd/Ctrl+K stores a link with its address, and a Markdown label shows no marks bar
-// (case board.editing/marks). The harness is web/tests/flow.mjs's.
+// (case board.editing/marks). Then, on a page of its own, the review fixes: a mark made on the last
+// of a run of identical characters stays on it when the same character is typed before it
+// (regressions/issue-mark-offsets). The harness is web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
@@ -590,6 +592,89 @@ try {
   const markdownKept = (await storedOne(markdown))?.text === '**Notes**'
   step('a Markdown label shows no mark bar', markdownOpened && markdownBar === 0 && markdownClosed && markdownKept, `opened ${markdownOpened}, bars ${markdownBar}, closed ${markdownClosed}, text kept ${markdownKept}`)
   step('no page errors while changing shapes and marking labels', errors.length === 0, errors.join(' | '))
+
+  // Review fixes (the regression cases named at each step), on a page of their own at a known view,
+  // with labels made by the agent (not the person's undo).
+  await page.keyboard.press('Escape')
+  const pageBeforeFixes = await personPage()
+  await newPage()
+  await until(async () => (await personPage()) !== pageBeforeFixes && (await shown()).length === 0)
+  await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
+  const fixesPage = await personPage()
+  const madeForFixes = await ai([
+    {
+      command: 'element.create',
+      params: {
+        page: fixesPage,
+        elements: [
+          { kind: 'shape', position: { x: 60, y: 80 }, size: { w: 200, h: 100 }, text: 'xx' },
+          { kind: 'shape', position: { x: 320, y: 80 }, size: { w: 200, h: 100 }, text: 'yy' },
+          { kind: 'shape', position: { x: 580, y: 80 }, size: { w: 200, h: 100 }, text: '😀😀' },
+        ],
+      },
+    },
+  ])
+  const [runX, runY, runEmoji] = madeForFixes.completed[0].result.created
+  await until(async () => (await shown()).length === 3)
+  /**
+   * Opens the label at world point (x, y), selects its last character with the keys, marks it with
+   * `markKey` (Cmd/Ctrl+B, or Cmd/Ctrl+K and `href` in the link field), puts the caret before it
+   * (ArrowLeft collapses the selection to its start) and types `typed`, then commits with Enter.
+   */
+  const markLastThenTypeBefore = async (x, y, markKey, href, typed) => {
+    const opened = await openLabel(x, y)
+    // The box opens with its text selected: ArrowRight goes to the end, Shift+ArrowLeft takes the last character.
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Shift+ArrowLeft')
+    const chosen = opened ? await editor.evaluate((field) => [field.selectionStart, field.selectionEnd, field.value.length]) : null
+    await page.keyboard.press(`${mod}+${markKey}`)
+    let fieldUsed = null
+    if (href) {
+      fieldUsed = await until(async () => (await linkField.count()) === 1, 30)
+      if (fieldUsed) {
+        await linkField.fill(href)
+        await linkField.press('Enter')
+      }
+      fieldUsed = fieldUsed && (await until(async () => (await linkField.count()) === 0 && (await editor.evaluate((field) => field.ownerDocument.activeElement === field)), 30))
+    }
+    await page.keyboard.press('ArrowLeft')
+    const caret = opened ? await editor.evaluate((field) => [field.selectionStart, field.selectionEnd]) : null
+    await page.keyboard.type(typed)
+    const typedValue = opened ? await editor.inputValue().catch(() => null) : null
+    await page.keyboard.press('Enter')
+    const closed = await until(async () => (await editor.count()) === 0, 30)
+    return { opened, chosen, fieldUsed, caret, typedValue, closed }
+  }
+  /** `runs` as [text, mark names] pairs, for the step details. */
+  const runList = (runs) => JSON.stringify(runs.map((run) => [run.insert, Object.keys(run.attributes ?? {})]))
+  const plain = (run) => run != null && (run.attributes == null || Object.keys(run.attributes).length === 0)
+  const said = (name, done) => `${name}: opened ${done.opened}, chose ${JSON.stringify(done.chosen)}, field ${done.fieldUsed}, caret ${JSON.stringify(done.caret)}, typed ${JSON.stringify(done.typedValue)}, closed ${done.closed}`
+
+  // 15. Typing inside a run of identical characters (regressions/issue-mark-offsets): in "xx" the
+  // second x made bold, the caret put between the two and an x typed: the bold goes to the old
+  // second x (now the third) and the typed x stays plain; the same with a link on the second of
+  // "yy" (the typed y is not linked), and with emoji that share their first UTF-16 unit.
+  const xDone = await markLastThenTypeBefore(160, 100, 'b', null, 'x')
+  const xStored = await until(async () => {
+    const runs = await runsOf(runX)
+    return (await storedOne(runX))?.text === 'xxx' && runs.length === 2 && plain(runs[0]) && runs[0].insert === 'xx' && runs[1].insert === 'x' && runs[1].attributes?.bold === true
+  }, 50)
+  const yDone = await markLastThenTypeBefore(420, 100, 'k', 'https://kition.ai/y', 'y')
+  const yStored = await until(async () => {
+    const runs = await runsOf(runY)
+    return (await storedOne(runY))?.text === 'yyy' && runs.length === 2 && plain(runs[0]) && runs[0].insert === 'yy' && runs[1].insert === 'y' && runs[1].attributes?.link?.href === 'https://kition.ai/y'
+  }, 50)
+  const emojiDone = await markLastThenTypeBefore(680, 100, 'b', null, '😀')
+  const emojiStored = await until(async () => {
+    const runs = await runsOf(runEmoji)
+    return (await storedOne(runEmoji))?.text === '😀😀😀' && runs.length === 2 && plain(runs[0]) && runs[0].insert === '😀😀' && runs[1].insert === '😀' && runs[1].attributes?.bold === true
+  }, 50)
+  step(
+    'typing inside a run of identical characters keeps each mark on its own character',
+    xDone.opened && xDone.closed && xStored && yDone.opened && yDone.fieldUsed && yDone.closed && yStored && emojiDone.opened && emojiDone.closed && emojiStored,
+    `${said('xx', xDone)}, stored ${xStored} ${runList(await runsOf(runX))}; ${said('yy', yDone)}, stored ${yStored} ${runList(await runsOf(runY))}; ` +
+      `${said('emoji', emojiDone)}, stored ${emojiStored} ${runList(await runsOf(runEmoji))} ${warnings.slice(-3).join(' | ')}`,
+  )
 } catch (error) {
   step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)
 } finally {

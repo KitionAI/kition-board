@@ -1,0 +1,33 @@
+format: 1
+id: regressions/issue-mark-offsets
+feature: board.editing
+intent: >-
+  While a label is edited, the marks waiting beside the text (and the stored ones the bar shows
+  pressed) follow the typing at the box's caret: in "xx" with the second x made bold, an x typed
+  between the two leaves the bold on the old second x (now the third) and the typed x plain; a link
+  made on the second of "yy" does not take the y typed before it; emoji that share their first
+  UTF-16 unit behave the same; and no mark boundary lands inside a surrogate pair or past the
+  text's end (web/src/board/marks.ts `follow`, checked without a browser by web/tests/marks.mjs
+  and in the editor by web/tests/editing.mjs step 15). Before, the edit was found by comparing the
+  old and new text from both ends, which puts typing inside a run of identical characters at the
+  run's end: the bold became [1, 3] and the link stayed on the typed character. Found by the review
+  of c7a161c..b540d9d.
+layer: gate
+dimension: function
+source:
+  kind: issue
+  from: "review of c7a161c..b540d9d (TextEditor.tsx follow)"
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/marks.mjs]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-22"
+timeout_s: 600
+requires: [chromium, webkit]

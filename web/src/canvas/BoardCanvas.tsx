@@ -31,7 +31,8 @@ import { styleFor, type Style } from '../board/style'
 import { TOOL_KEYS, type Tool } from '../tools'
 import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
-import { TextEditor, marksOf, type TextEditing, type TextMark } from './TextEditor'
+import { marksOf, type TextMark } from '../board/marks'
+import { TextEditor, type TextEditing } from './TextEditor'
 
 export type { Tool }
 

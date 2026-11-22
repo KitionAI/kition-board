@@ -6,9 +6,9 @@
  * Over a shape's label or a text (not a Markdown one), a small bar above the box sets bold
  * (Cmd/Ctrl+B), italic (Cmd/Ctrl+I) and a link (Cmd/Ctrl+K, a field for the address; an empty one
  * removes it) on the box's selection. The box stays a plain text box: the marks wait beside the
- * text as `{ start, end, mark, value }` in UTF-16 offsets of the current text, move with the
- * typing before them, and are sent after the text when the box commits (`text.mark`, design note
- * 4.3); the engine's fragment shows them then. A bar button is pressed when the selection lies
+ * text as `{ start, end, mark, value }` in UTF-16 offsets of the current text (`board/marks.ts`),
+ * move with the typing before them (placed at the caret), and are sent after the text when the box
+ * commits (`text.mark`, design note 4.3); the engine's fragment shows them then. A bar button is pressed when the selection lies
  * inside a mark of its kind, stored or waiting.
  *
  * Ported from Kition's `packages/board-editor/src/components/WhiteboardTextEditor.tsx`.
@@ -16,14 +16,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ICON_STROKE, isMac } from '@kition/sdk/editor'
 import { BoldIcon, ItalicIcon, LinkIcon, type IconComponent } from '@kition/tessera/icons/react'
-import type { TextRun } from '@kition/sdk/kdm'
 import { composingEnter } from '../board/ime'
-
-export type MarkName = 'bold' | 'italic' | 'link'
-/** A mark's value: `true` (bold, italic), a link's address, or `null` (removed). */
-export type MarkValue = true | { href: string } | null
-/** A mark over the UTF-16 range `start..end` of the box's text. */
-export type TextMark = { start: number; end: number; mark: MarkName; value: MarkValue }
+import { address, follow, markOver, type MarkName, type TextMark } from '../board/marks'
 
 export type TextEditing = {
   /** The element whose text this is; `null` for a new text element at `world`. */
@@ -41,90 +35,8 @@ export type TextEditing = {
   marks: readonly TextMark[] | null
 }
 
-const MARKS: readonly MarkName[] = ['bold', 'italic', 'link']
 const ICONS: Record<MarkName, IconComponent> = { bold: BoldIcon, italic: ItalicIcon, link: LinkIcon }
 const KEYS: Record<MarkName, string> = { bold: 'B', italic: 'I', link: 'K' }
-
-/** The stored marks of a text, from its runs (`Replica.textDelta`, UTF-16 lengths). */
-export function marksOf(runs: readonly TextRun[]): TextMark[] {
-  const out: TextMark[] = []
-  let at = 0
-  for (const run of runs) {
-    const end = at + run.insert.length
-    for (const mark of MARKS) {
-      const raw = run.attributes?.[mark]
-      const value: MarkValue = mark === 'link' ? (raw && typeof raw === 'object' && typeof (raw as { href?: unknown }).href === 'string' ? { href: (raw as { href: string }).href } : null) : raw === true ? true : null
-      if (value == null) continue
-      let last: TextMark | undefined
-      for (const item of out) if (item.mark === mark) last = item
-      if (last && last.end === at && JSON.stringify(last.value) === JSON.stringify(value)) last.end = end
-      else out.push({ start: at, end, mark, value })
-    }
-    at = end
-  }
-  return out
-}
-
-/**
- * Where offset `x` of the old text is in the new one after `delete` units at `at` gave way to
- * `insert` units. A start inside the replaced part goes after the new text; an end inside it goes
- * to its start. Typing at a range's end takes the mark only when `expand` (bold and italic, as the
- * board's schema says: `expand: after`; a link never grows).
- */
-function shifted(x: number, side: 'start' | 'end', at: number, removed: number, inserted: number, expand: boolean) {
-  if (side === 'start') {
-    if (x < at) return x
-    return x >= at + removed ? x + inserted - removed : at + inserted
-  }
-  if (x < at || (x === at && !(expand && removed === 0))) return x
-  if (x === at) return x + inserted
-  return x >= at + removed ? x + inserted - removed : at
-}
-
-/** `marks` after the text went from `before` to `after` (one edit: what lies between their common ends). */
-function follow(marks: readonly TextMark[], before: string, after: string): TextMark[] {
-  let prefix = 0
-  const most = Math.min(before.length, after.length)
-  while (prefix < most && before.charCodeAt(prefix) === after.charCodeAt(prefix)) prefix += 1
-  let suffix = 0
-  while (suffix < most - prefix && before.charCodeAt(before.length - 1 - suffix) === after.charCodeAt(after.length - 1 - suffix)) suffix += 1
-  const removed = before.length - prefix - suffix
-  const inserted = after.length - prefix - suffix
-  if (!removed && !inserted) return [...marks]
-  return marks
-    .map((item) => {
-      const expand = item.mark !== 'link'
-      return { ...item, start: shifted(item.start, 'start', prefix, removed, inserted, expand), end: shifted(item.end, 'end', prefix, removed, inserted, expand) }
-    })
-    .filter((item) => item.end > item.start)
-}
-
-/** The value of `mark` at UTF-16 unit `at`: the stored marks, then the waiting ones in order. */
-function valueAt(stored: readonly TextMark[], pending: readonly TextMark[], mark: MarkName, at: number): MarkValue {
-  let value: MarkValue = null
-  for (const item of [...stored, ...pending]) if (item.mark === mark && item.start <= at && at < item.end) value = item.value
-  return value
-}
-
-/** Whether every unit of the selection (or the one before a caret) has `mark`; and its value there. */
-function markOver(stored: readonly TextMark[], pending: readonly TextMark[], mark: MarkName, start: number, end: number): MarkValue {
-  const from = start < end ? start : Math.max(0, start - 1)
-  const to = start < end ? end : from + 1
-  let first: MarkValue = null
-  for (let at = from; at < to; at += 1) {
-    const value = valueAt(stored, pending, mark, at)
-    if (value == null) return null
-    first ??= value
-  }
-  return first
-}
-
-/** An address as the engine takes it: http, https or mailto (a bare host gets `https://`). */
-function address(text: string): string | null {
-  const trimmed = text.trim()
-  if (!trimmed) return null
-  return /^(https?:\/\/|mailto:)/i.test(trimmed) ? trimmed : `https://${trimmed}`
-}
 
 /** Whether `event` is the editor's own shortcut key with `letter` (Cmd on a Mac, else Ctrl). */
 function shortcut(event: ReactKeyboardEvent, letter: string) {
@@ -308,8 +220,10 @@ export function TextEditor({
         onChange={(event) => {
           const next = event.target.value
           if (rich) {
-            marks.current.stored = follow(marks.current.stored, value, next)
-            marks.current.pending = follow(marks.current.pending, value, next)
+            // The edit ends at the caret (typing inside a run of identical characters).
+            const caret = event.target.selectionEnd
+            marks.current.stored = follow(marks.current.stored, value, next, caret)
+            marks.current.pending = follow(marks.current.pending, value, next, caret)
           }
           setValue(next)
           readSelection()
