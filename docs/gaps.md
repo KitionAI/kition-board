@@ -17,7 +17,7 @@ land work, then this list. The comparison with the target application is in
 ## Differences on working features
 
 - `board.editing`: Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks.
-- `board.connectors.ends`: Ends meet the outline of ellipses and polygon shapes; a star, cloud, heart, cylinder, document and the other curved shapes, and the actor and the other open marks, still meet their box.
+- `board.connectors.ends`: Ends meet the outline of the ellipses, the polygon shapes of outline.rs (the diamond, triangles, hexagon, parallelogram and the others in its table) and the curved document, delay, display and stored-data (each curve sampled as a polygon within 0.3% of the box); a star, cloud, heart, cylinder, pill, multi-document, note and the four single arrows, and the actor and the other open marks (line, check, the braces), still meet their box.
 - `board.images`: Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs.
 
 ## Catalogue

@@ -137,3 +137,115 @@ fn a_new_shape_type_moves_the_cached_end_onto_the_new_outline_and_rectangles_sta
     let derived = doc.model().end_point(&ObjectId::from_string(&connector), &stored_end(&doc, &connector));
     assert_eq!(cached, derived, "the cache is the derived end");
 }
+
+/// A black, unfilled `shape` over `[x, y, w, h]` and, for each anchor of `ends`, a black
+/// rectangle at `from` (its top-left; 40 × 40) with a straight, heavy black connector from that
+/// rectangle's `from_anchor` to the shape's anchor. Answers (document, the connectors).
+fn joined(shape: &str, [x, y, w, h]: [f64; 4], ends: &[([f64; 2], [f64; 2], [f64; 2])]) -> (BoardDocument, Vec<String>) {
+    let mut doc = BoardDocument::create("Ends.kboard", 1000, 700).unwrap();
+    let made = doc
+        .execute(
+            "element.create",
+            json!({ "elements": [{ "kind": "shape", "shapeType": shape, "position": [x, y], "size": [w, h], "strokeColor": "#000000", "fillStyle": "none" }] }),
+        )
+        .unwrap();
+    let target = made["created"][0].as_str().unwrap().to_owned();
+    let mut connectors = Vec::new();
+    for (from, from_anchor, anchor) in ends {
+        let made = doc
+            .execute(
+                "element.create",
+                json!({ "elements": [{ "kind": "shape", "position": from, "size": [40, 40], "strokeColor": "#000000", "fillStyle": "none" }] }),
+            )
+            .unwrap();
+        let start = made["created"][0].as_str().unwrap().to_owned();
+        let made = doc
+            .execute(
+                "connector.create",
+                json!({
+                    "from": { "element": start, "anchor": from_anchor },
+                    "to": { "element": target, "anchor": anchor },
+                    "type": "straight",
+                    "style": { "strokeColor": "#000000", "strokeSize": "xl" },
+                }),
+            )
+            .unwrap();
+        connectors.push(made["created"][0].as_str().unwrap().to_owned());
+    }
+    (doc, connectors)
+}
+
+/// The point `back` units from `end` toward `start`.
+fn toward(end: Point, start: Point, back: f64) -> Point {
+    let length = (start.x - end.x).hypot(start.y - end.y);
+    Point::new(end.x + (start.x - end.x) / length * back, end.y + (start.y - end.y) / length * back)
+}
+
+/// A connector bound to the bottom middle and the bottom quarter of a document ends on its drawn
+/// wave, not on the box's bottom edge 15 units further down: the line reaches the wave (ink just
+/// below the end, where the box's edge left paper before) and stops there (paper inside).
+#[test]
+fn an_end_on_a_documents_bottom_meets_the_wave() {
+    // The document's box: (400, 100)-(600, 200); its wave is `Q 0.75 0.7 0.5 0.85 Q 0.25 1 0 0.85`.
+    let (doc, connectors) =
+        joined("document", [400.0, 100.0, 200.0, 100.0], &[([480.0, 400.0], [0.5, 0.0], [0.5, 1.0]), ([430.0, 400.0], [0.5, 0.0], [0.25, 1.0])]);
+    // On the wave's left half x runs straight from 0.5 to 0 while y goes 0.85, 1 (control), 0.85.
+    let wave = |x: f64| {
+        let t = (500.0 - x) / 100.0;
+        100.0 + 100.0 * (0.85 * (1.0 - t) * (1.0 - t) + 2.0 * (1.0 - t) * t + 0.85 * t * t)
+    };
+    let middle = route_end(&fragment(&doc, &connectors[0]));
+    assert!((middle.x - 500.0).abs() < 0.01 && (middle.y - 185.0).abs() < 0.5, "bottom middle: {middle:?}");
+    assert!(dark(&doc, 500.0, 193.0), "the line reaches the wave: the gap above the box's bottom edge is closed");
+    assert!(!dark(&doc, 500.0, 172.0), "the line stops at the wave");
+    let quarter = route_end(&fragment(&doc, &connectors[1]));
+    assert!(quarter.x > 450.0 && quarter.x < 500.0, "bottom quarter: {quarter:?}");
+    assert!((quarter.y - wave(quarter.x)).abs() < 0.5, "bottom quarter {quarter:?} is not on the wave ({})", wave(quarter.x));
+    let below = toward(quarter, Point::new(450.0, 400.0), 6.0);
+    assert!(dark(&doc, below.x, below.y), "ink just below the end at {below:?}");
+    let inside = toward(quarter, Point::new(450.0, 400.0), -12.0);
+    assert!(!dark(&doc, inside.x, inside.y), "paper inside the document at {inside:?}");
+    // The cache a command writes is the derived end.
+    let stored = stored_end(&doc, &connectors[1]).point;
+    assert!((stored.x - quarter.x).abs() < 0.01 && (stored.y - quarter.y).abs() < 0.01, "{stored:?}");
+}
+
+/// A connector bound to the right side of a delay, off its middle, ends on the drawn round side.
+#[test]
+fn an_end_on_a_delays_right_side_meets_its_curve() {
+    // The delay's box: (400, 100)-(600, 200); its right side is `C 1.13 0, 1.13 1, 0.6 1` from (0.6, 0).
+    let (doc, connectors) = joined("delay", [400.0, 100.0, 200.0, 100.0], &[([700.0, 50.0], [0.0, 0.5], [1.0, 0.15])]);
+    let end = route_end(&fragment(&doc, &connectors[0]));
+    let curve = |t: f64| {
+        let u = 1.0 - t;
+        let fx = u * u * u * 0.6 + 3.0 * u * u * t * 1.13 + 3.0 * u * t * t * 1.13 + t * t * t * 0.6;
+        let fy = 3.0 * u * t * t + t * t * t;
+        Point::new(400.0 + 200.0 * fx, 100.0 + 100.0 * fy)
+    };
+    let off = (0..=2000).map(|step| curve(f64::from(step) / 2000.0)).map(|p| (p.x - end.x).hypot(p.y - end.y)).fold(f64::INFINITY, f64::min);
+    assert!(off < 0.6, "the end {end:?} is {off} from the drawn curve");
+    assert!(end.x < 595.0, "the end {end:?} is not on the box's right edge");
+    let start = Point::new(700.0, 70.0);
+    let beside = toward(end, start, 6.0);
+    assert!(dark(&doc, beside.x, beside.y), "ink just outside the curve at {beside:?}");
+    let inside = toward(end, start, -12.0);
+    assert!(!dark(&doc, inside.x, inside.y), "paper inside the delay at {inside:?}");
+}
+
+/// `shape.previews` carries the curved shapes' sampled outlines as fraction lists, so the page
+/// (`web/src/board/outline.ts`, which takes any list of `[fx, fy]`) derives their ends as the
+/// engine does; the drawing in the same answer is still the curve.
+#[test]
+fn previews_carry_the_curved_outlines() {
+    use kition_board_kdm::outline::CURVES;
+    let mut doc = BoardDocument::create("Ends.kboard", 800, 600).unwrap();
+    let answer = doc.execute("shape.previews", json!({})).unwrap();
+    let shapes: Vec<Value> = answer["groups"].as_array().unwrap().iter().flat_map(|g| g["shapes"].as_array().unwrap().clone()).collect();
+    for (name, list) in CURVES {
+        let shape = shapes.iter().find(|s| s["shape"] == *name).unwrap();
+        let corners: Vec<[f64; 2]> = list.iter().map(|(x, y)| [*x, *y]).collect();
+        assert_eq!(shape.get("outline"), Some(&json!(corners)), "{name}");
+        let svg = shape["svg"].as_str().unwrap();
+        assert!(svg.contains("<path") && !svg.contains("<polygon"), "{name} is drawn as curves: {svg}");
+    }
+}

@@ -212,7 +212,7 @@ features:
     status: has
     paths: [crates/render/scene/src/fragment.rs, crates/engine/model/src/fields.rs, web/src/board/style.ts, bindings/wasm/examples/arrowhead_sheet.rs, crates/kdm/kdm-model/src/outline.rs, web/src/board/outline.ts]
     target: "Miro (web, 2026-11)"
-    gap: "Ends meet the outline of ellipses and polygon shapes; a star, cloud, heart, cylinder, document and the other curved shapes, and the actor and the other open marks, still meet their box"
+    gap: "Ends meet the outline of the ellipses, the polygon shapes of outline.rs (the diamond, triangles, hexagon, parallelogram and the others in its table) and the curved document, delay, display and stored-data (each curve sampled as a polygon within 0.3% of the box); a star, cloud, heart, cylinder, pill, multi-document, note and the four single arrows, and the actor and the other open marks (line, check, the braces), still meet their box"
     cases: [board.connectors/arrowheads, board.connectors/outline-ends, board.connectors/outline-ends-page]
     since: "2026-11-21"
   - id: board.cards
