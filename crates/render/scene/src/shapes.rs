@@ -17,7 +17,6 @@ pub fn supports_fill(shape: &str) -> bool {
 }
 
 /// Whether a shape is labelled (`line` and `check` are not).
-
 pub fn supports_label(shape: &str) -> bool {
     !matches!(shape, "line" | "check")
 }
