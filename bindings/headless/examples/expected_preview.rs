@@ -1,9 +1,9 @@
-//! Writes the expected preview of `conformance/basic.kboard`, `conformance/golden/basic.png`, that
+//! Writes the expected preview of `conformance/basic.kboard`, `conformance/expected/basic.png`, that
 //! `khp check` compares `board_inspect {preview: true}` with (KHP A39, khp
 //! `spec/conformance.md`): drawn by the kit's own engine with the fonts the kit ships, through the
 //! same `view.screenshot` (canvas, at most 1024 pixels) a kits server asks the headless kit for.
 //!
-//! `cargo run -p kition-board --example golden` (with kition-fonts beside the repository or
+//! `cargo run -p kition-board --example expected_preview` (with kition-fonts beside the repository or
 //! `KITION_FONTS_DIR` set, as for the executable). Review the picture before committing it.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -21,7 +21,7 @@ const MAX_SIZE: u32 = 1024;
 fn main() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     assert_eq!(kition_board::add_shipped_fonts(), 2, "the build found no kition-fonts checkout: the preview would have no text");
-    let root = std::env::temp_dir().join(format!("kition-board-golden-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("kition-board-expected-preview-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
     let root = std::fs::canonicalize(root).unwrap();
@@ -34,9 +34,9 @@ fn main() {
     let opened = kit.open(OpenRequest { file: &folder.file("basic.kboard").unwrap(), read_only: true, create: None }).unwrap();
     let shot =
         kit.screenshot(&opened.id, &ScreenshotRequest { scope: ScreenshotScope::Canvas, max_size: MAX_SIZE, scale: 1.0, target: None }).unwrap();
-    let target = repo.join("conformance/golden/basic.png");
+    let target = repo.join("conformance/expected/basic.png");
     std::fs::create_dir_all(target.parent().unwrap()).unwrap();
     std::fs::write(&target, &shot.png).unwrap();
-    println!("conformance/golden/basic.png: {} x {}", shot.width, shot.height);
+    println!("conformance/expected/basic.png: {} x {}", shot.width, shot.height);
     let _ = std::fs::remove_dir_all(root);
 }

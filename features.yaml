@@ -2,7 +2,7 @@ format: 1
 kit: board
 updated: "2026-11-20"
 gate_budget_s: 600
-protected: ["conformance/golden/**"]
+protected: ["conformance/expected/**"]
 features:
   - id: board.agent.observe
     title: An agent reads the flow and answers on the board
@@ -45,7 +45,7 @@ features:
     commands: [file.render]
     paths: [bindings/headless/build.rs, bindings/headless/src/lib.rs, bindings/headless/src/main.rs, bindings/wasm/src/render.rs, crates/render/scene/src/**]
     requirements: [AX13]
-    cases: [board.agent.preview/render-explicit-view, board.agent.preview/render-named-view, regressions/issue-golden-preview, regressions/issue-headless-shipped-fonts]
+    cases: [board.agent.preview/render-explicit-view, board.agent.preview/render-named-view, regressions/issue-expected-preview, regressions/issue-headless-shipped-fonts]
     since: "2026-11-17"
   - id: board.agent.context
     title: No agent call depends on or leaves behind the page the editor shows; commands say what they read and the parameter on fills
