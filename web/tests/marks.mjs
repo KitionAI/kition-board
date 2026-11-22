@@ -3,8 +3,9 @@
 // box's caret, so typing inside a run of identical characters (or of emoji that share their first
 // UTF-16 unit) moves a mark by exactly what was typed before it, and no mark boundary lands inside
 // a surrogate pair or past the text's end (case regressions/issue-mark-offsets). The browser half
-// is web/tests/editing.mjs step 15.
-import { follow } from '../src/board/marks.ts'
+// is web/tests/editing.mjs step 15. Link addresses go with their scheme in lower case, and a refused
+// mark does not drop the marks after it (case regressions/issue-link-scheme, editing.mjs step 16).
+import { address, follow, sendMarks } from '../src/board/marks.ts'
 
 let failures = 0
 const step = (name, ok, detail = '') => {
@@ -82,6 +83,37 @@ for (let round = 0; round < 3000 && !unsound; round += 1) {
   if (!sound(got, after)) unsound = `${JSON.stringify(before)} → ${JSON.stringify(after)} caret ${caret}: ${ranges(marks)} → ${ranges(got)}`
 }
 step('no boundary inside a surrogate pair or past the end, after 3000 random edits', unsound == null, unsound ?? '')
+
+// Link addresses (regressions/issue-link-scheme): the engine takes http, https and mailto as written,
+// so the box sends the scheme in lower case; a bare host gets https://.
+for (const [typed, wanted] of [
+  ['HTTPS://Example.com/Docs', 'https://Example.com/Docs'],
+  ['Http://example.com', 'http://example.com'],
+  ['Mailto:Someone@Example.com', 'mailto:Someone@Example.com'],
+  ['  https://kition.ai/plan ', 'https://kition.ai/plan'],
+  ['kition.ai', 'https://kition.ai'],
+  ['', null],
+  ['   ', null],
+]) {
+  const got = address(typed)
+  step(`the address ${JSON.stringify(typed)} is sent as ${JSON.stringify(wanted)}`, got === wanted, `got ${JSON.stringify(got)}`)
+}
+
+// A refused mark does not drop the ones after it; every refusal's reason comes back for the notice.
+{
+  const sent = []
+  const refused = await sendMarks('e1', 'Read the docs', [link(9, 13), bold(0, 4), { start: 5, end: 40, mark: 'italic', value: true }, bold(20, 30)], async (params) => {
+    sent.push(params)
+    return params.mark === 'link' ? 'invalid-params: a link must be http, https or mailto' : null
+  })
+  const shape = JSON.stringify(sent.map((params) => [params.mark, params.range, params.units, 'value' in params ? params.value : 'none']))
+  step(
+    'a refused mark does not stop the marks after it',
+    JSON.stringify(refused) === JSON.stringify(['invalid-params: a link must be http, https or mailto']) &&
+      shape === JSON.stringify([['link', [9, 13], 'utf16', { href: 'https://example.com' }], ['bold', [0, 4], 'utf16', 'none'], ['italic', [5, 13], 'utf16', 'none']]),
+    `refused ${JSON.stringify(refused)}; sent ${shape}`,
+  )
+}
 
 console.log(failures ? `marks: ${failures} failed` : 'marks: all passed')
 process.exit(failures ? 1 : 0)

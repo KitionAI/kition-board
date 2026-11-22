@@ -31,7 +31,7 @@ import { styleFor, type Style } from '../board/style'
 import { TOOL_KEYS, type Tool } from '../tools'
 import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
-import { marksOf, type TextMark } from '../board/marks'
+import { marksOf, sendMarks, type TextMark } from '../board/marks'
 import { TextEditor, type TextEditing } from './TextEditor'
 
 export type { Tool }
@@ -481,16 +481,19 @@ export function BoardCanvas(props: Props) {
   /**
    * The marks the box kept, after the text: one `text.mark` each, in the order they were made, in
    * UTF-16 offsets of the committed text (the engine has no command that writes a text and its
-   * marks together, so each is an undo step of its own).
+   * marks together, so each is an undo step of its own). A refused mark does not stop the others;
+   * the person is told what was refused.
    */
   const commitMarks = useCallback(
     async (id: string, text: string, marks: readonly TextMark[]) => {
-      for (const { start, end, mark, value } of marks) {
-        const to = Math.min(end, text.length)
-        if (start >= to) continue
-        const answer = await commit('text.mark', { id, range: [start, to], mark, units: 'utf16', ...(value === true ? {} : { value }) })
-        if (!answer) return
-      }
+      const refused = await sendMarks(id, text, marks, async (params) => {
+        let reason: string | null = null
+        const answer = await commit('text.mark', params, undefined, (why) => {
+          reason = why
+        })
+        return answer ? null : (reason ?? 'text.mark was refused')
+      })
+      if (refused.length) toast('error', latest.current.t('marksFailed'), refused.join('; '))
     },
     [commit],
   )

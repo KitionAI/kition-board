@@ -1,0 +1,31 @@
+format: 1
+id: regressions/issue-link-scheme
+feature: board.editing
+intent: >-
+  A link typed with its scheme in capitals (HTTPS://Example.com/Docs, Mailto:someone@example.com)
+  is stored: the marks bar accepts http, https and mailto in any case and sends the scheme in lower
+  case, as text.mark takes it. When the engine refuses one mark of a commit, the marks after it are
+  still sent and the editor shows a notice naming what was refused (web/tests/marks.mjs, and
+  web/tests/editing.mjs step 16: a capitalised link, then bold, in one commit). Before, the bar
+  sent HTTPS:// as typed, text.mark refused it, and the commit stopped there: the link and every
+  mark made after it were dropped with only a console warning. Found by the review of
+  c7a161c..b540d9d.
+layer: gate
+dimension: function
+source:
+  kind: issue
+  from: "review of c7a161c..b540d9d (TextEditor.tsx address, BoardCanvas.tsx commitMarks)"
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/marks.mjs]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-22"
+timeout_s: 600
+requires: [chromium, webkit]

@@ -13,7 +13,8 @@
 // elsewhere, Cmd/Ctrl+K stores a link with its address, and a Markdown label shows no marks bar
 // (case board.editing/marks). Then, on a page of its own, the review fixes: a mark made on the last
 // of a run of identical characters stays on it when the same character is typed before it
-// (regressions/issue-mark-offsets). The harness is web/tests/flow.mjs's.
+// (regressions/issue-mark-offsets); a link typed with HTTPS:// is stored, and so are the marks after
+// it (regressions/issue-link-scheme). The harness is web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
@@ -674,6 +675,49 @@ try {
     xDone.opened && xDone.closed && xStored && yDone.opened && yDone.fieldUsed && yDone.closed && yStored && emojiDone.opened && emojiDone.closed && emojiStored,
     `${said('xx', xDone)}, stored ${xStored} ${runList(await runsOf(runX))}; ${said('yy', yDone)}, stored ${yStored} ${runList(await runsOf(runY))}; ` +
       `${said('emoji', emojiDone)}, stored ${emojiStored} ${runList(await runsOf(runEmoji))} ${warnings.slice(-3).join(' | ')}`,
+  )
+
+  /** The texts of the frame's notices of `level` (kit-editor's toasts). */
+  const notices = (level) => board((level) => [...document.querySelectorAll(`.kui-toast[data-level=${level}]`)].map((node) => node.textContent ?? ''), level)
+
+  // 16. A link address with its scheme in capitals (regressions/issue-link-scheme): "docs" in "Read
+  // the docs" linked to HTTPS://Example.com/Docs, then "Read" made bold, one commit: the link is
+  // stored with https in lower case and the bold made after it is stored too, with no notice.
+  const madeForScheme = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 60, y: 260 }, size: { w: 300, h: 100 }, text: 'Read the docs' }] } }])
+  const [schemed] = madeForScheme.completed[0].result.created
+  await until(async () => (await shown()).includes(schemed))
+  const schemeOpened = await openLabel(210, 280)
+  await editor.evaluate((field) => field.setSelectionRange(9, 13))
+  await page.keyboard.press(`${mod}+k`)
+  const schemeField = await until(async () => (await linkField.count()) === 1, 30)
+  if (schemeField) {
+    await linkField.fill('HTTPS://Example.com/Docs')
+    await linkField.press('Enter')
+  }
+  const schemeBack = await until(async () => (await linkField.count()) === 0 && (await editor.evaluate((field) => field.ownerDocument.activeElement === field)), 30)
+  await editor.evaluate((field) => field.setSelectionRange(0, 4))
+  await page.keyboard.press(`${mod}+b`)
+  const schemeBold = await pressedIs('bold', 'true')
+  await page.keyboard.press('Enter')
+  const schemeClosed = await until(async () => (await editor.count()) === 0, 30)
+  const schemeStored = await until(async () => {
+    const runs = await runsOf(schemed)
+    return runWith(runs, 'link')?.insert === 'docs' && runWith(runs, 'bold')?.insert === 'Read'
+  }, 50)
+  const schemeRuns = await runsOf(schemed)
+  const schemeNotices = await notices('error')
+  step(
+    'a link address with its scheme in capitals is stored, and the marks after it too',
+    schemeOpened &&
+      schemeField &&
+      schemeBack &&
+      schemeBold &&
+      schemeClosed &&
+      schemeStored &&
+      runWith(schemeRuns, 'link')?.attributes?.link?.href === 'https://Example.com/Docs' &&
+      (await storedOne(schemed))?.text === 'Read the docs' &&
+      !schemeNotices.some((text) => text.includes('marks')),
+    `opened ${schemeOpened}, field ${schemeField}, back ${schemeBack}, bold pressed ${schemeBold}, closed ${schemeClosed}, stored ${schemeStored}: ${JSON.stringify(schemeRuns)}; notices ${JSON.stringify(schemeNotices)} ${warnings.slice(-3).join(' | ')}`,
   )
 } catch (error) {
   step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)

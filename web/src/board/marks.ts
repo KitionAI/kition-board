@@ -123,9 +123,33 @@ export function markOver(stored: readonly TextMark[], pending: readonly TextMark
   return first
 }
 
-/** An address as the engine takes it: http, https or mailto (a bare host gets `https://`). */
+/**
+ * An address as the engine takes it: http, https or mailto, the scheme in lower case (the engine
+ * compares it as written, so `HTTPS://` or `Mailto:` would be refused); a bare host gets `https://`.
+ */
 export function address(text: string): string | null {
   const trimmed = text.trim()
   if (!trimmed) return null
-  return /^(https?:\/\/|mailto:)/i.test(trimmed) ? trimmed : `https://${trimmed}`
+  const scheme = /^(https?:\/\/|mailto:)/i.exec(trimmed)?.[0]
+  return scheme ? scheme.toLowerCase() + trimmed.slice(scheme.length) : `https://${trimmed}`
+}
+
+/** The parameters of one `text.mark` the editor sends (UTF-16 offsets). */
+export type MarkParams = { id: string; range: [number, number]; mark: MarkName; units: 'utf16'; value?: MarkValue }
+
+/**
+ * Sends the waiting `marks` of the committed `text` of `id`, one `text.mark` each in the order they
+ * were made (a range past the text is cut to it; an empty one is not sent). `send` answers null when
+ * the engine took the mark, else its reason. A refused mark does not stop the ones after it; the
+ * answer lists every refusal's reason, for the editor's notice.
+ */
+export async function sendMarks(id: string, text: string, marks: readonly TextMark[], send: (params: MarkParams) => Promise<string | null>): Promise<string[]> {
+  const refused: string[] = []
+  for (const { start, end, mark, value } of marks) {
+    const to = Math.min(end, text.length)
+    if (start >= to) continue
+    const reason = await send({ id, range: [start, to], mark, units: 'utf16', ...(value === true ? {} : { value }) })
+    if (reason != null) refused.push(reason)
+  }
+  return refused
 }
