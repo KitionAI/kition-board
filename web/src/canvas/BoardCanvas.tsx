@@ -166,6 +166,8 @@ export function BoardCanvas(props: Props) {
   const latest = useRef(props)
   latest.current = props
   const editingNow = useRef(editing)
+  /** Commits and closes the open text box (`TextEditor`'s `commitRef`). */
+  const commitEditor = useRef<(() => void) | null>(null)
   editingNow.current = editing
   /** Where the pointer is over the canvas (client coordinates), for a paste; null outside it. */
   const pointer = useRef<Point | null>(null)
@@ -763,7 +765,11 @@ export function BoardCanvas(props: Props) {
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     note(`down ${tool}${editing ? ' editing' : ''} ${event.button}`)
     pointer.current = { x: event.clientX, y: event.clientY }
-    if (editing) return
+    // A press on the canvas closes the text box, committing it (whatever has the focus).
+    if (editing) {
+      commitEditor.current?.()
+      return
+    }
     // The canvas takes the keys (tool letters, Delete, Undo) once it is used.
     container.current?.focus({ preventScroll: true })
     const p = toWorld(event.clientX, event.clientY)
@@ -1440,7 +1446,7 @@ export function BoardCanvas(props: Props) {
           </g>
         </g>
       </svg>
-      {editing ? <TextEditor key={`${editing.id}:${editing.left}:${editing.top}`} editing={editing} placeholder={t('textPlaceholder')} labels={markLabels} onCommit={commitText} onCancel={() => {
+      {editing ? <TextEditor key={`${editing.id}:${editing.left}:${editing.top}`} editing={editing} placeholder={t('textPlaceholder')} labels={markLabels} commitRef={commitEditor} onCommit={commitText} onCancel={() => {
             setEditing(null)
             container.current?.focus({ preventScroll: true })
           }} /> : null}

@@ -50,6 +50,7 @@ export function TextEditor({
   labels,
   onCommit,
   onCancel,
+  commitRef,
 }: {
   editing: TextEditing
   placeholder: string
@@ -57,9 +58,12 @@ export function TextEditor({
   labels: { bar: string; bold: string; italic: string; link: string; address: string }
   onCommit: (value: string, marks: readonly TextMark[]) => void
   onCancel: () => void
+  /** Set to a function that commits the box and closes it (a press on the canvas). */
+  commitRef?: { current: (() => void) | null }
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
   const bar = useRef<HTMLDivElement>(null)
+  const linkInput = useRef<HTMLInputElement>(null)
   const composing = useRef(false)
   const done = useRef(false)
   const [value, setValue] = useState(editing.value)
@@ -70,7 +74,8 @@ export function TextEditor({
   const [linking, setLinking] = useState<{ start: number; end: number; text: string } | null>(null)
   const [, setTick] = useState(0)
   // The focus moving between the text box and the link field is not leaving the editor, whatever
-  // the browser says the next focus is.
+  // the browser says the next focus is. Set only when the text box has the focus and is about to
+  // hand it to the field, and cleared when the field takes it, so it never swallows a later blur.
   const openingLink = useRef(false)
   const returning = useRef(false)
   const rich = editing.marks != null
@@ -92,6 +97,15 @@ export function TextEditor({
     if (commit) onCommit(field.current?.value ?? value, marks.current.pending)
     else onCancel()
   }
+
+  // A press on the canvas commits the box whatever has the focus.
+  useEffect(() => {
+    if (!commitRef) return undefined
+    commitRef.current = () => finish(true)
+    return () => {
+      commitRef.current = null
+    }
+  })
 
   const readSelection = () => {
     const box = field.current
@@ -115,8 +129,13 @@ export function TextEditor({
     if (!box || box.selectionStart >= box.selectionEnd) return
     const { selectionStart: start, selectionEnd: end } = box
     const current = markOver(marks.current.stored, marks.current.pending, 'link', start, end)
-    openingLink.current = true
+    // Only a focused text box gives the focus to the field (a Link button pressed from the field
+    // leaves it there, and then no blur follows).
+    const fromText = box.ownerDocument.activeElement === box
+    openingLink.current = fromText
     setLinking({ start, end, text: current && current !== true ? current.href : '' })
+    // A field already open is not mounted again, so its autoFocus does not take the focus.
+    if (linking && fromText) linkInput.current?.focus()
   }
 
   /**
@@ -175,6 +194,7 @@ export function TextEditor({
           {markButton('link', openLink)}
           {linking ? (
             <input
+              ref={linkInput}
               type="url"
               className="kui-field board-text-link-field"
               value={linking.text}
@@ -182,8 +202,16 @@ export function TextEditor({
               aria-label={labels.address}
               autoFocus
               onChange={(event) => setLinking({ ...linking, text: event.target.value })}
+              onFocus={() => {
+                openingLink.current = false
+              }}
               onBlur={(event) => {
-                if (!returning.current && leaving(event.relatedTarget)) finish(true)
+                if (returning.current || !leaving(event.relatedTarget)) return
+                // A browser may name no next focus (a click back into the text box): decide once
+                // the focus has moved.
+                window.setTimeout(() => {
+                  if (leaving(field.current?.ownerDocument.activeElement ?? null)) finish(true)
+                }, 0)
               }}
               onKeyDown={(event) => {
                 event.stopPropagation()

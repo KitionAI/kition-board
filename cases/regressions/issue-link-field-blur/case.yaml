@@ -1,0 +1,28 @@
+format: 1
+id: regressions/issue-link-field-blur
+feature: board.editing
+intent: >-
+  With the marks bar's link field open, a click back into the text box and Cmd/Ctrl+K (or the Link
+  button) on another selection move the focus to the field, and a click on the canvas then commits
+  and closes the text box; the next click on the canvas works as usual (web/tests/editing.mjs step
+  17). A press on the canvas closes an open text box whatever has the focus. Before, the second
+  Cmd/Ctrl+K set the flag that lets the text box's next blur pass (meant for the focus moving to a
+  newly opened field) although no such blur followed, so the next real blur was swallowed: the box
+  stayed open and every press on the canvas was ignored. Found by the review of c7a161c..b540d9d.
+layer: gate
+dimension: function
+source:
+  kind: issue
+  from: "review of c7a161c..b540d9d (TextEditor.tsx openLink)"
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-22"
+timeout_s: 600
+requires: [chromium, webkit]

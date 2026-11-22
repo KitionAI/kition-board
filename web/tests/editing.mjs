@@ -14,7 +14,9 @@
 // (case board.editing/marks). Then, on a page of its own, the review fixes: a mark made on the last
 // of a run of identical characters stays on it when the same character is typed before it
 // (regressions/issue-mark-offsets); a link typed with HTTPS:// is stored, and so are the marks after
-// it (regressions/issue-link-scheme). The harness is web/tests/flow.mjs's.
+// it (regressions/issue-link-scheme); Cmd/Ctrl+K pressed again while the link field is open, then a
+// click on the canvas, closes the box (regressions/issue-link-field-blur). The harness is
+// web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
@@ -718,6 +720,35 @@ try {
       (await storedOne(schemed))?.text === 'Read the docs' &&
       !schemeNotices.some((text) => text.includes('marks')),
     `opened ${schemeOpened}, field ${schemeField}, back ${schemeBack}, bold pressed ${schemeBold}, closed ${schemeClosed}, stored ${schemeStored}: ${JSON.stringify(schemeRuns)}; notices ${JSON.stringify(schemeNotices)} ${warnings.slice(-3).join(' | ')}`,
+  )
+
+  // 17. Cmd/Ctrl+K pressed again while the link field is open (regressions/issue-link-field-blur):
+  // with the field open on "Close", a click back into the text box and Cmd/Ctrl+K on "box" move the
+  // focus to the field; a click on the empty canvas then commits and closes the box (nothing linked,
+  // the text kept), and the next click on the canvas selects the shape under it.
+  const madeForField = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 420, y: 260 }, size: { w: 300, h: 100 }, text: 'Close the box' }] } }])
+  const [closing] = madeForField.completed[0].result.created
+  await until(async () => (await shown()).includes(closing))
+  const fieldOpened = await openLabel(570, 280)
+  await editor.evaluate((field) => field.setSelectionRange(0, 5))
+  await page.keyboard.press(`${mod}+k`)
+  const firstField = await until(async () => (await linkField.count()) === 1, 30)
+  await editor.click()
+  const clickedBack = await until(async () => (await editor.count()) === 1 && (await linkField.count()) === 1 && (await editor.evaluate((field) => field.ownerDocument.activeElement === field)), 30)
+  await editor.evaluate((field) => field.setSelectionRange(10, 13))
+  await page.keyboard.press(`${mod}+k`)
+  const fieldFocused = await until(async () => (await linkField.count()) === 1 && (await linkField.evaluate((input) => input.ownerDocument.activeElement === input)), 30)
+  const fieldAddress = fieldFocused ? await linkField.inputValue() : null
+  await click(760, 450)
+  const fieldClosed = await until(async () => (await editor.count()) === 0 && (await linkField.count()) === 0, 30)
+  const closingRuns = await runsOf(closing)
+  const closingText = (await storedOne(closing))?.text
+  await click(560, 340)
+  const pressWorks = await until(async () => JSON.stringify(await selected()) === JSON.stringify([closing]), 30)
+  step(
+    'Cmd/Ctrl+K again with the link field open, then a click on the canvas, commits and closes the box',
+    fieldOpened && firstField && clickedBack && fieldFocused && fieldAddress === '' && fieldClosed && closingText === 'Close the box' && runWith(closingRuns, 'link') == null && pressWorks,
+    `opened ${fieldOpened}, field ${firstField}, clicked back ${clickedBack}, field focused again ${fieldFocused} (address ${JSON.stringify(fieldAddress)}), closed ${fieldClosed}, text ${JSON.stringify(closingText)} ${JSON.stringify(closingRuns)}, next press selects ${pressWorks} (${JSON.stringify(await selected())}) ${warnings.slice(-3).join(' | ')}`,
   )
 } catch (error) {
   step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)
