@@ -1,0 +1,22 @@
+format: 1
+id: board.connectors/outline-ends
+feature: board.connectors.ends
+intent: >-
+  A bound connector end meets its target's outline, not its box: an end anchored at a diamond's
+  box corner is drawn on the diamond's side and the box corner stays paper; the end is the same
+  after a save and a reopen; a board whose stored end point is still on the box draws the end on
+  the outline and a save without edits appends nothing (bound ends are derived, never repaired);
+  a new shapeType moves the stored point onto the new outline, and a rectangle's end stays its
+  box point exactly. shape.previews answers each shape's outline for the editor.
+layer: unit
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/outline_ends.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: outline_ends }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-21"

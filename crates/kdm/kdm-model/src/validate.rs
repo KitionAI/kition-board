@@ -30,7 +30,8 @@ use kition_kit::session::Result;
 use serde_json::Value;
 
 use crate::element::{End, Kind};
-use crate::geometry::{Point, Rect, Size, anchor_point, clamp_anchor};
+use crate::geometry::{Point, Rect, Size, clamp_anchor};
+use crate::outline::{outline_point, outline_shape_in};
 use crate::view::MAX_DEPTH;
 use crate::{ELEMENT, PAGE, root_id};
 
@@ -247,10 +248,12 @@ pub fn repair(tx: &mut Tx<'_>) -> Result<bool> {
     Ok(wrote)
 }
 
-/// Where `anchor` is on `target` as stored now, when the target has a box.
+/// Where `anchor` is on `target` as stored now, when the target has a box: on its outline (design
+/// note 1.4).
 fn target_point(tx: &Tx<'_>, target: &ObjectId, anchor: [f64; 2]) -> Option<Point> {
     let position = Point::parse_object(&tx.get(target, "position").ok()?)?;
     let size = Size::parse(&tx.get(target, "size").ok()?)?;
     let rotation = tx.get(target, "rotation").ok().and_then(|value| value.as_f64()).unwrap_or(0.0);
-    Some(anchor_point(Rect::new(position.x, position.y, position.x + size.w, position.y + size.h), rotation, anchor))
+    let rect = Rect::new(position.x, position.y, position.x + size.w, position.y + size.h);
+    Some(outline_point(outline_shape_in(tx, target).as_deref(), rect, rotation, anchor))
 }

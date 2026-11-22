@@ -186,11 +186,13 @@ impl BoardDocument {
         Ok(json!({ "fields": fields, "style": style, "palette": palette }))
     }
 
-    /// `shape.previews { size? }` → `{ groups: [{ id, shapes: [{ shape, svg }] }] }`: the shape
-    /// library's groups (`SHAPE_GROUPS`), each shape drawn by the renderer's own `shapes::outline`
-    /// as a small SVG document, `size` × `size * 0.75` pixels (28 by default, 8 to 128), stroked in
-    /// `currentColor` and not filled: the editor's library panel shows these pictures in its text
-    /// colour, so it has no shape drawing of its own. A reading command: the board does not change.
+    /// `shape.previews { size? }` → `{ groups: [{ id, shapes: [{ shape, svg, outline? }] }] }`: the
+    /// shape library's groups (`SHAPE_GROUPS`), each shape drawn by the renderer's own
+    /// `shapes::outline` as a small SVG document, `size` × `size * 0.75` pixels (28 by default, 8 to
+    /// 128), stroked in `currentColor` and not filled: the editor's library panel shows these
+    /// pictures in its text colour, so it has no shape drawing of its own. `outline` is what a bound
+    /// connector end meets ([`outline_json`]), so the page derives ends as the engine does (design
+    /// note 1.4). A reading command: the board does not change.
     pub fn shape_previews(&self, params: &Value) -> Result<Value, String> {
         use kition_board_model::spec::{PREVIEW_SIZE, PREVIEW_SIZES};
         use kition_board_scene::shapes::{Paint, outline};
@@ -225,7 +227,13 @@ impl BoardDocument {
                         );
                         outline(&mut svg, shape, w, h, &look);
                         svg.push_str("</svg>");
-                        json!({ "shape": shape, "svg": svg })
+                        let mut entry = serde_json::Map::new();
+                        entry.insert("shape".into(), json!(shape));
+                        entry.insert("svg".into(), json!(svg));
+                        if let Some(outline) = outline_json(shape) {
+                            entry.insert("outline".into(), outline);
+                        }
+                        Value::Object(entry)
                     })
                     .collect();
                 json!({ "id": group, "shapes": shapes })
@@ -333,5 +341,19 @@ mod web {
         pub fn blob(&self, hash: &str) -> Vec<u8> {
             self.0.blob(hash)
         }
+    }
+}
+
+/// What a bound end of `shape` meets, for the page's mirror of `outline::outline_point`
+/// (`web/src/board/outline.ts`): `"ellipse"`, the polygon's corners as `[fx, fy]` fractions of the
+/// box, or `{ "slant": [fx, fy] }` for the parallelogram (inset `min(w * fx, h * fy)`); `None` when
+/// it is the box.
+fn outline_json(shape: &str) -> Option<Value> {
+    use kition_board_kdm::outline::{Outline, outline_of};
+    match outline_of(Some(shape)) {
+        Outline::Box => None,
+        Outline::Ellipse => Some(json!("ellipse")),
+        Outline::Polygon(list) => Some(Value::Array(list.iter().map(|(fx, fy)| json!([fx, fy])).collect())),
+        Outline::Slant(fx, fy) => Some(json!({ "slant": [fx, fy] })),
     }
 }

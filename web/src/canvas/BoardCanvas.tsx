@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { FrameChrome, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
 import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rect, rotate, union, type Point, type Rect } from '../board/geometry'
+import { rayAnchor } from '../board/outline'
 import { ElementLayer, type Override, type Viewport } from '../board/layer'
 import { controlLanes, graphOf, isMindNode } from '../board/mindmap'
 import { frameAt, isBoxed, type BoardElement } from '../board/model'
@@ -373,8 +374,13 @@ export function BoardCanvas(props: Props) {
     const box = element && isBoxed(element.kind) ? sync.view.rect(element) : null
     if (element && box) {
       // Near an edge the end goes where the pointer is; further in, the engine faces it toward the
-      // other end (no anchor).
-      const { anchor, point } = nearestEdgeAnchor(box, element.rotation, p)
+      // other end (no anchor). A shape with an outline of its own (a diamond, an ellipse) is pinned
+      // on the ray from its centre through the pointer, so the end meets the outline under the
+      // pointer (design note 1.4); a box keeps the nearest edge.
+      const outline = sync.view.outlineOf(element)
+      const edge = nearestEdgeAnchor(box, element.rotation, p)
+      const anchor = (outline && rayAnchor(box, element.rotation, p)) || edge.anchor
+      const point = outline ? sync.view.boundPoint(element, box, anchor) : edge.point
       const near = distance(point, p) <= 16 / viewport.current.zoom
       return near ? { element: element.id, anchor, point } : { element: element.id, anchor: null, point: center(box) }
     }
@@ -393,7 +399,7 @@ export function BoardCanvas(props: Props) {
       const box = target ? sync.view.rect(target) : null
       if (end.binding && target && box) {
         const moved = moving.has(target.id) ? offset(box, delta.x, delta.y) : box
-        return anchorPoint(moved, target.rotation, end.binding.anchor)
+        return sync.view.boundPoint(target, moved, end.binding.anchor)
       }
       return moving.has(id) ? { x: end.point.x + delta.x, y: end.point.y + delta.y } : end.point
     }
@@ -532,7 +538,7 @@ export function BoardCanvas(props: Props) {
         const box = element ? v.rect(element) : null
         const side = CONNECTION_HANDLES.find((item) => item.side === value)
         if (element && box && side) {
-          const from: EndTarget = { element: element.id, anchor: side.anchor, point: anchorPoint(box, element.rotation, side.anchor) }
+          const from: EndTarget = { element: element.id, anchor: side.anchor, point: v.boundPoint(element, box, side.anchor) }
           gesture.current = { type: 'connect', from, current: { element: null, point: p }, elbow: true }
           capture()
         }

@@ -12,6 +12,7 @@ import { parseSchema, randomActor, Replica } from '@kition/sdk/kdm'
 import schemaJson from '../../../crates/kdm/kdm-model/model/schema.json'
 import type { Rect } from './geometry'
 import { BoardView } from './model'
+import { readOutlines } from './outline'
 
 export const boardSchema = parseSchema(schemaJson)
 
@@ -22,6 +23,8 @@ export type BoardEngine = {
   elementSvg(request: string): Promise<string>
   blob(hash: string): Promise<Uint8Array>
   textMetrics(request: string): Promise<string>
+  /** `shape.previews`'s answer: each shape's `outline`, what a bound end meets (design note 1.4). */
+  shapePreviews(): Promise<unknown>
 }
 
 export type Lod = 'full' | 'low'
@@ -115,12 +118,25 @@ export class BoardSync {
     const replica = Replica.load(boardSchema, await engine.snapshot(), randomActor())
     const sync = new BoardSync(replica, engine)
     sync.view.refresh(replica, null)
-    await sync.fragments.fetch([...sync.view.elements.keys()], 'full')
+    await Promise.all([sync.fragments.fetch([...sync.view.elements.keys()], 'full'), sync.loadOutlines()])
     // The first import of a page replica is slow (spike S2: 18–26 ms); warm it up now, not on the
     // first commit.
     const { changes } = await engine.exportChanges(own(replica.version().encode()))
     replica.importChanges(new Uint8Array(changes))
     return sync
+  }
+
+  /**
+   * The shapes' outlines from the engine, so the page derives bound ends as the engine does. A
+   * failed or empty answer leaves every end on the box.
+   */
+  private async loadOutlines() {
+    try {
+      const outlines = readOutlines(await this.engine.shapePreviews())
+      if (outlines.size) this.view.outlines = outlines
+    } catch {
+      // The box until a later open: the engine's fragments still draw the ends where they are.
+    }
   }
 
   /** Called with the ids that changed after each pull that changed something. */

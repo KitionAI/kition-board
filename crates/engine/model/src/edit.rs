@@ -9,7 +9,8 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use kition_board_kdm::geometry::{anchor_point, auto_text_size, styled_text_size};
+use kition_board_kdm::geometry::{auto_text_size, styled_text_size};
+use kition_board_kdm::outline::{outline_point, outline_shape_in};
 use kition_board_kdm::{BoardModel, Element, End, Kind, PageView, Point, Rect, Size};
 use kition_kit::kdm::{ObjectId, Tx};
 use serde_json::{Value, json};
@@ -195,8 +196,8 @@ pub fn geometry_in(model: &BoardModel, tx: &Tx<'_>, id: &ObjectId, fresh: &Fresh
     Some((Rect::new(position.x, position.y, position.x + size.w, position.y + size.h), rotation))
 }
 
-/// Where `end` is now in the transaction: derived from its bindable target on `page`, else its
-/// stored point.
+/// Where `end` is now in the transaction: derived from its bindable target on `page` (on the
+/// target's outline, design note 1.4), else its stored point.
 pub fn end_point(model: &BoardModel, tx: &Tx<'_>, page: &ObjectId, end: &End) -> Point {
     end_point_in(model, tx, page, end, &Fresh::new())
 }
@@ -207,7 +208,7 @@ pub fn end_point_in(model: &BoardModel, tx: &Tx<'_>, page: &ObjectId, end: &End,
         && on_page(model, tx, page, &binding.target)
         && let Some((rect, rotation)) = geometry_in(model, tx, &binding.target, fresh)
     {
-        return anchor_point(rect, rotation, binding.anchor);
+        return outline_point(outline_shape_in(tx, &binding.target).as_deref(), rect, rotation, binding.anchor);
     }
     end.point
 }

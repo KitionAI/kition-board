@@ -8,7 +8,8 @@
  * rules of `crates/kdm/kdm-model/src/view.rs`.
  */
 import type { Replica } from '@kition/sdk/kdm'
-import { anchorPoint, rect, rectOfPoints, rotatedBounds, union, type Point, type Rect } from './geometry'
+import { rect, rectOfPoints, rotatedBounds, union, type Point, type Rect } from './geometry'
+import { outlinePoint, type Outline } from './outline'
 import { hiddenByCollapse, isMindNode } from './mindmap'
 
 export type Kind = 'shape' | 'text' | 'stroke' | 'connector' | 'image' | 'card' | 'frame' | 'group'
@@ -165,6 +166,11 @@ export class BoardView {
   private childrenOf = new Map<string, Set<string>>()
   /** The connectors with an end bound to the key. */
   private boundTo = new Map<string, Set<string>>()
+  /**
+   * Each shape's outline, as the engine answers it (`shape.previews`, read by `board/sync.ts`):
+   * what a bound end meets. Empty until it arrives, when every end is on the box.
+   */
+  outlines: ReadonlyMap<string, Outline> = new Map()
 
   constructor(private readonly measured: (id: string) => { w: number; h: number } | null) {}
 
@@ -298,6 +304,16 @@ export class BoardView {
     return rect(element.position.x, element.position.y, element.position.x + size.w, element.position.y + size.h)
   }
 
+  /** What a bound end on `element` meets: a shape's outline, `null` (its box) for the rest. */
+  outlineOf(element: BoardElement): Outline | null {
+    return element.kind === 'shape' && element.shapeType ? (this.outlines.get(element.shapeType) ?? null) : null
+  }
+
+  /** Where an end bound to `target` at `anchor` is when its unrotated box is `box` (design note 1.4: on its outline). */
+  boundPoint(target: BoardElement, box: Rect, anchor: readonly [number, number]): Point {
+    return outlinePoint(this.outlineOf(target), box, target.rotation, anchor)
+  }
+
   /** Where a connector end is: derived from a bound target on the same page, else its point. */
   endPoint(connector: string, value: End): Point {
     const binding = value.binding
@@ -305,7 +321,7 @@ export class BoardView {
       const target = this.elements.get(binding.target)
       if (target && isBindable(target.kind) && this.placement.get(binding.target) === this.placement.get(connector)) {
         const box = this.rect(target)
-        if (box) return anchorPoint(box, target.rotation, binding.anchor)
+        if (box) return this.boundPoint(target, box, binding.anchor)
       }
     }
     return value.point

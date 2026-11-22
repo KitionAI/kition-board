@@ -145,6 +145,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       elementSvg: (request) => doc.invoke<string>('elementSvg', request),
       blob: (hash) => doc.invoke<Uint8Array>('blob', hash),
       textMetrics: (request) => doc.invoke<string>('textMetrics', request),
+      shapePreviews: async () => JSON.parse(await doc.execute('shape.previews', {})) as unknown,
     }
     void BoardSync.open(engine)
       .then((made) => {

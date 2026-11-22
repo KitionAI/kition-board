@@ -11,8 +11,8 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use kition_board_kdm::geometry::anchor_point;
 use kition_board_kdm::mindmap::{Edge, Topology, collapsed, is_node};
+use kition_board_kdm::outline::outline_point;
 use kition_board_kdm::{Binding, BoardModel, ELEMENT, End, PageView, Point, Rect, Size};
 use kition_kit::kdm::{ObjectId, Tx};
 use serde_json::{Map, Value, json};
@@ -351,7 +351,8 @@ fn apply(model: &BoardModel, tx: &mut Tx<'_>, page: &PageView, graph: &Graph, di
         for (terminal, target, rect, turn, anchor) in
             [("start", &edge.parent, parent, parent_turn, start), ("end", &edge.child, child, child_turn, end)]
         {
-            let value = End { point: anchor_point(rect, turn, anchor), binding: Some(Binding { target: target.clone(), anchor }) }.to_json();
+            let shape = model.element(target).and_then(|element| element.outline_shape());
+            let value = End { point: outline_point(shape, rect, turn, anchor), binding: Some(Binding { target: target.clone(), anchor }) }.to_json();
             changed |= put(tx, model, connector, terminal, Some(value))?;
         }
         if changed {

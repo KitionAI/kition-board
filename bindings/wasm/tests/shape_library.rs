@@ -198,3 +198,25 @@ fn previews_follow_the_groups_are_unfilled_and_answer_their_output_schema() {
         assert!(format!("{:?}", doc.execute("shape.previews", refused.clone())).contains("invalid-params"), "{refused}");
     }
 }
+
+/// `shape.previews` carries what a bound connector end meets (case `board.connectors/outline-ends`),
+/// so the page derives ends as the engine does: the polygon table's corners, the ellipses, the
+/// parallelogram's inset rule, and nothing for the box.
+#[test]
+fn previews_carry_the_outline_a_bound_end_meets() {
+    use kition_board_kdm::outline::{HEXAGON, POLYGONS, SLANT};
+    let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
+    let answer = doc.execute("shape.previews", json!({})).unwrap();
+    let shapes: Vec<Value> = answer["groups"].as_array().unwrap().iter().flat_map(|g| g["shapes"].as_array().unwrap().clone()).collect();
+    let outline = |name: &str| shapes.iter().find(|s| s["shape"] == name).unwrap().get("outline").cloned();
+    assert_eq!(outline("diamond").unwrap().as_array().unwrap().len(), 4);
+    assert_eq!(outline("ellipse"), Some(json!("ellipse")));
+    assert_eq!(outline("or-junction"), Some(json!("ellipse")));
+    assert_eq!(outline("rectangle"), None);
+    assert_eq!(outline("star"), None, "the box");
+    assert_eq!(outline("parallelogram"), Some(json!({ "slant": [SLANT.0, SLANT.1] })));
+    for (name, list) in POLYGONS.iter().chain([&("hexagon", HEXAGON)]) {
+        let corners: Vec<[f64; 2]> = list.iter().map(|(x, y)| [*x, *y]).collect();
+        assert_eq!(outline(name), Some(json!(corners)), "{name}");
+    }
+}

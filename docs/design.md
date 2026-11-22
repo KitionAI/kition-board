@@ -146,7 +146,11 @@ Kit-standard has no `atomic` groups (`spec/sets/model.md`: `json` is "for couple
 
 ### 1.4 Bound ends are derived
 
-Rule: **when an end has a `binding` whose target exists on the same page, every reader (the engine's view, render, export, inspect, check) computes the end point from the target's `position`, `size`, `rotation` and the `anchor`; the stored `point` is ignored.** Commands still write the freshly computed `point` (so a reader of the raw KDM JSON, such as `state_json` or a third-party tool, sees a near value), but nothing depends on it being current.
+Rule: **when an end has a `binding` whose target exists on the same page, every reader (the engine's view, render, export, inspect, check) computes the end point from the target's `position`, `size`, `rotation`, `shapeType` and the `anchor`: it is the point where the ray from the target box's centre through the anchor's point leaves the target's outline; the stored `point` is ignored.** Commands still write the freshly computed `point` (so a reader of the raw KDM JSON, such as `state_json` or a third-party tool, sees a near value), but nothing depends on it being current.
+
+- The outline (`kition_board_kdm::outline::outline_point`, the one derivation every reader and every cache write goes through): the ellipse inscribed in the box for `ellipse`, `summing-junction` and `or-junction`; the polygon of `outline::POLYGONS` for a shape in that table, and the hexagon and the parallelogram with the insets they are drawn with; the box for every other shape and every other kind. Rectangles, sticky notes, frames, cards, pictures and text therefore resolve exactly to the anchor's point on the box, as they always did. An anchor at the centre, a box with a zero side, or anything not finite resolves to the anchor's point on the box.
+- The anchor stays a point on the box (`nearest_edge_anchor` picks it when a connector is dropped on an element's body, facing the other end), so a board written before ends met outlines keeps its anchors and draws its ends on the outline without any write; a save of it without edits appends nothing. A new `shapeType` (`element.update`) writes the bound ends' cached points on the new outline in the same command.
+- The editor derives the same point with the outlines the engine answers in `shape.previews` (`outline` per shape; `web/src/board/outline.ts`); until that answer arrives it uses the box.
 
 - No repair transaction runs after a merge: two people who move the two shapes of a connector at once converge to positions, and the connector is drawn between them, with no system change to sync.
 - An unbound end, or a binding whose target is gone or on another page, uses `point` (and the repair in 1.5 clears the binding).
@@ -313,7 +317,7 @@ A table or board card's fragment carries a `slot` rectangle for a preview of the
 
 The page holds kit-editor's shell, the board editor (`web/src`: the canvas, its gestures, snapping, the spatial index, the viewport, connection handles; the tool rail, whose shape slot holds 18 shapes; the shape library panel above the style panel, with all 44 shapes in their four groups and a search, its groups and pictures from `shape.previews`), and a **page replica** of the KDM relayed to the worker's replica. The worker runs `BoardDocument` (WebAssembly). The editor:
 
-- reads geometry, hierarchy, selection targets and culling bounds from the page replica (bound ends derived per 1.4);
+- reads geometry, hierarchy, selection targets and culling bounds from the page replica (bound ends derived per 1.4, on the outlines `shape.previews` answers, read once when the board opens; a connector end dropped on a shape with an outline of its own is pinned on the ray from its centre through the pointer);
 - draws each element with **the engine's SVG fragment**, never its own shape code;
 - sends **every change to the document as one engine command** at the end of a gesture; it never writes the page replica itself (a page-replica write would be a second writer of document logic).
 
@@ -369,7 +373,7 @@ Conventions: every command has an id, title, menu path or none, shortcut or none
 | | `element.rotate` | `{ ids, degrees, about?: "each" \| "selection" }` | |
 | | `element.style` | `{ ids, style: { strokeColor?, fillColor?, … } }` | colours: token or `#rrggbb` |
 | | `element.getStyle` | `{ ids }` | `mutates: false` |
-| | `shape.previews` | `{ size? }` (8 to 128, 28 by default) → `{ groups: [{ id, shapes: [{ shape, svg }] }] }` | `mutates: false`; the four groups of `SHAPE_GROUPS` and one SVG per shape, `size` × `size * 0.75`, drawn by the renderer's `shapes::outline` in `currentColor`, unfilled: the editor's shape library panel shows these, so it has no shape drawing of its own |
+| | `shape.previews` | `{ size? }` (8 to 128, 28 by default) → `{ groups: [{ id, shapes: [{ shape, svg, outline? }] }] }` | `mutates: false`; the four groups of `SHAPE_GROUPS` and one SVG per shape, `size` × `size * 0.75`, drawn by the renderer's `shapes::outline` in `currentColor`, unfilled: the editor's shape library panel shows these, so it has no shape drawing of its own. `outline` is what a bound end meets (1.4): `"ellipse"`, the polygon's corners as `[fx, fy]` fractions of the box, or `{ "slant": [fx, fy] }` (the parallelogram, inset `min(w * fx, h * fy)`); absent for the box |
 | | `element.setText` | `{ id, text }` | minimal diff on the KDM text |
 | | `text.mark` | `{ id, range: [start, end], mark: "bold" \| "italic" \| "link", value? }` | Unicode scalar offsets for agents, UTF-16 for the editor (M18) |
 | | `element.duplicate` | `{ ids, offset? }` | |

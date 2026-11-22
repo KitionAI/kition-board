@@ -22,7 +22,8 @@ use kition_kit::session::Result;
 use serde_json::Value;
 
 use crate::element::{Element, End, Kind};
-use crate::geometry::{Point, Rect, Size, anchor_point, auto_text_size, styled_text_size};
+use crate::geometry::{Point, Rect, Size, auto_text_size, styled_text_size};
+use crate::outline::outline_point;
 use crate::{PAGE, root_id};
 
 /// How deep the view follows `parent` chains and group nesting; deeper is treated as a cycle.
@@ -293,7 +294,8 @@ impl BoardModel {
     }
 
     /// Where a connector end is: derived from its binding's target when the target is a bindable
-    /// element on the same page (design note 1.4), the stored point otherwise.
+    /// element on the same page (design note 1.4: on the target's outline), the stored point
+    /// otherwise.
     pub fn end_point(&self, connector: &ObjectId, end: &End) -> Point {
         if let Some(binding) = &end.binding
             && let Some(target) = self.elements.get(&binding.target)
@@ -301,7 +303,7 @@ impl BoardModel {
             && self.placement.get(&binding.target) == self.placement.get(connector)
             && let Some(rect) = self.rect(target)
         {
-            return anchor_point(rect, target.rotation, binding.anchor);
+            return outline_point(target.outline_shape(), rect, target.rotation, binding.anchor);
         }
         end.point
     }

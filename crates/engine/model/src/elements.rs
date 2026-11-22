@@ -142,7 +142,8 @@ pub fn update(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Val
             ("key", Some(key)) => check_key_free(model, page, key, Some(&id))?,
             _ => {}
         }
-        geometry |= matches!(field.as_str(), "position" | "size" | "rotation");
+        // A new shapeType is a new outline: the ends bound to it move onto it (design note 1.4).
+        geometry |= matches!(field.as_str(), "position" | "size" | "rotation" | "shapeType");
         tx.set(&id, field, checked)?;
     }
     if geometry {

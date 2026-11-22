@@ -1,5 +1,6 @@
 //! Board geometry in board units (1 unit = 1 CSS pixel at 100%): points, sizes, boxes, rotation
-//! about a box centre, and the derived point of a bound connector end (design note 1.4).
+//! about a box centre, and an anchor's point on a box (a bound connector end is derived from it on
+//! the target's outline: `outline::outline_point`, design note 1.4).
 //!
 //! Ported from Kition's `packages/board-editor/src/lib/boardBindingEngine.ts`
 //! (`getBoardConnectorAnchor`, `resolveBoardConnectorAnchor`) and `whiteboardGeometry.ts`
@@ -180,7 +181,8 @@ pub fn clamp_anchor(anchor: [f64; 2]) -> [f64; 2] {
 }
 
 /// The world point of `anchor` (normalised to the unrotated `rect`) on a box rotated by
-/// `rotation` degrees about its centre.
+/// `rotation` degrees about its centre. A bound end is this point only on a target whose outline
+/// is its box; `outline::outline_point` derives every bound end.
 pub fn anchor_point(rect: Rect, rotation: f64, anchor: [f64; 2]) -> Point {
     let [ax, ay] = clamp_anchor(anchor);
     let local = Point { x: rect.x0 + rect.width() * ax, y: rect.y0 + rect.height() * ay };

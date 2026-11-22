@@ -208,6 +208,12 @@ impl Element {
         self.registers.get(field)
     }
 
+    /// The `shapeType` whose outline a bound connector end meets (design note 1.4,
+    /// [`crate::outline::outline_point`]): a shape's, `None` for every other kind (their box).
+    pub fn outline_shape(&self) -> Option<&str> {
+        if self.kind == Kind::Shape { self.register("shapeType").and_then(Value::as_str) } else { None }
+    }
+
     /// The element's text as styled paragraphs when it is styled: its Markdown (`textFormat:
     /// markdown`, whose marks are not used), else its bold and italic marks. `None` for plain text.
     pub fn styled_text(&self) -> Option<Vec<kition_board_text::Paragraph>> {

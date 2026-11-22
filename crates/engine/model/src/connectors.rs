@@ -6,7 +6,8 @@
 //! (`getBoardConnectorAnchor`, `getBoardConnectorAnchorAt`) and the `connector.create` and
 //! `connector.update-terminal` commands of `boardCommands.ts`.
 
-use kition_board_kdm::geometry::{anchor_point, clamp_anchor, nearest_edge_anchor};
+use kition_board_kdm::geometry::{clamp_anchor, nearest_edge_anchor};
+use kition_board_kdm::outline::outline_point;
 use kition_board_kdm::{Binding, BoardModel, ELEMENT, End, Kind, PageView, Point};
 use kition_kit::kdm::{ObjectId, Tx};
 use kition_kit::session::write_text;
@@ -63,14 +64,16 @@ fn aim(model: &BoardModel, page: &PageView, spec: &EndSpec) -> Result<Point> {
             let target = bind_target(model, page, id)?;
             let rect = model.rect(target).ok_or_else(|| invalid(format!("{} has no box", id.as_str())))?;
             Ok(match anchor {
-                Some(anchor) => anchor_point(rect, target.rotation, *anchor),
+                Some(anchor) => outline_point(target.outline_shape(), rect, target.rotation, *anchor),
                 None => rect.center().rotate(rect.center(), target.rotation),
             })
         }
     }
 }
 
-/// The stored end for `spec`; an element end without an anchor binds to the edge nearest `toward`.
+/// The stored end for `spec`; an element end without an anchor binds to the edge nearest `toward`
+/// (an anchor on the box, which the end resolves onto the target's outline along the same ray from
+/// the centre, design note 1.4).
 fn resolve(model: &BoardModel, page: &PageView, spec: &EndSpec, toward: Point) -> Result<End> {
     match spec {
         EndSpec::Point(point) => Ok(End::free(*point)),
@@ -78,7 +81,10 @@ fn resolve(model: &BoardModel, page: &PageView, spec: &EndSpec, toward: Point) -
             let target = bind_target(model, page, id)?;
             let rect = model.rect(target).ok_or_else(|| invalid(format!("{} has no box", id.as_str())))?;
             let anchor = anchor.unwrap_or_else(|| nearest_edge_anchor(rect, target.rotation, toward).0);
-            Ok(End { point: anchor_point(rect, target.rotation, anchor), binding: Some(Binding { target: id.clone(), anchor }) })
+            Ok(End {
+                point: outline_point(target.outline_shape(), rect, target.rotation, anchor),
+                binding: Some(Binding { target: id.clone(), anchor }),
+            })
         }
     }
 }

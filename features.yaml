@@ -209,10 +209,10 @@ features:
     dimension: [function]
     priority: P0
     status: partial
-    paths: [crates/render/scene/src/fragment.rs, crates/engine/model/src/fields.rs, web/src/board/style.ts, bindings/wasm/examples/arrowhead_sheet.rs]
+    paths: [crates/render/scene/src/fragment.rs, crates/engine/model/src/fields.rs, web/src/board/style.ts, bindings/wasm/examples/arrowhead_sheet.rs, crates/kdm/kdm-model/src/outline.rs, web/src/board/outline.ts]
     target: "Miro (web, 2026-11)"
-    gap: "The nine arrowheads are built; bound ends meet the box, not the outline"
-    cases: [board.connectors/arrowheads]
+    gap: "The nine arrowheads and outline ends are built; the outline ends' cases have not passed a CI run yet"
+    cases: [board.connectors/arrowheads, board.connectors/outline-ends, board.connectors/outline-ends-page]
     since: "2026-11-21"
   - id: board.cards
     title: "Cards that link to a file or a web page, and links retargeted when files move"

@@ -575,7 +575,8 @@ pub fn output(id: &str) -> Option<Value> {
                 "id": { "type": "string", "required": true, "description": "basic, flowchart, arrows or marks" },
                 "shapes": { "type": "array", "required": true, "items": { "type": "object", "additionalProperties": false, "properties": {
                     "shape": { "type": "string", "required": true, "description": "A shapeType value" },
-                    "svg": { "type": "string", "required": true, "description": "The shape's outline as an SVG document, stroked in currentColor and not filled" } } } },
+                    "svg": { "type": "string", "required": true, "description": "The shape's outline as an SVG document, stroked in currentColor and not filled" },
+                    "outline": { "type": "json", "description": "What a bound connector end meets, absent for the box: \"ellipse\", the polygon's corners as [fx, fy] fractions of the box, or { \"slant\": [fx, fy] } for a parallelogram whose inset is min(w * fx, h * fy)" } } } },
             } } },
         } }),
         "page.activate" => json!({ "type": "object", "additionalProperties": false, "properties": {

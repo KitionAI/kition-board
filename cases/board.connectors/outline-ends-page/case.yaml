@@ -1,0 +1,25 @@
+format: 1
+id: board.connectors/outline-ends-page
+feature: board.connectors.ends
+intent: >-
+  In the editor, through the development host: a connector drawn with the connector tool from a
+  rectangle to just inside a diamond's upper-right side ends on the diamond's outline, not its
+  box, and the end the page derives (from the outlines the engine answers in shape.previews) is
+  the engine's within 0.01 units.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/shapes.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/shapes.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/shapes.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

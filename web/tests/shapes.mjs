@@ -4,7 +4,9 @@
 // each pictured by the engine (`shape.previews`); the search; five library shapes drawn on the
 // canvas, each stored with its shapeType and drawn by the engine; the rail's shape slot lit for a
 // shape it does not hold; and the five shapes after a save through the host and a reopen
-// (case board.shapes/library-panel). The harness is web/tests/flow.mjs's.
+// (case board.shapes/library-panel); then a connector end dropped on a diamond, derived by the page as
+// the engine derives it and on the diamond's outline, not its box (case board.connectors/outline-ends-page).
+// The harness is web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
@@ -184,6 +186,66 @@ try {
     'a library shape survives save and reopen',
     saved && ids.length === PICKED.length && kept,
     `saved ${saved}; ${JSON.stringify(reopened.map((element) => [element.ref, element.shapeType]))}`,
+  )
+
+  // 6 and 7. A connector end dropped on a diamond meets the diamond's outline, not its box, and the
+  // page derives it as the engine does (design note 1.4; case board.connectors/outline-ends-page).
+  // On a page of its own at a known view, a diamond and a rectangle drawn from the library, then the
+  // connector tool from the rectangle's centre to just inside the diamond's upper-right side.
+  const outlinePageBefore = await personPage()
+  await newPage()
+  await until(async () => (await personPage()) !== outlinePageBefore && (await board(() => window.kitBoard.shown().length)) === 0)
+  await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
+  /** Draws `shape` from the library by a drag over (x0, y0, w, h); answers its id. */
+  const drawShape = async (shape, x0, y0, w, h) => {
+    const button = kit.getByTestId(`board-library-${shape}`)
+    await button.click()
+    await until(async () => (await button.getAttribute('aria-pressed')) === 'true' && (await attr('board-canvas', 'data-tool')) === 'shape')
+    const count = await mark()
+    await drag(await screen(x0, y0), await screen(x0 + w, y0 + h))
+    return newest(count + 1)
+  }
+  /** A stored element's box, whichever form its position and size take. */
+  const boxOf = (element) => {
+    const [x, y] = Array.isArray(element?.position) ? element.position : [element?.position?.x, element?.position?.y]
+    const [w, h] = Array.isArray(element?.size) ? element.size : [element?.size?.w, element?.size?.h]
+    return [x, y, w, h].every(Number.isFinite) ? { cx: x + w / 2, cy: y + h / 2, hw: w / 2, hh: h / 2 } : null
+  }
+  const diamond = await drawShape('diamond', 420, 120, 200, 120)
+  const rectangle = await drawShape('rectangle', 80, 320, 140, 90)
+  const shapesStored = diamond && rectangle ? await storedOf([diamond, rectangle]) : []
+  const diamondBox = boxOf(shapesStored.find((element) => element.ref === diamond))
+  const rectangleBox = boxOf(shapesStored.find((element) => element.ref === rectangle))
+  let connector = null
+  if (diamondBox && rectangleBox) {
+    await kit.locator('.kui-tool-rail [data-testid="board-tool-connector"]').click()
+    await until(async () => (await attr('board-canvas', 'data-tool')) === 'connector')
+    // The middle of the diamond's upper-right side, pulled 15% toward its centre: on the diamond,
+    // within the 16-unit reach that pins an end where the pointer is.
+    const { cx, cy, hw, hh } = diamondBox
+    const drop = { x: cx + 0.85 * (hw / 2), y: cy - 0.85 * (hh / 2) }
+    const count = await mark()
+    await drag(await screen(rectangleBox.cx, rectangleBox.cy), await screen(drop.x, drop.y))
+    connector = await newest(count + 1)
+  }
+  const stored = connector ? (await storedOf([connector])).find((element) => element.kind === 'connector') : null
+  const derived = connector ? await board((id) => window.kitBoard.endPoints(id), connector) : []
+  const engineEnds = [stored?.start?.point, stored?.end?.point]
+  const off =
+    derived.length >= 2 && engineEnds.every(Array.isArray)
+      ? Math.max(Math.hypot(derived[0].x - engineEnds[0][0], derived[0].y - engineEnds[0][1]), Math.hypot(derived.at(-1).x - engineEnds[1][0], derived.at(-1).y - engineEnds[1][1]))
+      : Infinity
+  step(
+    "the page's derived end on a diamond matches the engine's",
+    off < 0.01 && stored?.start?.binding?.target === rectangle && stored?.end?.binding?.target === diamond,
+    `${off} ${connector} ${JSON.stringify(stored ?? null).slice(0, 300)} ${JSON.stringify(derived)}`,
+  )
+  const end = derived.at(-1)
+  const onOutline = end && diamondBox ? Math.abs(end.x - diamondBox.cx) / diamondBox.hw + Math.abs(end.y - diamondBox.cy) / diamondBox.hh : NaN
+  step(
+    "the end is on the diamond's outline, not its box",
+    Math.abs(onOutline - 1) <= 0.02 && end.x > diamondBox.cx && end.y < diamondBox.cy,
+    `${JSON.stringify(end ?? null)} at ${onOutline} of the half-diagonals; diamond ${JSON.stringify(diamondBox)}`,
   )
 
   step('no page errors', errors.length === 0, errors.join(' | '))
