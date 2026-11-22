@@ -1,16 +1,20 @@
-//! The 18 shapes of `shapeType`, drawn in the element's local frame (origin at its top-left
-//! corner, `w` × `h`, unrotated).
+//! The 44 shapes of `shapeType`, drawn in the element's local frame (origin at its top-left
+//! corner, `w` × `h`, unrotated). The polygons' outlines come from one table,
+//! `kition_board_kdm::outline`.
 //!
-//! Ported from Kition's `packages/board-editor/src/components/WhiteboardShapeBody.tsx`
+//! The first 18 are ported from Kition's `packages/board-editor/src/components/WhiteboardShapeBody.tsx`
 //! (`WhiteboardShapeGeometry`, `createStarPoints`, `createCloudPath`, `createHeartPath`) and the
-//! shape definitions of `boardElementDefinitions.ts`.
+//! shape definitions of `boardElementDefinitions.ts`; the flowchart shapes follow the ISO 5807
+//! symbols.
 
 use crate::svg::num;
 
-/// Whether a shape is filled and labelled (`line` and `check` are neither).
+/// Whether a shape is filled: the open shapes (`line`, `check`, the braces and the actor) are not.
 pub fn supports_fill(shape: &str) -> bool {
-    !matches!(shape, "line" | "check")
+    !matches!(shape, "line" | "check" | "brace-left" | "brace-right" | "actor")
 }
+
+/// Whether a shape is labelled (`line` and `check` are not).
 
 pub fn supports_label(shape: &str) -> bool {
     !matches!(shape, "line" | "check")
@@ -32,6 +36,15 @@ fn rect(out: &mut String, w: f64, h: f64, rx: f64, paint: &str) {
     out.push_str(&format!(r#"<rect width="{}" height="{}" rx="{}" {paint}/>"#, num(w), num(h), num(rx.max(0.0))));
 }
 
+/// The part of an actor's box its figure takes, from the top; its label goes below.
+const ACTOR_HEIGHT: f64 = 0.72;
+
+/// How wide a brace is drawn in a box `w` × `h`: the whole box when it is narrow, else 0.3 of its
+/// height.
+fn brace_width(w: f64, h: f64) -> f64 {
+    w.min(h * 0.3)
+}
+
 /// How an outline is painted.
 pub struct Paint<'a> {
     /// The fill and stroke attributes.
@@ -48,10 +61,15 @@ pub struct Paint<'a> {
 pub fn outline(out: &mut String, shape: &str, w: f64, h: f64, look: &Paint<'_>) {
     let (paint, inner, corner, sticky) = (look.body, look.inner, look.corner, look.sticky);
     let (cx, cy) = (w / 2.0, h / 2.0);
+    if let Some(list) = kition_board_kdm::outline::polygon(shape) {
+        let scaled: Vec<(f64, f64)> = list.iter().map(|(fx, fy)| (w * fx, h * fy)).collect();
+        polygon(out, &scaled, paint);
+        return;
+    }
+    // "x y" at the fractions (fx, fy) of the box.
+    let p = |fx: f64, fy: f64| format!("{} {}", num(w * fx), num(h * fy));
     match shape {
         "ellipse" => out.push_str(&format!(r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" {paint}/>"#, num(cx), num(cy), num(cx), num(cy))),
-        "triangle" => polygon(out, &[(cx, 0.0), (w, h), (0.0, h)], paint),
-        "diamond" => polygon(out, &[(cx, 0.0), (w, cy), (cx, h), (0.0, cy)], paint),
         "hexagon" => {
             let inset = w * 0.24;
             polygon(out, &[(inset, 0.0), (w - inset, 0.0), (w, cy), (w - inset, h), (inset, h), (0.0, cy)], paint);
@@ -71,7 +89,6 @@ pub fn outline(out: &mut String, shape: &str, w: f64, h: f64, look: &Paint<'_>) 
             polygon(out, &list, paint);
         }
         "cloud" => {
-            let p = |fx: f64, fy: f64| format!("{} {}", num(w * fx), num(h * fy));
             let d = format!(
                 "M {} C {}, {}, {} C {}, {}, {} C {}, {}, {} C {}, {}, {} L {} Z",
                 p(0.2, 0.72),
@@ -92,7 +109,6 @@ pub fn outline(out: &mut String, shape: &str, w: f64, h: f64, look: &Paint<'_>) 
             path(out, &d, paint);
         }
         "heart" => {
-            let p = |fx: f64, fy: f64| format!("{} {}", num(w * fx), num(h * fy));
             let d = format!(
                 "M {} C {}, {}, {} C {}, {}, {} C {}, {}, {} C {}, {}, {} Z",
                 p(0.5, 0.9),
@@ -155,6 +171,148 @@ pub fn outline(out: &mut String, shape: &str, w: f64, h: f64, look: &Paint<'_>) 
         "line" if h > w => out.push_str(&format!(r#"<line x1="{}" y1="0" x2="{}" y2="{}" {inner}/>"#, num(cx), num(cx), num(h))),
         "line" => out.push_str(&format!(r#"<line x1="0" y1="{}" x2="{}" y2="{}" {inner}/>"#, num(cy), num(w), num(cy))),
         "pill" => rect(out, w, h, cy, paint),
+        "document" => path(
+            out,
+            &format!("M 0 0 L {} L {} Q {} {} Q {} {} Z", p(1.0, 0.0), p(1.0, 0.85), p(0.75, 0.7), p(0.5, 0.85), p(0.25, 1.0), p(0.0, 0.85)),
+            paint,
+        ),
+        "multi-document" => {
+            // Two sheets behind the front one, each 88% × 84% of the box, offset up and right. Only
+            // their top and right edges show: their paths stay open, and what their fill covers
+            // beyond those edges lies under the sheet in front.
+            path(out, &format!("M {} L {} L {} L {} L {}", p(0.12, 0.08), p(0.12, 0.0), p(1.0, 0.0), p(1.0, 0.714), p(0.94, 0.714)), paint);
+            path(out, &format!("M {} L {} L {} L {} L {}", p(0.06, 0.16), p(0.06, 0.08), p(0.94, 0.08), p(0.94, 0.794), p(0.88, 0.794)), paint);
+            path(
+                out,
+                &format!(
+                    "M {} L {} L {} Q {} {} Q {} {} Z",
+                    p(0.0, 0.16),
+                    p(0.88, 0.16),
+                    p(0.88, 0.874),
+                    p(0.66, 0.748),
+                    p(0.44, 0.874),
+                    p(0.22, 1.0),
+                    p(0.0, 0.874)
+                ),
+                paint,
+            );
+        }
+        "predefined-process" => {
+            rect(out, w, h, 0.0, paint);
+            path(out, &format!("M {} L {} M {} L {}", p(0.12, 0.0), p(0.12, 1.0), p(0.88, 0.0), p(0.88, 1.0)), inner);
+        }
+        "internal-storage" => {
+            rect(out, w, h, 0.0, paint);
+            let i = w.min(h) * 0.18;
+            path(out, &format!("M {} 0 L {} {} M 0 {} L {} {}", num(i), num(i), num(h), num(i), num(w), num(i)), inner);
+        }
+        "cylinder" => {
+            // The top is a whole ellipse; the bottom shows its front half.
+            let ry = (h * 0.15).min(w * 0.25);
+            let (top, low, rx, ry, w) = (num(ry), num(h - ry), num(cx), num(ry), num(w));
+            path(out, &format!("M 0 {top} L 0 {low} A {rx} {ry} 0 0 0 {w} {low} L {w} {top} A {rx} {ry} 0 0 0 0 {top} Z"), paint);
+            path(out, &format!("M 0 {top} A {rx} {ry} 0 0 0 {w} {top}"), inner);
+        }
+        "delay" => path(out, &format!("M 0 0 L {} C {}, {}, {} L {} Z", p(0.6, 0.0), p(1.13, 0.0), p(1.13, 1.0), p(0.6, 1.0), p(0.0, 1.0)), paint),
+        "display" => path(
+            out,
+            &format!("M {} L {} Q {} {} L {} L {} Z", p(0.18, 0.0), p(0.85, 0.0), p(1.15, 0.5), p(0.85, 1.0), p(0.18, 1.0), p(0.0, 0.5)),
+            paint,
+        ),
+        "stored-data" => path(
+            out,
+            &format!(
+                "M {} L {} Q {} {} L {} Q {} {} Z",
+                p(0.15, 0.0),
+                p(1.0, 0.0),
+                p(0.7, 0.5),
+                p(1.0, 1.0),
+                p(0.15, 1.0),
+                p(-0.15, 0.5),
+                p(0.15, 0.0)
+            ),
+            paint,
+        ),
+        "summing-junction" | "or-junction" => {
+            out.push_str(&format!(r#"<ellipse cx="{}" cy="{}" rx="{}" ry="{}" {paint}/>"#, num(cx), num(cy), num(cx), num(cy)));
+            let d = if shape == "or-junction" {
+                format!("M {} 0 L {} {} M 0 {} L {} {}", num(cx), num(cx), num(h), num(cy), num(w), num(cy))
+            } else {
+                let (dx, dy) = (cx * std::f64::consts::FRAC_1_SQRT_2, cy * std::f64::consts::FRAC_1_SQRT_2);
+                format!(
+                    "M {} {} L {} {} M {} {} L {} {}",
+                    num(cx - dx),
+                    num(cy - dy),
+                    num(cx + dx),
+                    num(cy + dy),
+                    num(cx + dx),
+                    num(cy - dy),
+                    num(cx - dx),
+                    num(cy + dy)
+                )
+            };
+            path(out, &d, inner);
+        }
+        "note" => {
+            // A sheet with its top right corner folded down.
+            let f = w.min(h) * 0.25;
+            polygon(out, &[(0.0, 0.0), (w - f, 0.0), (w, f), (w, h), (0.0, h)], paint);
+            path(out, &format!("M {} 0 L {} {} L {} {}", num(w - f), num(w - f), num(f), num(w), num(f)), inner);
+        }
+        "brace-left" | "brace-right" => {
+            // The left brace opens to the right, along the box's left side; the right brace is its
+            // mirror. A wide box keeps the brace's proportions and leaves the rest to the label.
+            let bw = brace_width(w, h);
+            let q = |fx: f64, fy: f64| {
+                let x = if shape == "brace-left" { bw * fx } else { w - bw * fx };
+                format!("{} {}", num(x), num(h * fy))
+            };
+            let d = format!(
+                "M {} Q {} {} L {} Q {} {} Q {} {} L {} Q {} {}",
+                q(1.0, 0.0),
+                q(0.5, 0.0),
+                q(0.5, 0.2),
+                q(0.5, 0.4),
+                q(0.5, 0.5),
+                q(0.0, 0.5),
+                q(0.5, 0.5),
+                q(0.5, 0.6),
+                q(0.5, 0.8),
+                q(0.5, 1.0),
+                q(1.0, 1.0)
+            );
+            path(out, &d, inner);
+        }
+        "actor" => {
+            // A stick figure in the top of the box, at most 0.6 times as wide as it is tall; the
+            // label goes under it (`label_box`).
+            let fh = h * ACTOR_HEIGHT;
+            let fw = w.min(fh * 0.6);
+            let x = |fx: f64| num(cx + fw * (fx - 0.5));
+            let y = |fy: f64| num(fh * fy);
+            let r = (fw * 0.25).min(fh * 0.125);
+            out.push_str(&format!(r#"<circle cx="{}" cy="{}" r="{}" {inner}/>"#, num(cx), num(r), num(r)));
+            let d = format!(
+                "M {} {} L {} {} M {} {} L {} {} M {} {} L {} {} M {} {} L {} {}",
+                num(cx),
+                num(2.0 * r),
+                x(0.5),
+                y(0.65),
+                x(0.1),
+                y(0.38),
+                x(0.9),
+                y(0.38),
+                x(0.5),
+                y(0.65),
+                x(0.1),
+                y(1.0),
+                x(0.5),
+                y(0.65),
+                x(0.9),
+                y(1.0)
+            );
+            path(out, &d, inner);
+        }
         _ => {
             let default = if sticky { 4.0 } else { 12.0_f64.min(w / 6.0).min(h / 6.0) };
             rect(out, w, h, corner.unwrap_or(default).min(cx).min(cy), paint);

@@ -154,8 +154,10 @@ features:
     dimension: [function]
     priority: P0
     status: missing
+    paths: [crates/kdm/kdm-model/src/outline.rs, crates/render/scene/src/shapes.rs, crates/engine/model/src/fields.rs]
     target: "Miro (web, 2026-11)"
     gap: "18 shapes in one flat list; Miro has a grouped library with the flowchart set"
+    cases: [board.shapes/library]
     since: "2026-11-21"
   - id: board.editing
     title: "Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label"

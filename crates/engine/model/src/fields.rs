@@ -1,5 +1,5 @@
 //! Which fields each kind of element uses (design note 1.2), and the values a command accepts for
-//! them: colours as one of nine tokens or `#rrggbb`, style enums, the 18 shapes.
+//! them: colours as one of nine tokens or `#rrggbb`, style enums, the 44 shapes.
 //!
 //! Ported from Kition's `packages/board-editor/src/lib/whiteboardTypes.ts`, `whiteboardStyle.ts`
 //! and `boardElementDefinitions.ts`.
@@ -11,7 +11,8 @@ use crate::params::{MAX_DIMENSION, Result, invalid, point, size};
 
 /// The colour tokens a theme restyles.
 pub const COLOR_TOKENS: &[&str] = &["ink", "gray", "purple", "green", "orange", "red", "yellow", "blue", "white"];
-/// The 18 shapes of `shapeType` (v1's 19 without `frame`, which is a kind now).
+/// The 44 shapes of `shapeType`: v1's 19 without `frame` (which is a kind now), then 26 more
+/// (basic shapes, the flowchart set and an actor).
 pub const SHAPE_TYPES: &[&str] = &[
     "rectangle",
     "ellipse",
@@ -31,6 +32,77 @@ pub const SHAPE_TYPES: &[&str] = &[
     "arrow-up",
     "arrow-down",
     "line",
+    "pentagon",
+    "octagon",
+    "trapezoid",
+    "right-triangle",
+    "cross",
+    "chevron",
+    "arrow-left-right",
+    "arrow-up-down",
+    "callout",
+    "brace-left",
+    "brace-right",
+    "document",
+    "multi-document",
+    "predefined-process",
+    "cylinder",
+    "manual-input",
+    "manual-operation",
+    "delay",
+    "display",
+    "off-page",
+    "stored-data",
+    "internal-storage",
+    "summing-junction",
+    "or-junction",
+    "note",
+    "actor",
+];
+/// The shape library's groups, in the order the editor shows them. Every shape is in exactly one.
+pub const SHAPE_GROUPS: &[(&str, &[&str])] = &[
+    (
+        "basic",
+        &[
+            "rectangle",
+            "ellipse",
+            "triangle",
+            "right-triangle",
+            "diamond",
+            "pentagon",
+            "hexagon",
+            "octagon",
+            "trapezoid",
+            "parallelogram",
+            "pill",
+            "cross",
+            "star",
+            "cloud",
+            "heart",
+            "callout",
+        ],
+    ),
+    (
+        "flowchart",
+        &[
+            "document",
+            "multi-document",
+            "predefined-process",
+            "cylinder",
+            "manual-input",
+            "manual-operation",
+            "delay",
+            "display",
+            "off-page",
+            "stored-data",
+            "internal-storage",
+            "summing-junction",
+            "or-junction",
+            "note",
+        ],
+    ),
+    ("arrows", &["arrow-left", "arrow-right", "arrow-up", "arrow-down", "arrow-left-right", "arrow-up-down", "chevron"]),
+    ("marks", &["x-box", "check-box", "check", "line", "brace-left", "brace-right", "actor"]),
 ];
 pub const SHAPE_STYLES: &[&str] = &["default", "sticky", "mind-node", "flow-node", "image-placeholder"];
 pub const FILL_STYLES: &[&str] = &["none", "solid", "semi", "pattern"];

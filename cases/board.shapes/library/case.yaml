@@ -1,0 +1,19 @@
+format: 1
+id: board.shapes/library
+feature: board.shapes
+intent: >-
+  Every one of the 44 shapes of shapeType is in exactly one group of the library, is drawn by the
+  engine as itself (no two shapes draw the same fragment) inside its box, keeps finite numbers on
+  an empty or one-unit box, and survives a save and a reopen; an unknown shape is refused.
+layer: unit
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/shape_library.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: shape_library }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-21"

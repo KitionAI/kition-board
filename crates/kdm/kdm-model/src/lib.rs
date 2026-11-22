@@ -10,6 +10,7 @@
 //! - [`validate`]: rules V1–V9, the deterministic repair after open, import, undo and redo (1.5).
 //! - [`blobs`]: the blob store and the blob bundle hosts exchange.
 //! - [`file`]: the `.kboard` file as a replica: open, and save by appending to the change log (2.3).
+//! - [`outline`]: the polygon shapes' outlines, as fractions of the element's box.
 //!
 //! Ported from Kition's `packages/board-editor/src/kdm` and `packages/board-kit/src/engine`.
 
@@ -25,6 +26,7 @@ pub mod element;
 pub mod file;
 pub mod geometry;
 pub mod mindmap;
+pub mod outline;
 pub mod validate;
 pub mod view;
 

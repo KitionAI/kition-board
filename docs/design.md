@@ -112,7 +112,7 @@ The two comment types are the kition-sdk constants `COMMENT_THREAD_TYPE_JSON` an
 | `alt` | string | free text | its own register, editable without touching the blob |
 | `key` | string | an authoring id (`[A-Za-z_][A-Za-z0-9_]*`), unique per page among live elements | V8 |
 | `shapeStyle` | string | `default`, `sticky`, `mind-node`, `flow-node`, `image-placeholder` | |
-| `shapeType` | string | one of the 18 shapes | `string`, not `enum`, so a new shape is not a schema change (M5) |
+| `shapeType` | string | one of the 44 shapes, in four groups of the shape library: basic (16), flowchart (14), arrows (7), marks (7) (`SHAPE_TYPES`, `SHAPE_GROUPS`) | `string`, not `enum`, so a new shape is not a schema change (M5) |
 | `CommentThread`, `Comment` | types | anchor `{ "object": <element or page id>, "point"?: [x, y] }` (point relative to the object's box; `point` is the kit's own key, M23 allows it) | H10: declared so comments need no schema change; there are no comment commands (section 6) |
 | Others | | `title`, `pages`, `name`, `elements`, `parent`, `rotation` (degrees, about the box centre), `locked`, `fillStyle`, `dashStyle`, `strokeSize`, `opacity` (0..1), `fontSize`, `connectorType`, arrowheads, `connectorRole`, the four mind-map fields, `sourceRefIds` | |
 

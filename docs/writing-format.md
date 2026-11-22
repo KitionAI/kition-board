@@ -121,7 +121,7 @@ schema says which.
 | `kind` | `shape`, `text`, `frame`, `stroke` | `element.create` |
 | `kind` | `shape`, `text`, `stroke`, `connector`, `image`, `card`, `frame` | `element.getStyle` |
 | `shapeStyle` | `default`, `sticky`, `mind-node`, `flow-node`, `image-placeholder` | `element.create`, `element.getStyle` |
-| `shapeType` | `rectangle`, `ellipse`, `triangle`, `diamond`, `hexagon`, `pill`, `parallelogram`, `star`, `cloud`, `heart`, `x-box`, `check-box`, `check`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`, `line` | `element.create` |
+| `shapeType` | `rectangle`, `ellipse`, `triangle`, `diamond`, `hexagon`, `pill`, `parallelogram`, `star`, `cloud`, `heart`, `x-box`, `check-box`, `check`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`, `line`, `pentagon`, `octagon`, `trapezoid`, `right-triangle`, `cross`, `chevron`, `arrow-left-right`, `arrow-up-down`, `callout`, `brace-left`, `brace-right`, `document`, `multi-document`, `predefined-process`, `cylinder`, `manual-input`, `manual-operation`, `delay`, `display`, `off-page`, `stored-data`, `internal-storage`, `summing-junction`, `or-junction`, `note`, `actor` | `element.create` |
 | `strokeSize` | `s`, `m`, `l`, `xl` | `element.create`, `element.style`, `stroke.create` |
 | `template` | `mindmap`, `flowchart`, `roadmap`, `kanban`, `retrospective`, `storyboard` | `template.insert` |
 | `textAlign` | `left`, `center`, `right` | `element.create`, `element.style` |
