@@ -233,7 +233,7 @@ features:
     paths: [crates/engine/model/src/elements.rs, crates/engine/check/src/lib.rs, bindings/wasm/src/lib.rs, bindings/wasm/src/files.rs]
     target: "Miro (web, 2026-11)"
     gap: "Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs."
-    cases: [board.images/save-reopen]
+    cases: [board.images/save-reopen, regressions/issue-picture-paste]
     since: "2026-11-17"
   - id: board.layout
     title: "Align, distribute and stack elements"

@@ -485,7 +485,7 @@ pub fn description(id: &str) -> &'static str {
             "Reads the elements into a board clipboard payload without changing the board; pass the payload to element.paste to place copies on any page."
         }
         "element.paste" => {
-            "Places copies of a clipboard.copy payload on a page, at `at` or offset from the originals; answers the new elements' ids."
+            "Places copies of a clipboard.copy payload on a page, at `at` or offset from the originals; answers the new elements' ids, and in `skipped` the pictures left out because this board does not store their bytes (copied on another board)."
         }
         "element.create" => {
             "Makes one or more elements (shapes, text, sticky notes, strokes, frames, connectors, cards) on a page in one step; use it to build content, element.update to change existing elements."

@@ -339,9 +339,12 @@ export function BoardCanvas(props: Props) {
     }
   }, [applyView, contentBox, onSelection, page, show])
 
-  /** Runs one engine command, then shows its change; `done` drops the gesture's preview in the same frame. */
+  /**
+   * Runs one engine command, then shows its change; `done` drops the gesture's preview in the same
+   * frame. A refused command answers null; `refused` hears the engine's reason.
+   */
   const commit = useCallback(
-    async (command: string, params: Record<string, unknown>, done?: () => void) => {
+    async (command: string, params: Record<string, unknown>, done?: () => void, refused?: (reason: string) => void) => {
       let result: string | null = null
       const started = performance.now()
       try {
@@ -350,6 +353,7 @@ export function BoardCanvas(props: Props) {
       } catch (error) {
         done?.()
         console.warn(`[board] ${command} was refused: ${errorText(error)}`)
+        refused?.(errorText(error))
         return null
       }
       let answer: Record<string, unknown> | null = null
@@ -568,12 +572,19 @@ export function BoardCanvas(props: Props) {
       void commit('element.delete', { ids: [...ids] })
     })
   }
-  /** Pastes the board payload `from` holds (or the copy kept here) with its top-left at `at`; selects the copies. */
+  /**
+   * Pastes the board payload `from` holds (or the copy kept here) with its top-left at `at`; selects
+   * the copies. Pictures copied on another board whose files this board does not have are left out
+   * by the engine (`skipped`), and the person is told.
+   */
   const pasteBoard = async (from: clipboard.Carried | null, at: Point) => {
     const payload = await clipboard.payloadFor(from)
     if (!payload || latest.current.readOnly) return
     const place = clipboard.pastePlace(at)
-    selectMade(createdOf(await commit('element.paste', { ...onPage(), payload, at: [place.x, place.y] })))
+    const t = latest.current.t
+    const answer = await commit('element.paste', { ...onPage(), payload, at: [place.x, place.y] }, undefined, (reason) => toast('error', t('pasteFailed'), reason))
+    if (Array.isArray(answer?.skipped) && answer.skipped.length) toast('warning', t('picturesLeftOut'), t('picturesLeftOutHint'))
+    selectMade(createdOf(answer))
   }
   /** One image.insert per picture, centred on `at` and each further one 24 units on; selects them. */
   const placePictures = async (files: File[], at: Point, named: boolean) => {

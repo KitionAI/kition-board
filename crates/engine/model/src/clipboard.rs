@@ -243,7 +243,9 @@ pub fn copy(model: &BoardModel, params: &Value) -> Result<Value> {
 }
 
 /// `element.paste { page?, payload, at? }`: copies of a payload; `at` puts the copies' top-left
-/// there, otherwise copies of elements still on the page are offset by 24.
+/// there, otherwise copies of elements still on the page are offset by 24. A picture whose bytes
+/// the board does not store is left out and named in `skipped`; a payload of only such pictures is
+/// refused (`not-found`, `board.image-missing-blob`).
 pub fn paste(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value) -> Result<Value> {
     let page = params::page(model, params, ctx.active_page)?;
     let payload = params.get("payload").and_then(Value::as_object).ok_or_else(|| invalid("`payload` must be a board clipboard payload"))?;
@@ -281,8 +283,42 @@ pub fn paste(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value)
             if still_here { (24.0, 24.0) } else { (0.0, 0.0) }
         }
     };
-    let (ids, _) = instantiate(model, tx, page, items, dx, dy, Keys::Drop)?;
-    Ok(created(&ids))
+    // A picture names its bytes by hash; a payload copied on another board can name bytes this
+    // board does not store. Such a picture is left out (a copy would be a broken picture,
+    // `board.image-missing-blob`) and named in the answer; the rest lands where it would have.
+    let (kept, skipped): (Vec<&Value>, Vec<&Value>) = items.iter().partition(|item| !missing_picture(ctx, item));
+    if kept.is_empty() {
+        return Err(params::not_found(
+            "board.image-missing-blob: the payload's pictures are not stored in this board; insert the picture files instead",
+        ));
+    }
+    let owned: Vec<Value>;
+    let kept: &[Value] = if skipped.is_empty() {
+        items
+    } else {
+        owned = kept.into_iter().cloned().collect();
+        &owned
+    };
+    let (ids, _) = instantiate(model, tx, page, kept, dx, dy, Keys::Drop)?;
+    let mut answer = created(&ids);
+    if !skipped.is_empty() {
+        let named: Vec<Value> = skipped
+            .iter()
+            .map(|item| json!({ "ref": item.get("ref").cloned().unwrap_or(Value::Null), "reason": "board.image-missing-blob" }))
+            .collect();
+        if let Some(fields) = answer.as_object_mut() {
+            fields.insert("skipped".into(), Value::Array(named));
+        }
+    }
+    Ok(answer)
+}
+
+/// Whether payload `item` is a picture whose bytes the board does not store.
+fn missing_picture(ctx: &Ctx<'_>, item: &Value) -> bool {
+    if item.get("kind").and_then(Value::as_str) != Some(Kind::Image.as_str()) {
+        return false;
+    }
+    item.get("image").and_then(|image| image.get("hash")).and_then(Value::as_str).is_none_or(|hash| ctx.blobs.get(hash).is_none())
 }
 
 /// `element.duplicate { ids, offset? }`: copies next to the originals (offset `[24, 24]`).
