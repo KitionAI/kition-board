@@ -727,7 +727,8 @@ try {
   // 17. Cmd/Ctrl+K pressed again while the link field is open (regressions/issue-link-field-blur):
   // with the field open on "Close", a click back into the text box and Cmd/Ctrl+K on "box" move the
   // focus to the field; a click on the empty canvas then commits and closes the box (nothing linked,
-  // the text kept), and the next click on the canvas selects the shape under it.
+  // the text kept), and the canvas takes presses again (the empty canvas clears the selection, the
+  // shape is selected).
   const madeForField = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 420, y: 260 }, size: { w: 300, h: 100 }, text: 'Close the box' }] } }])
   const [closing] = madeForField.completed[0].result.created
   await until(async () => (await shown()).includes(closing))
@@ -745,12 +746,15 @@ try {
   const fieldClosed = await until(async () => (await editor.count()) === 0 && (await linkField.count()) === 0, 30)
   const closingRuns = await runsOf(closing)
   const closingText = (await storedOne(closing))?.text
+  // The canvas takes presses again: one on the empty canvas clears the selection, one on the shape selects it.
+  await click(760, 450)
+  const emptyPress = await until(async () => (await selected()).length === 0, 30)
   await click(560, 340)
-  const pressWorks = await until(async () => JSON.stringify(await selected()) === JSON.stringify([closing]), 30)
+  const pressWorks = emptyPress && (await until(async () => JSON.stringify(await selected()) === JSON.stringify([closing]), 30))
   step(
     'Cmd/Ctrl+K again with the link field open, then a click on the canvas, commits and closes the box',
     fieldOpened && firstField && clickedBack && fieldFocused && fieldAddress === '' && fieldClosed && closingText === 'Close the box' && runWith(closingRuns, 'link') == null && pressWorks,
-    `opened ${fieldOpened}, field ${firstField}, clicked back ${clickedBack}, field focused again ${fieldFocused} (address ${JSON.stringify(fieldAddress)}), closed ${fieldClosed}, text ${JSON.stringify(closingText)} ${JSON.stringify(closingRuns)}, next press selects ${pressWorks} (${JSON.stringify(await selected())}) ${warnings.slice(-3).join(' | ')}`,
+    `opened ${fieldOpened}, field ${firstField}, clicked back ${clickedBack}, field focused again ${fieldFocused} (address ${JSON.stringify(fieldAddress)}), closed ${fieldClosed}, text ${JSON.stringify(closingText)} ${JSON.stringify(closingRuns)}, next press on the empty canvas clears the selection ${emptyPress}, the one after selects ${pressWorks} (${JSON.stringify(await selected())}) ${warnings.slice(-3).join(' | ')}`,
   )
 
   // 18. Cmd/Ctrl+X and Delete on a locked shape (regressions/issue-locked-cut-key): as the canvas
