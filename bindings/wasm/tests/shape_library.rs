@@ -148,3 +148,53 @@ fn an_actors_label_is_under_its_figure() {
     let y = first_baseline(&svg);
     assert!(y > 144.0 && y < 200.0, "the label's baseline is at {y}: {svg}");
 }
+
+/// `shape.previews` (case `board.shapes/library-panel`): the library panel's groups and pictures
+/// come from the engine, one SVG per shape drawn by the renderer, in the order of `SHAPE_GROUPS`.
+#[test]
+fn the_engine_answers_one_preview_per_shape_in_its_group() {
+    let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
+    let answer = doc.execute("shape.previews", json!({})).unwrap();
+    let groups = answer["groups"].as_array().unwrap();
+    assert_eq!(groups.iter().map(|g| g["id"].as_str().unwrap()).collect::<Vec<_>>(), ["basic", "flowchart", "arrows", "marks"]);
+    assert_eq!(groups.iter().map(|g| g["shapes"].as_array().unwrap().len()).sum::<usize>(), 44);
+    assert!(groups.iter().all(|g| g["shapes"].as_array().unwrap().iter().all(|s| s["svg"].as_str().unwrap().starts_with("<svg"))));
+    assert!(format!("{:?}", doc.execute("shape.previews", json!({ "size": 1e9 }))).contains("invalid-params"));
+}
+
+#[test]
+fn previews_follow_the_groups_are_unfilled_and_answer_their_output_schema() {
+    let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
+    let answer = doc.execute("shape.previews", json!({ "size": 40 })).unwrap();
+    let listed: Vec<(String, Vec<String>)> = answer["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|g| {
+            (g["id"].as_str().unwrap().to_owned(), g["shapes"].as_array().unwrap().iter().map(|s| s["shape"].as_str().unwrap().to_owned()).collect())
+        })
+        .collect();
+    let expected: Vec<(String, Vec<String>)> =
+        SHAPE_GROUPS.iter().map(|(id, shapes)| ((*id).to_owned(), shapes.iter().map(|s| (*s).to_owned()).collect())).collect();
+    assert_eq!(listed, expected);
+    let mut seen: Vec<String> = Vec::new();
+    for group in answer["groups"].as_array().unwrap() {
+        for shape in group["shapes"].as_array().unwrap() {
+            let svg = shape["svg"].as_str().unwrap();
+            let name = shape["shape"].as_str().unwrap();
+            assert!(svg.contains(r#"width="40" height="30""#) && svg.ends_with("</svg>"), "{name}: {svg}");
+            assert!(svg.contains("currentColor") && !svg.contains("fill=\"var(") && !svg.contains("NaN"), "{name}: {svg}");
+            assert!(!seen.iter().any(|other| other == svg), "{name} looks like another shape");
+            seen.push(svg.to_owned());
+        }
+    }
+    // A reading command: nothing changed, nothing to undo.
+    let inspected = doc.inspect().unwrap();
+    assert_eq!((inspected["elements"].as_u64(), inspected["canUndo"].as_bool()), (Some(0), Some(false)));
+    let output = doc.commands().into_iter().find(|c| c.id == "shape.previews").and_then(|c| c.output_schema).unwrap();
+    kition_kit::schema::validate_output(&output).unwrap();
+    kition_kit::schema::check_params(&output["properties"], answer.as_object().unwrap()).unwrap();
+    for refused in [json!({ "size": 4 }), json!({ "size": "big" }), json!({ "size": f64::MAX }), json!({ "shape": "rectangle" })] {
+        assert!(format!("{:?}", doc.execute("shape.previews", refused.clone())).contains("invalid-params"), "{refused}");
+    }
+}

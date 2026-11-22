@@ -35,6 +35,7 @@ import { ExportDialog } from './panels/ExportDialog'
 import { PageTabs, type PageTab } from './panels/PageTabs'
 import { TemplateGallery } from './panels/TemplateGallery'
 import { MindMapSection, type MindNodeState } from './panels/MindMapSection'
+import { ShapeLibrary } from './panels/ShapeLibrary'
 import { StylePanel, type StyleTarget } from './panels/StylePanel'
 import { HIGHLIGHT_STYLE, PICTURE_EXTENSIONS, TOOLS, railId, type Tool } from './tools'
 
@@ -287,8 +288,19 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     },
     [insertCard, insertPicture],
   )
+  /** A shape from the library panel: the shape tool draws it next; the keys go to the canvas again. */
+  const pickShape = useCallback(
+    (shape: string) => {
+      if (ui.state(`tool:${railId('shape', shape)}`).denied) return
+      setShapeType(shape)
+      setTool('shape')
+      canvasApi.current?.focus()
+    },
+    [ui],
+  )
   const shown = TOOLS.find((item) => item.id === activeTool)
-  const focusTool = useMemo(() => (shown ? { label: t(shown.label), icon: shown.icon } : null), [shown, t])
+  // The Focus bar names the shape itself, also one from the library that the rail's slot stands for.
+  const focusTool = useMemo(() => (shown ? { label: tool === 'shape' ? t(`shape.${shapeType}`) : t(shown.label), icon: shown.icon } : null), [shapeType, shown, t, tool])
 
   // The style panel styles the selection, or what the active drawing tool makes next.
   const selectionKey = selection.join(',')
@@ -416,13 +428,14 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     () => (
       <KitElement id="panel:style">
         <Panel side="right" width={232} title={t('style')} testId="board-style">
+          {readOnly ? null : <ShapeLibrary active={tool === 'shape' ? shapeType : null} onPick={pickShape} />}
           <StylePanel target={readOnly ? null : styleTarget} onApply={applyStyle} />
           {mindNode ? <MindMapSection node={mindNode} onGrow={grow} /> : null}
           {cardState ? <CardSection card={cardState} onRetarget={() => void retarget()} onCaption={() => canvasApi.current?.edit(cardState.id)} /> : null}
         </Panel>
       </KitElement>
     ),
-    [applyStyle, cardState, grow, mindNode, readOnly, retarget, styleTarget, t],
+    [applyStyle, cardState, grow, mindNode, pickShape, readOnly, retarget, shapeType, styleTarget, t, tool],
   )
 
   return (

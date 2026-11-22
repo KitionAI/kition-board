@@ -58,6 +58,21 @@ name it.
 - A shape belongs to a frame through `parent` (the frame's id). Moving the frame moves it.
 - A `line` shape runs along its box's longer side, through its middle: give it a tall box for a
   vertical line; `rotation` turns it. A freehand `stroke` takes `dashStyle` as shapes do.
+- A shape's `shapeType` is one of 44, in four groups (`shape.previews` lists them with a picture
+  of each). Basic: `rectangle`, `ellipse`, `triangle`, `right-triangle`, `diamond`, `pentagon`,
+  `hexagon`, `octagon`, `trapezoid`, `parallelogram`, `pill`, `cross`, `star`, `cloud`, `heart`,
+  `callout`. Arrows: `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`, `arrow-left-right`,
+  `arrow-up-down`, `chevron`. Marks: `x-box`, `check-box`, `check`, `line`, `brace-left`,
+  `brace-right`, `actor`.
+- **Flow charts** use the standard symbols: `rectangle` for a step, `diamond` for a decision, `pill`
+  for start and end, `parallelogram` for input or output. The flowchart group adds `document` (a
+  step that makes or reads a document; `multi-document` for several), `cylinder` (a data store or
+  database), `predefined-process` (a step defined elsewhere, such as another chart),
+  `manual-input` (data a person types in), `manual-operation` (a step a person does by hand),
+  `delay` (a wait), `display` (what is shown on a screen), `off-page` (the flow goes on on another
+  page), `stored-data`, `internal-storage`, `summing-junction` and `or-junction` (flows that meet),
+  and `note` (a comment beside a step). An `actor` names who does a step. A label goes in the part
+  of the shape its outline leaves free (above a callout's tail, under a cylinder's top).
 - Text is plain unless marked: [`text.mark`](/kits/board/commands/text.mark/) makes a range bold or
   italic, and a text or sticky with `textFormat: "markdown"` draws its Markdown (headings, lists,
   quotes, `**bold**`, `*italic*`, `` `code` ``, links) without the markers.

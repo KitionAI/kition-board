@@ -10,6 +10,10 @@ use crate::fields::{
     TEXT_ALIGNS,
 };
 
+/// The bounds of `shape.previews`'s `size` (a picture's width in pixels) and its default.
+pub const PREVIEW_SIZES: (f64, f64) = (8.0, 128.0);
+pub const PREVIEW_SIZE: f64 = 28.0;
+
 /// One command of the table.
 pub struct Spec {
     pub id: &'static str,
@@ -48,6 +52,7 @@ pub const COMMANDS: &[Spec] = &[
     spec("element.rotate", "Rotate", ARRANGE),
     spec("element.style", "Style", None),
     Spec { mutates: false, ..spec("element.getStyle", "Read style", None) },
+    Spec { mutates: false, ..spec("shape.previews", "Shape library", None) },
     spec("element.setText", "Edit text", None),
     spec("text.mark", "Format text", None),
     spec("frame.create", "Frame", INSERT),
@@ -275,6 +280,9 @@ pub fn schema(id: &str) -> Option<Value> {
             "kind": choice(&["shape", "text", "stroke", "connector", "image", "card", "frame"], "A new element's kind, for its defaults (instead of ids)"),
             "shapeStyle": choice(SHAPE_STYLES, "The new shape's role"),
         }),
+        "shape.previews" => json!({
+            "size": number(PREVIEW_SIZES.0, PREVIEW_SIZES.1, "Each picture's width in pixels, 8 to 128 (28 by default); its height is three quarters of it"),
+        }),
         "element.setText" => json!({ "id": required(text("A shape, text, connector, card or frame")), "text": required(text("The whole new text")) }),
         "text.mark" => json!({
             "id": required(text("The element")),
@@ -496,6 +504,9 @@ pub fn description(id: &str) -> &'static str {
         "element.getStyle" => {
             "Reads the style fields the elements use, or a new element's defaults for a kind, without changing anything; null marks a field the elements differ on. Also answers the colour palette."
         }
+        "shape.previews" => {
+            "Answers the shape library without changing anything: the shapeType values in their four groups (basic, flowchart, arrows, marks), each with a small SVG picture the engine draws of it."
+        }
         "element.setText" => "Replaces the whole text of a shape, text element, connector label, card caption or frame title.",
         "text.mark" => "Applies or removes bold, italic or a link on a character range of one element's text.",
         "frame.create" => "Makes a frame with a box and title and moves the named elements into it; frames group content and export as one area.",
@@ -558,6 +569,14 @@ pub fn output(id: &str) -> Option<Value> {
             "style": { "type": "object", "required": true, "additionalProperties": true, "description": "Each field's value; null where the elements differ" },
             "palette": { "type": "array", "required": true, "items": { "type": "object", "additionalProperties": false, "properties": {
                 "token": { "type": "string", "required": true }, "stroke": { "type": "string", "required": true }, "fill": { "type": "string", "required": true } } } },
+        } }),
+        "shape.previews" => json!({ "type": "object", "additionalProperties": false, "properties": {
+            "groups": { "type": "array", "required": true, "description": "The shape library's groups, in the order the editor shows them", "items": { "type": "object", "additionalProperties": false, "properties": {
+                "id": { "type": "string", "required": true, "description": "basic, flowchart, arrows or marks" },
+                "shapes": { "type": "array", "required": true, "items": { "type": "object", "additionalProperties": false, "properties": {
+                    "shape": { "type": "string", "required": true, "description": "A shapeType value" },
+                    "svg": { "type": "string", "required": true, "description": "The shape's outline as an SVG document, stroked in currentColor and not filled" } } } },
+            } } },
         } }),
         "page.activate" => json!({ "type": "object", "additionalProperties": false, "properties": {
             "page": { "type": "string", "required": true, "description": "The page now shown" },

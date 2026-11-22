@@ -1,6 +1,7 @@
 /**
  * The editor's tools (the tool rail and their letters): select, hand, the 18 shapes in one slot,
- * sticky note, text, connector, pen, highlighter and eraser in one slot, frame, and picture.
+ * sticky note, text, connector, pen, highlighter and eraser in one slot, frame, and picture. All 44
+ * shapes are in the library panel (`panels/ShapeLibrary.tsx`), whose groups come from the engine.
  *
  * Ported from Kition's `packages/board-editor/src/components/WhiteboardToolbar.tsx` (`TOOLS`, the
  * shape button and its palette, the picture button) and `WhiteboardShapePalette.tsx`
@@ -58,9 +59,14 @@ export const TOOLS: readonly BoardTool[] = [
 /** The tool a letter picks (the shape letter picks the last shape used). */
 export const TOOL_KEYS: Readonly<Record<string, Tool>> = { v: 'select', h: 'hand', r: 'shape', n: 'note', m: 'mindmap', t: 'text', a: 'connector', p: 'pen', l: 'highlight', e: 'eraser', f: 'frame' }
 
-/** The rail id of what the canvas does now. */
+const RAIL_SHAPES = new Set(SHAPES.map(({ shape }) => shape))
+
+/**
+ * The rail id of what the canvas does now. A shape from the library panel that is not one of the
+ * rail's 18 lights the shape slot (as its rectangle).
+ */
 export function railId(tool: Tool, shapeType: string) {
-  return tool === 'shape' ? `shape:${shapeType}` : tool
+  return tool === 'shape' ? `shape:${RAIL_SHAPES.has(shapeType) ? shapeType : 'rectangle'}` : tool
 }
 
 /** A highlighter stroke's look (v1 `DEFAULT_WHITEBOARD_HIGHLIGHT_STYLE`). */

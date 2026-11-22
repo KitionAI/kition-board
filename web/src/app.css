@@ -168,6 +168,78 @@
   stroke-opacity: 0.45;
 }
 
+/*
+ * The shape library (panels/ShapeLibrary.tsx): the engine's pictures are stroked in currentColor, so
+ * they take the host's text colour in light and dark; the chosen shape is marked as the chips are.
+ */
+.board-library {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.board-shape-search {
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--kit-text, #1e1e1e);
+  font-size: 12px;
+}
+
+.board-library-none,
+.board-library-heading {
+  font-size: 11px;
+}
+
+.board-library-heading {
+  margin-bottom: 4px;
+}
+
+.board-library-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.board-library-shape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--kit-radius-control, 8px);
+  background: transparent;
+  color: var(--kit-text, #1e1e1e);
+  cursor: pointer;
+}
+
+.board-library-shape:hover {
+  border-color: var(--kit-border, #e5e3df);
+  background: var(--kit-surface, #ffffff);
+}
+
+.board-library-shape:focus-visible {
+  outline: 2px solid var(--kit-primary, #966e00);
+  outline-offset: -1px;
+}
+
+.board-library-shape[aria-pressed='true'] {
+  border-color: var(--kit-primary, #966e00);
+  background: var(--kit-primary-soft, var(--kit-surface, #ffffff));
+  color: var(--kit-primary, #966e00);
+}
+
+.board-library-picture {
+  display: inline-flex;
+  pointer-events: none;
+}
+
+.board-library-picture svg {
+  display: block;
+  overflow: visible;
+}
+
 /* The style panel (design.md: 8px controls, the project purple for the chosen one). */
 .board-style {
   display: flex;

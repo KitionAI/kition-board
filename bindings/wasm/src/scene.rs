@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use kition_board_kdm::Kind;
-use kition_board_model::fields::{STYLE_FIELDS, uses};
+use kition_board_model::fields::{SHAPE_GROUPS, STYLE_FIELDS, uses};
 use kition_board_scene::style::{PALETTE, Scheme, field_default};
 use kition_board_scene::{Area, Raster, area};
 use kition_board_text::{Family, LABEL_SIZE, REGULAR, Style, layout};
@@ -184,6 +184,54 @@ impl BoardDocument {
         }
         let palette: Vec<Value> = PALETTE.iter().map(|(token, stroke, fill)| json!({ "token": token, "stroke": stroke, "fill": fill })).collect();
         Ok(json!({ "fields": fields, "style": style, "palette": palette }))
+    }
+
+    /// `shape.previews { size? }` → `{ groups: [{ id, shapes: [{ shape, svg }] }] }`: the shape
+    /// library's groups (`SHAPE_GROUPS`), each shape drawn by the renderer's own `shapes::outline`
+    /// as a small SVG document, `size` × `size * 0.75` pixels (28 by default, 8 to 128), stroked in
+    /// `currentColor` and not filled: the editor's library panel shows these pictures in its text
+    /// colour, so it has no shape drawing of its own. A reading command: the board does not change.
+    pub fn shape_previews(&self, params: &Value) -> Result<Value, String> {
+        use kition_board_model::spec::{PREVIEW_SIZE, PREVIEW_SIZES};
+        use kition_board_scene::shapes::{Paint, outline};
+        use kition_board_scene::svg::num;
+        let w = match params.get("size") {
+            None => PREVIEW_SIZE,
+            Some(size) => size
+                .as_f64()
+                .filter(|size| size.is_finite() && (PREVIEW_SIZES.0..=PREVIEW_SIZES.1).contains(size))
+                .ok_or_else(|| format!("invalid-params: `size` must be a number from {} to {}", PREVIEW_SIZES.0, PREVIEW_SIZES.1))?,
+        };
+        let h = w * 0.75;
+        // Room for half the stroke on every side.
+        let pad = 1.0;
+        let body = r#"fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round""#;
+        let inner = r#"fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round""#;
+        let look = Paint { body, inner, corner: None, sticky: false };
+        let groups: Vec<Value> = SHAPE_GROUPS
+            .iter()
+            .map(|(group, shapes)| {
+                let shapes: Vec<Value> = shapes
+                    .iter()
+                    .map(|shape| {
+                        let mut svg = format!(
+                            r#"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="{} {} {} {}" aria-hidden="true">"#,
+                            num(w),
+                            num(h),
+                            num(-pad),
+                            num(-pad),
+                            num(w + 2.0 * pad),
+                            num(h + 2.0 * pad)
+                        );
+                        outline(&mut svg, shape, w, h, &look);
+                        svg.push_str("</svg>");
+                        json!({ "shape": shape, "svg": svg })
+                    })
+                    .collect();
+                json!({ "id": group, "shapes": shapes })
+            })
+            .collect();
+        Ok(json!({ "groups": groups }))
     }
 
     /// `file.export { format: png | svg | pdf, page?, frame?, scale?, background?, fit? }` →

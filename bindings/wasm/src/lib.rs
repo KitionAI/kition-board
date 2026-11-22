@@ -556,6 +556,7 @@ impl BoardDocument {
                 .map(|(done, damage)| json!({ "done": done, "damage": damage })),
             "page.activate" => self.activate(&params),
             "element.getStyle" => self.style_of(&params),
+            "shape.previews" => self.shape_previews(&params),
             "file.export" => self.export_file(&params),
             "file.render" => self.render_view(&params),
             _ if !kition_board_model::mutates(command) => Ok(kition_board_model::read(self.session.model(), command, &params)?),

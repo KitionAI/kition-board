@@ -1,0 +1,27 @@
+format: 1
+id: board.shapes/library-panel
+feature: board.shapes
+intent: >-
+  The shape library panel in the editor, through the development host: it shows the engine's four
+  groups and 44 shapes, each pictured by the engine (shape.previews); its search keeps only the
+  shapes whose name holds the words; a library shape picked in it (document, database, callout,
+  pentagon, left brace) is drawn by one drag with its shapeType and drawn by the engine, the rail's
+  shape slot lights for a shape it does not hold, and the drawn shapes keep their shapeType through
+  a save through the host and a reopen.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/shapes.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/shapes.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/shapes.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

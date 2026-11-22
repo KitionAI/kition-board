@@ -311,7 +311,7 @@ A table or board card's fragment carries a `slot` rectangle for a preview of the
 
 ### 4.1 Shape
 
-The page holds kit-editor's shell, the board editor (`web/src`: the canvas, its gestures, snapping, the spatial index, the viewport, connection handles), and a **page replica** of the KDM relayed to the worker's replica. The worker runs `BoardDocument` (WebAssembly). The editor:
+The page holds kit-editor's shell, the board editor (`web/src`: the canvas, its gestures, snapping, the spatial index, the viewport, connection handles; the tool rail, whose shape slot holds 18 shapes; the shape library panel above the style panel, with all 44 shapes in their four groups and a search, its groups and pictures from `shape.previews`), and a **page replica** of the KDM relayed to the worker's replica. The worker runs `BoardDocument` (WebAssembly). The editor:
 
 - reads geometry, hierarchy, selection targets and culling bounds from the page replica (bound ends derived per 1.4);
 - draws each element with **the engine's SVG fragment**, never its own shape code;
@@ -369,6 +369,7 @@ Conventions: every command has an id, title, menu path or none, shortcut or none
 | | `element.rotate` | `{ ids, degrees, about?: "each" \| "selection" }` | |
 | | `element.style` | `{ ids, style: { strokeColor?, fillColor?, … } }` | colours: token or `#rrggbb` |
 | | `element.getStyle` | `{ ids }` | `mutates: false` |
+| | `shape.previews` | `{ size? }` (8 to 128, 28 by default) → `{ groups: [{ id, shapes: [{ shape, svg }] }] }` | `mutates: false`; the four groups of `SHAPE_GROUPS` and one SVG per shape, `size` × `size * 0.75`, drawn by the renderer's `shapes::outline` in `currentColor`, unfilled: the editor's shape library panel shows these, so it has no shape drawing of its own |
 | | `element.setText` | `{ id, text }` | minimal diff on the KDM text |
 | | `text.mark` | `{ id, range: [start, end], mark: "bold" \| "italic" \| "link", value? }` | Unicode scalar offsets for agents, UTF-16 for the editor (M18) |
 | | `element.duplicate` | `{ ids, offset? }` | |

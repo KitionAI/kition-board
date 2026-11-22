@@ -153,11 +153,12 @@ features:
     title: "A library of 44 shapes in four groups (basic, flowchart, arrows, marks), each drawn by the engine with its label inside the shape"
     dimension: [function]
     priority: P0
-    status: missing
-    paths: [crates/kdm/kdm-model/src/outline.rs, crates/render/scene/src/shapes.rs, crates/engine/model/src/fields.rs]
+    status: partial
+    commands: [shape.previews]
+    paths: [crates/kdm/kdm-model/src/outline.rs, crates/render/scene/src/shapes.rs, crates/engine/model/src/fields.rs, bindings/wasm/src/scene.rs, web/src/panels/ShapeLibrary.tsx, web/tests/shapes.mjs]
     target: "Miro (web, 2026-11)"
-    gap: "18 shapes in one flat list; Miro has a grouped library with the flowchart set"
-    cases: [board.shapes/library]
+    gap: "The 44 shapes, their four groups and the library panel are built; it becomes has when the kit's CI run passes its two cases"
+    cases: [board.shapes/library, board.shapes/library-panel]
     since: "2026-11-21"
   - id: board.editing
     title: "Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label"

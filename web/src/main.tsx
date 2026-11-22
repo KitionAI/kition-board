@@ -12,7 +12,10 @@ const KIT_UI = defineKitUi({
   tools: [
     ...TOOLS.map((tool) => ({ id: `tool:${tool.id}`, label: CATALOGS['en-US'][tool.label] ?? tool.label })),
   ],
-  panels: [{ id: 'panel:style', label: 'Style' }],
+  panels: [
+    { id: 'panel:style', label: 'Style' },
+    { id: 'panel:shapes', label: 'Shapes' },
+  ],
   tabs: [],
   groups: [],
   controls: [
