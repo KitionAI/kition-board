@@ -23,7 +23,7 @@ The difference column is the feature's recorded gap.
 | `board.images` Pictures on the board, with alternative text | P0 | has | Miro (web, 2026-11) | Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs. |
 | `board.layout` Align, distribute and stack elements | P0 | has | — | — |
 | `board.pages` Pages: create, rename, duplicate, delete, reorder, switch | P0 | has | — | — |
-| `board.shapes` A library of 44 shapes in four groups (basic, flowchart, arrows, marks), each drawn by the engine with its label inside the shape | P0 | partial | Miro (web, 2026-11) | The 44 shapes, their four groups and the library panel are built; it becomes has when the kit's CI run passes its two cases |
+| `board.shapes` A library of 44 shapes in four groups (basic, flowchart, arrows, marks), each drawn by the engine with its label inside the shape | P0 | has | Miro (web, 2026-11) | — |
 | `board.text` Text on the board: marks on a text run | P0 | has | Miro (web, 2026-11) | — |
 | `board.agent.conversation` An agent builds on the board over a conversation | P1 | has | — | — |
 | `board.agent.draft` An agent's draft of a board is a replica of it, pictures included (draft: true; board_draft_ready, board_draft_reopen) | P1 | has | — | — |
@@ -42,6 +42,6 @@ The difference column is the feature's recorded gap.
 
 | Priority | has | partial | missing |
 | --- | ---: | ---: | ---: |
-| P0 | 13 | 2 | 2 |
+| P0 | 14 | 2 | 1 |
 | P1 | 8 | 5 | 0 |
 | P2 | 0 | 1 | 0 |
