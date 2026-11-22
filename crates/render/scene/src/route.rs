@@ -205,9 +205,19 @@ fn branch_offset(delta: f64) -> f64 {
     delta.signum() * (distance / 2.0).min(32.0_f64.max(140.0_f64.min(distance * 0.45)))
 }
 
+/// How far an elbow goes straight out of a side that faces away from the other end before it turns.
+const STUB: f64 = 24.0;
+
 /// A connector's path through its route (start, waypoints, end). `kind` is its `connectorType`;
 /// a mind-map branch (`role`) curves along `axis`.
 pub fn connector(route: &[Point], kind: Option<&str>, role: Option<&str>, axis: Option<&str>) -> Option<Path> {
+    connector_from(route, kind, role, axis, [None, None])
+}
+
+/// [`connector`], with the sides its start and end are bound to (each a unit axis vector pointing
+/// out of its element, `BoardModel::end_side`; `None` for a free end): an elbow without bends
+/// leaves and enters through them.
+pub fn connector_from(route: &[Point], kind: Option<&str>, role: Option<&str>, axis: Option<&str>, sides: [Option<Point>; 2]) -> Option<Path> {
     let (start, end) = (*route.first()?, *route.last()?);
     if route.len() < 2 {
         return None;
@@ -224,10 +234,7 @@ pub fn connector(route: &[Point], kind: Option<&str>, role: Option<&str>, axis: 
         return Some(Path { start, segs: vec![seg] });
     }
     match kind {
-        Some("elbow") if !bends => {
-            let middle = (start.x + end.x) / 2.0;
-            rounded(&[start, Point::new(middle, start.y), Point::new(middle, end.y), end])
-        }
+        Some("elbow") if !bends => rounded(&elbow(start, end, sides)),
         Some("elbow") => rounded(route),
         Some("curved") if !bends => {
             let middle = (start.x + end.x) / 2.0;
@@ -235,6 +242,63 @@ pub fn connector(route: &[Point], kind: Option<&str>, role: Option<&str>, axis: 
         }
         Some("curved") => smooth(route),
         _ => Some(Path { start, segs: route.iter().skip(1).map(|p| Seg::Line(*p)).collect() }),
+    }
+}
+
+/// The corners of an elbow from `start` to `end` that leaves and enters through `sides` (pointing
+/// out of each end's element). A free end goes sideways toward the other end, so two free ends,
+/// or two facing sides, turn halfway across as they always did. A side that faces away first
+/// goes [`STUB`] straight out. No route avoids other elements.
+fn elbow(start: Point, end: Point, sides: [Option<Point>; 2]) -> Vec<Point> {
+    let sideways = |from: f64, to: f64| Point::new(if to >= from { 1.0 } else { -1.0 }, 0.0);
+    let [from, to] = sides;
+    let out = from.unwrap_or_else(|| sideways(start.x, end.x));
+    let back = to.unwrap_or_else(|| sideways(end.x, start.x));
+    let (s, e) = (Point::new(start.x + out.x * STUB, start.y + out.y * STUB), Point::new(end.x + back.x * STUB, end.y + back.y * STUB));
+    match (out.y == 0.0, back.y == 0.0) {
+        (true, true) => {
+            let middle = (start.x + end.x) / 2.0;
+            if (middle - start.x) * out.x >= 0.0 && (middle - end.x) * back.x >= 0.0 {
+                vec![start, Point::new(middle, start.y), Point::new(middle, end.y), end]
+            } else if out.x == back.x {
+                // Both sides face the same way: around the outer one.
+                let x = if out.x > 0.0 { s.x.max(e.x) } else { s.x.min(e.x) };
+                vec![start, Point::new(x, start.y), Point::new(x, end.y), end]
+            } else {
+                let y = (start.y + end.y) / 2.0;
+                vec![start, s, Point::new(s.x, y), Point::new(e.x, y), e, end]
+            }
+        }
+        (false, false) => {
+            let middle = (start.y + end.y) / 2.0;
+            if (middle - start.y) * out.y >= 0.0 && (middle - end.y) * back.y >= 0.0 {
+                vec![start, Point::new(start.x, middle), Point::new(end.x, middle), end]
+            } else if out.y == back.y {
+                let y = if out.y > 0.0 { s.y.max(e.y) } else { s.y.min(e.y) };
+                vec![start, Point::new(start.x, y), Point::new(end.x, y), end]
+            } else {
+                let x = (start.x + end.x) / 2.0;
+                vec![start, s, Point::new(x, s.y), Point::new(x, e.y), e, end]
+            }
+        }
+        // Out sideways, in from above or below: one turn where both lines meet, when it is
+        // outside both sides.
+        (true, false) => {
+            let corner = Point::new(end.x, start.y);
+            if (corner.x - start.x) * out.x > 0.0 && (corner.y - end.y) * back.y > 0.0 {
+                vec![start, corner, end]
+            } else {
+                vec![start, s, Point::new(s.x, e.y), e, end]
+            }
+        }
+        (false, true) => {
+            let corner = Point::new(start.x, end.y);
+            if (corner.y - start.y) * out.y > 0.0 && (corner.x - end.x) * back.x > 0.0 {
+                vec![start, corner, end]
+            } else {
+                vec![start, s, Point::new(e.x, s.y), e, end]
+            }
+        }
     }
 }
 

@@ -15,7 +15,7 @@ The difference column is the feature's recorded gap.
 | `board.agent.observe` An agent reads the flow and answers on the board | P0 | has | — | — |
 | `board.agent.recover` An agent fixes what the check reports | P0 | has | — | — |
 | `board.connectors` Connectors bound to elements, with labels and waypoints | P0 | has | Miro (web, 2026-11) | — |
-| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | has | Miro (web, 2026-11) | Ends meet the outline of ellipses and polygon shapes; a star, cloud, heart, cylinder and the other curved shapes still meet their box |
+| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | has | Miro (web, 2026-11) | Ends meet the outline of ellipses and polygon shapes; a star, cloud, heart, cylinder, document and the other curved shapes, and the actor and the other open marks, still meet their box |
 | `board.drawing` Freehand strokes | P0 | has | — | — |
 | `board.editing` Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label | P0 | has | Miro (web, 2026-11) | Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks. |
 | `board.elements` Create, select, move, resize, rotate, style, group, stack and lock elements | P0 | has | Miro (web, 2026-11) | — |

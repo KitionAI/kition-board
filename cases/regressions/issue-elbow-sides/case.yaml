@@ -1,0 +1,20 @@
+format: 1
+id: regressions/issue-elbow-sides
+feature: board.connectors
+intent: >-
+  An elbow connector leaves and enters through the sides its ends are bound to: bottom to top
+  leaves downward and arrives from above, a right side to a top below turns once, and a side that
+  faces away from the other end (a diamond's left corner to the left side of a box below it) steps
+  out before it turns instead of turning back across the shape. Free ends, and ends bound to
+  facing sides, keep the route they had. Found drawing an order flow chart
+  (bindings/wasm/examples/flowchart_sheet.rs): every elbow left both ends sideways, so an arrow
+  bound to a pill's top lay along its top edge.
+layer: gate
+source: {kind: synthetic, from: bindings/wasm/tests/elbow_sides.rs, license: Apache-2.0}
+input: []
+steps:
+  - cargo-test: {package: kition-board-kit, test: elbow_sides}
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-22"

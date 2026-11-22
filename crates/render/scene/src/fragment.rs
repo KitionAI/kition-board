@@ -589,8 +589,14 @@ fn arrowhead(out: &mut String, kind: &str, tip: Point, direction: Point, look: &
 fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragment {
     let look = style::look(element, options.colors);
     let route_points = model.route(element);
-    let path =
-        route::connector(&route_points, text_of(element, "connectorType"), text_of(element, "connectorRole"), text_of(element, "mindMapBranchAxis"));
+    let sides = [&element.start, &element.end].map(|end| end.as_ref().and_then(|end| model.end_side(&element.id, end)));
+    let path = route::connector_from(
+        &route_points,
+        text_of(element, "connectorType"),
+        text_of(element, "connectorRole"),
+        text_of(element, "mindMapBranchAxis"),
+        sides,
+    );
     let Some(path) = path else {
         return Fragment { svg: String::new(), bounds: Rect::of_points(&route_points).unwrap_or_default(), local: false, slot: None, size: None };
     };

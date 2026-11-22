@@ -154,7 +154,7 @@ Rule: **when an end has a `binding` whose target exists on the same page, every 
 
 - No repair transaction runs after a merge: two people who move the two shapes of a connector at once converge to positions, and the connector is drawn between them, with no system change to sync.
 - An unbound end, or a binding whose target is gone or on another page, uses `point` (and the repair in 1.5 clears the binding).
-- Connector routing (straight, elbow, curved) is computed from the ends and `waypoints` at read time, in `crates/engine/model`; nothing derived is stored.
+- Connector routing (straight, elbow, curved) is computed from the ends and `waypoints` at read time, in `crates/engine/model`; nothing derived is stored. An elbow without waypoints leaves and enters through the sides its ends are bound to (the side an anchor is on, `geometry::anchor_side`; a free end, a corner or the centre goes sideways toward the other end), going 24 units straight out first where a side faces away; it does not route around other elements.
 
 ### 1.5 Validation and repair (M4, E14)
 

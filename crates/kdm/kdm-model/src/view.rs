@@ -22,7 +22,7 @@ use kition_kit::session::Result;
 use serde_json::Value;
 
 use crate::element::{Element, End, Kind};
-use crate::geometry::{Point, Rect, Size, auto_text_size, styled_text_size};
+use crate::geometry::{Point, Rect, Size, anchor_side, auto_text_size, styled_text_size};
 use crate::outline::outline_point;
 use crate::{PAGE, root_id};
 
@@ -306,6 +306,18 @@ impl BoardModel {
             return outline_point(target.outline_shape(), rect, target.rotation, binding.anchor);
         }
         end.point
+    }
+
+    /// The side of its target a bound end leaves or enters through, pointing out of the target
+    /// (`geometry::anchor_side`); `None` for an end [`end_point`](Self::end_point) does not derive
+    /// from a target.
+    pub fn end_side(&self, connector: &ObjectId, end: &End) -> Option<Point> {
+        let binding = end.binding.as_ref()?;
+        let target = self.elements.get(&binding.target)?;
+        if !target.kind.bindable() || self.placement.get(&binding.target) != self.placement.get(connector) || self.rect(target).is_none() {
+            return None;
+        }
+        anchor_side(binding.anchor, target.rotation)
     }
 
     /// A connector's route: its start, waypoints and end, ends derived.

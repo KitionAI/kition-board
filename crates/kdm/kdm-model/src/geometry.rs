@@ -180,6 +180,27 @@ pub fn clamp_anchor(anchor: [f64; 2]) -> [f64; 2] {
     anchor.map(|v| if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.5 })
 }
 
+/// The side of its box `anchor` is on, as a unit vector pointing out of the box (left, right, up
+/// or down) on a box rotated by `rotation` degrees; `None` at a corner or the centre, or when the
+/// rotation is not a quarter turn (no side then faces along an axis).
+pub fn anchor_side(anchor: [f64; 2], rotation: f64) -> Option<Point> {
+    let [ax, ay] = clamp_anchor(anchor);
+    let (dx, dy) = (ax - 0.5, ay - 0.5);
+    let local = if dx.abs() > dy.abs() {
+        Point::new(dx.signum(), 0.0)
+    } else if dy.abs() > dx.abs() {
+        Point::new(0.0, dy.signum())
+    } else {
+        return None;
+    };
+    let turns = rotation / 90.0;
+    if !turns.is_finite() || (turns - turns.round()).abs() > 1e-9 {
+        return None;
+    }
+    let turned = local.rotate(Point::default(), 90.0 * turns.round());
+    Some(Point::new(turned.x.round() + 0.0, turned.y.round() + 0.0))
+}
+
 /// The world point of `anchor` (normalised to the unrotated `rect`) on a box rotated by
 /// `rotation` degrees about its centre. A bound end is this point only on a target whose outline
 /// is its box; `outline::outline_point` derives every bound end.
@@ -262,6 +283,19 @@ mod tests {
         assert!(close(anchor_point(rect, 0.0, [1.0, 0.5]), Point::new(100.0, 25.0)));
         assert!(close(anchor_point(rect, 90.0, [1.0, 0.5]), Point::new(50.0, 75.0)), "a quarter turn moves the right middle below the centre");
         assert!(close(anchor_point(rect, 0.0, [2.0, -1.0]), Point::new(100.0, 0.0)), "anchors are clamped");
+    }
+
+    #[test]
+    fn an_anchor_names_the_side_it_leaves_through() {
+        assert_eq!(anchor_side([1.0, 0.5], 0.0), Some(Point::new(1.0, 0.0)));
+        assert_eq!(anchor_side([0.5, 0.0], 0.0), Some(Point::new(0.0, -1.0)));
+        assert_eq!(anchor_side([0.0, 0.2], 0.0), Some(Point::new(-1.0, 0.0)));
+        assert_eq!(anchor_side([1.0, 0.5], 90.0), Some(Point::new(0.0, 1.0)), "a quarter turn faces the right side down");
+        assert_eq!(anchor_side([1.0, 0.5], -90.0), Some(Point::new(0.0, -1.0)));
+        assert_eq!(anchor_side([1.0, 0.0], 0.0), None, "a corner faces no one side");
+        assert_eq!(anchor_side([0.5, 0.5], 0.0), None, "the centre faces no side");
+        assert_eq!(anchor_side([1.0, 0.5], 30.0), None, "no side faces along an axis");
+        assert_eq!(anchor_side([f64::NAN, 1.0], f64::NAN), None);
     }
 
     #[test]
