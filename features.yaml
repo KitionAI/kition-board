@@ -1,6 +1,6 @@
 format: 1
 kit: board
-updated: "2026-11-20"
+updated: "2026-11-21"
 gate_budget_s: 600
 protected: ["conformance/expected/**"]
 features:
@@ -146,14 +146,32 @@ features:
     status: has
     commands: [element.duplicate, element.delete, element.paste, element.create, element.update, element.move, element.resize, element.rotate, element.style, element.getStyle, element.setText, element.group, element.ungroup, element.reorder, element.lock, clipboard.copy]
     paths: [crates/engine/check/src/lib.rs, bindings/wasm/examples/checks.rs, crates/engine/model/src/elements.rs, bindings/wasm/src/lib.rs]
+    target: "Miro (web, 2026-11)"
     cases: [board.elements/save-reopen-append, regressions/issue-c8-board-engine-locks, regressions/issue-c8-board-engine-structure, regressions/issue-c8-board-engine-paste, regressions/issue-c8-board-engine-derived]
     since: "2026-11-17"
+  - id: board.shapes
+    title: "A library of 44 shapes in four groups (basic, flowchart, arrows, marks), each drawn by the engine with its label inside the shape"
+    dimension: [function]
+    priority: P0
+    status: missing
+    target: "Miro (web, 2026-11)"
+    gap: "18 shapes in one flat list; Miro has a grouped library with the flowchart set"
+    since: "2026-11-21"
+  - id: board.editing
+    title: "Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label"
+    dimension: [function]
+    priority: P0
+    status: missing
+    target: "Miro (web, 2026-11)"
+    gap: "engine commands exist; the editor has no shortcut or menu for them"
+    since: "2026-11-21"
   - id: board.text
     title: "Text on the board: marks on a text run"
     dimension: [function]
     priority: P0
     status: has
     commands: [text.mark]
+    target: "Miro (web, 2026-11)"
     cases: [board.text/save-reopen, regressions/issue-2]
     since: "2026-11-17"
   - id: board.frames
@@ -180,8 +198,17 @@ features:
     status: has
     commands: [connector.create, connector.bind, connector.setLabel, connector.setWaypoints]
     paths: [crates/engine/check/src/lib.rs, crates/engine/model/src/elements.rs, bindings/wasm/examples/sample.rs, bindings/wasm/examples/checks.rs]
+    target: "Miro (web, 2026-11)"
     cases: [board.connectors/save-reopen]
     since: "2026-11-17"
+  - id: board.connectors.ends
+    title: "Nine arrowheads, and a bound end that meets its target's outline"
+    dimension: [function]
+    priority: P0
+    status: missing
+    target: "Miro (web, 2026-11)"
+    gap: "3 arrowheads; ends meet the box, not the outline"
+    since: "2026-11-21"
   - id: board.cards
     title: "Cards that link to a file or a web page, and links retargeted when files move"
     dimension: [function]
@@ -198,6 +225,7 @@ features:
     status: has
     commands: [image.insert, image.setAlt]
     paths: [crates/engine/model/src/elements.rs, crates/engine/check/src/lib.rs, bindings/wasm/src/lib.rs, bindings/wasm/src/files.rs]
+    target: "Miro (web, 2026-11)"
     gap: "Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs."
     cases: [board.images/save-reopen]
     since: "2026-11-17"

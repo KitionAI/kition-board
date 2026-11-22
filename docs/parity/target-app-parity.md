@@ -1,9 +1,9 @@
 # Target-app parity
 
-> **Last updated:** 2026-11-17 · **Source:** `features.yaml` (updated 2026-11-17) and the engine's command list
+> **Last updated:** 2026-11-21 · **Source:** `features.yaml` (updated 2026-11-21) and the engine's command list
 
 Each feature in `features.yaml` records its status against what the feature promises and, where it
-has one, the target application it is compared with (none yet).
+has one, the target application it is compared with (Miro, web, 2026-11, for the editing features).
 The difference column is the feature's recorded gap.
 
 | Feature | Priority | Status | Target | Difference |
@@ -14,14 +14,17 @@ The difference column is the feature's recorded gap.
 | `board.agent.ids` One id space for pages and elements that survives reopening; receipts and the guard between agents name them | P0 | has | — | — |
 | `board.agent.observe` An agent reads the flow and answers on the board | P0 | has | — | — |
 | `board.agent.recover` An agent fixes what the check reports | P0 | has | — | — |
-| `board.connectors` Connectors bound to elements, with labels and waypoints | P0 | has | — | — |
+| `board.connectors` Connectors bound to elements, with labels and waypoints | P0 | has | Miro (web, 2026-11) | — |
+| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | missing | Miro (web, 2026-11) | 3 arrowheads; ends meet the box, not the outline |
 | `board.drawing` Freehand strokes | P0 | has | — | — |
-| `board.elements` Create, select, move, resize, rotate, style, group, stack and lock elements | P0 | has | — | — |
+| `board.editing` Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label | P0 | missing | Miro (web, 2026-11) | engine commands exist; the editor has no shortcut or menu for them |
+| `board.elements` Create, select, move, resize, rotate, style, group, stack and lock elements | P0 | has | Miro (web, 2026-11) | — |
 | `board.frames` Frames that hold and fit elements | P0 | has | — | — |
-| `board.images` Pictures on the board, with alternative text | P0 | has | — | Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs. |
+| `board.images` Pictures on the board, with alternative text | P0 | has | Miro (web, 2026-11) | Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs. |
 | `board.layout` Align, distribute and stack elements | P0 | has | — | — |
 | `board.pages` Pages: create, rename, duplicate, delete, reorder, switch | P0 | has | — | — |
-| `board.text` Text on the board: marks on a text run | P0 | has | — | — |
+| `board.shapes` A library of 44 shapes in four groups (basic, flowchart, arrows, marks), each drawn by the engine with its label inside the shape | P0 | missing | Miro (web, 2026-11) | 18 shapes in one flat list; Miro has a grouped library with the flowchart set |
+| `board.text` Text on the board: marks on a text run | P0 | has | Miro (web, 2026-11) | — |
 | `board.agent.conversation` An agent builds on the board over a conversation | P1 | has | — | — |
 | `board.agent.draft` An agent's draft of a board is a replica of it, pictures included (draft: true; board_draft_ready, board_draft_reopen) | P1 | has | — | — |
 | `board.agent.environment` Offline environment tasks use board words and valid model values | P1 | partial | — | Seed 7 gives 100 verified tasks but no creates. Element.kind is a creation-only register a raw batch create gives (limits12); whether Page replay comparison treats fresh UUIDs as the same objects on the pinned kition-sdk is not measured. Rich-text scalars and derived fields replay. |
@@ -32,11 +35,13 @@ The difference column is the feature's recorded gap.
 | `board.history` Undo and redo | P1 | partial | — | The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen. |
 | `board.mindmap` Mind maps: lay out, add children and siblings, collapse, set direction | P1 | has | — | — |
 | `board.platform.brand` The embedded editor uses the canonical kit palette | P1 | has | — | — |
+| `board.platform.color-scheme` The board follows the host's color scheme: in dark, the canvas, the default ink, the colour tokens, the selection handles, the cards (their bodies, preview stand-ins and badge glyphs) and the minimap are drawn for a dark surface, live, nothing moving; a file's own colours, exports, previews and thumbnails stay as they are | P1 | has | — | — |
 | `board.platform.display-modes` The editor in every display mode: Menus by default, Single line and Classic open on Edit, Focus shows only the board and leaves on Escape | P1 | has | — | — |
+| `board.platform.document-identity` A host reads the document id a .kboard carries and forks a copied board into a new document with no history (document.identity, document.fork; Kit Process Protocol 5.6) | P1 | has | — | — |
 | `board.templates` Insert a template | P2 | partial | — | The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen. |
 
 | Priority | has | partial | missing |
 | --- | ---: | ---: | ---: |
-| P0 | 13 | 1 | 0 |
-| P1 | 6 | 5 | 0 |
+| P0 | 13 | 1 | 3 |
+| P1 | 8 | 5 | 0 |
 | P2 | 0 | 1 | 0 |
