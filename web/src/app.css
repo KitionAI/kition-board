@@ -138,6 +138,49 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
+/* Bold, italic and link over the text box's selection (TextEditor's marks bar). */
+.board-text-marks {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--kit-border, #e5e3df);
+  border-radius: 8px;
+  background: var(--kit-surface, #ffffff);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.board-text-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kit-text, #1e1e1e);
+  cursor: pointer;
+}
+
+.board-text-mark:hover {
+  background: color-mix(in srgb, var(--kit-text, #1e1e1e) 8%, transparent);
+}
+
+.board-text-mark[aria-pressed='true'] {
+  background: var(--kit-primary, #966e00);
+  color: var(--kit-primary-text, #ffffff);
+}
+
+.board-text-link-field {
+  width: 220px;
+  height: 28px;
+  margin-left: 4px;
+}
+
 .board-minimap {
   position: absolute;
   right: 12px;

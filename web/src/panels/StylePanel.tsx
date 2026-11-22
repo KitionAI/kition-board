@@ -4,7 +4,11 @@
  * active, for what it draws next. Only the fields the elements take are shown; each one's value
  * is the engine's (`element.getStyle`: what is set, else the kind's default; none when the
  * elements differ). A change to the selection is one `element.style` (one undo step); opacity and
- * text size are sent when the slider or field is let go.
+ * text size are sent when the slider or field is let go. When every selected element is a plain or
+ * flow-chart shape, a Shape section changes their `shapeType` to any of the library's shapes, in
+ * its groups (`shape.previews`, the answer the board asked for once): one `element.update` per
+ * shape, so box, label, style and bound connectors stay, and the connectors' ends move to the new
+ * outline in the same command (design note 1.4).
  *
  * Ported from Kition's `packages/board-editor/src/components/WhiteboardStylePanel.tsx`, on kit-editor's
  * panel and controls; the swatches' colours come from the engine's palette.
@@ -17,6 +21,40 @@ import { ARROWHEADS, CONNECTOR_TYPES, DASH_STYLES, FONT_FAMILIES, STROKE_SIZES, 
 
 /** What the panel styles: the selected elements, or the next element a tool draws (`defaults`). */
 export type StyleTarget = { ids: readonly string[] } | { kind: Kind; shapeStyle?: string; defaults: Style }
+
+/**
+ * The Shape section's state: the library's groups (each a group id and its shapeType values, in the
+ * library's order) and the selected shapes' common shapeType (`null` when they differ).
+ */
+export type ShapeChoice = { groups: readonly { id: string; shapes: readonly string[] }[]; value: string | null }
+
+/** A drop-down of the library's shapes in their groups (kit-editor's `Choice` markup, with groups). */
+function ShapeSection({ choice, onShape }: { choice: ShapeChoice; onShape: (shape: string) => void }) {
+  const { t } = useKitEditor()
+  return (
+    <PanelSection title={t('styleShape')} testId="board-style-shape">
+      <label className="kui-choice">
+        <span>{t('styleShapeType')}</span>
+        <select className="kui-field" value={choice.value ?? ''} aria-label={t('styleShapeType')} onChange={(event) => event.target.value && onShape(event.target.value)} data-testid="board-style-shapeType">
+          {choice.value == null ? (
+            <option value="" disabled>
+              {t('styleMixed')}
+            </option>
+          ) : null}
+          {choice.groups.map((group) => (
+            <optgroup key={group.id} label={t(`shapeGroup.${group.id}`)} data-group={group.id}>
+              {group.shapes.map((shape) => (
+                <option key={shape} value={shape}>
+                  {t(`shape.${shape}`)}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+    </PanelSection>
+  )
+}
 
 const FILL_ICONS = { none: Ban, solid: Square, semi: SunMedium, pattern: Grid3X3 } as const
 const DASH_ICONS = { solid: DashSolid, dashed: DashDashed, dotted: DashDotted } as const
@@ -64,7 +102,7 @@ function Chips<V extends string>({ label, value, choices, onChange, testId }: { 
   )
 }
 
-export function StylePanel({ target, onApply }: { target: StyleTarget | null; onApply: (style: Style) => void }) {
+export function StylePanel({ target, onApply, shape, onShape }: { target: StyleTarget | null; onApply: (style: Style) => void; shape?: ShapeChoice | null; onShape?: (shape: string) => void }) {
   const { t, query, session } = useKitEditor()
   const revision = (session as { change?: { revision?: number } }).change?.revision ?? 0
   const [answer, setAnswer] = useState<{ key: string; value: StyleAnswer } | null>(null)
@@ -110,6 +148,7 @@ export function StylePanel({ target, onApply }: { target: StyleTarget | null; on
   return (
     <div className="board-style" data-testid="board-style-panel" data-target={defaults ? 'defaults' : 'selection'}>
       <div className="board-style-scope kui-muted">{defaults ? t('styleDefaults') : t('styleSelection')}</div>
+      {shape && onShape && !defaults ? <ShapeSection choice={shape} onShape={onShape} /> : null}
       {has('strokeColor') ? (
         <PanelSection title={t('styleStroke')} testId="board-style-stroke">
           <ColorRow field="strokeColor" role="stroke" value={value('strokeColor')} palette={known.palette} onPick={(color) => set('strokeColor', color)} label={t('styleStroke')} />

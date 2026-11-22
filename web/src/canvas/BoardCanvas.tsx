@@ -31,7 +31,7 @@ import { styleFor, type Style } from '../board/style'
 import { TOOL_KEYS, type Tool } from '../tools'
 import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
-import { TextEditor, type TextEditing } from './TextEditor'
+import { TextEditor, marksOf, type TextEditing, type TextMark } from './TextEditor'
 
 export type { Tool }
 
@@ -445,7 +445,7 @@ export function BoardCanvas(props: Props) {
       if (!id) {
         if (!at) return
         const s = toScreen(at)
-        setEditing({ id: null, kind: 'new-text', value: '', left: s.x, top: s.y, width: Math.max(160, 240 * v.zoom), height: 34, fontSize: Math.max(12, 20 * v.zoom), align: 'left' })
+        setEditing({ id: null, kind: 'new-text', value: '', left: s.x, top: s.y, width: Math.max(160, 240 * v.zoom), height: 34, fontSize: Math.max(12, 20 * v.zoom), align: 'left', marks: [] })
         return
       }
       const element = sync.view.elements.get(id)
@@ -454,7 +454,7 @@ export function BoardCanvas(props: Props) {
         const route = sync.view.route(element)
         const middle = route.length ? route[Math.floor(route.length / 2) - (route.length % 2 ? 0 : 1)] : { x: 0, y: 0 }
         const s = toScreen(middle)
-        setEditing({ id, kind: 'connector', value: element.text, left: s.x - 90, top: s.y - 17, width: 180, height: 34, fontSize: Math.max(12, 14 * v.zoom), align: 'center' })
+        setEditing({ id, kind: 'connector', value: element.text, left: s.x - 90, top: s.y - 17, width: 180, height: 34, fontSize: Math.max(12, 14 * v.zoom), align: 'center', marks: null })
         return
       }
       const box = sync.view.rect(element)
@@ -463,16 +463,35 @@ export function BoardCanvas(props: Props) {
       const w = (box.x1 - box.x0) * v.zoom
       const h = (box.y1 - box.y0) * v.zoom
       const size = (element.fontSize ?? (element.kind === 'text' ? 20 : 16)) * v.zoom
-      if (element.kind === 'shape') setEditing({ id, kind: 'shape', value: element.text, left: s.x + 8, top: s.y + h / 2 - size, width: Math.max(80, w - 16), height: size * 2, fontSize: size, align: 'center' })
-      else if (element.kind === 'frame') setEditing({ id, kind: 'frame', value: element.text, left: s.x, top: s.y - 30, width: Math.max(160, w), height: 28, fontSize: 14 * v.zoom, align: 'left' })
-      else if (element.kind === 'card') setEditing({ id, kind: 'card', value: element.text, left: s.x, top: s.y + h + 4, width: Math.max(160, w), height: 28, fontSize: 13 * v.zoom, align: 'center' })
-      else setEditing({ id, kind: 'text', value: element.text, left: s.x, top: s.y, width: Math.max(160, w + 24), height: Math.max(34, h), fontSize: size, align: 'left' })
+      // A shape's label and a text take bold, italic and links; a Markdown one writes them as Markdown.
+      const marks = (element.kind === 'shape' || element.kind === 'text') && sync.textFormat(id) !== 'markdown' ? marksOf(sync.textRuns(id)) : null
+      if (element.kind === 'shape') setEditing({ id, kind: 'shape', value: element.text, left: s.x + 8, top: s.y + h / 2 - size, width: Math.max(80, w - 16), height: size * 2, fontSize: size, align: 'center', marks })
+      else if (element.kind === 'frame') setEditing({ id, kind: 'frame', value: element.text, left: s.x, top: s.y - 30, width: Math.max(160, w), height: 28, fontSize: 14 * v.zoom, align: 'left', marks: null })
+      else if (element.kind === 'card') setEditing({ id, kind: 'card', value: element.text, left: s.x, top: s.y + h + 4, width: Math.max(160, w), height: 28, fontSize: 13 * v.zoom, align: 'center', marks: null })
+      else setEditing({ id, kind: 'text', value: element.text, left: s.x, top: s.y, width: Math.max(160, w + 24), height: Math.max(34, h), fontSize: size, align: 'left', marks })
     },
     [sync, toScreen],
   )
 
+  /**
+   * The marks the box kept, after the text: one `text.mark` each, in the order they were made, in
+   * UTF-16 offsets of the committed text (the engine has no command that writes a text and its
+   * marks together, so each is an undo step of its own).
+   */
+  const commitMarks = useCallback(
+    async (id: string, text: string, marks: readonly TextMark[]) => {
+      for (const { start, end, mark, value } of marks) {
+        const to = Math.min(end, text.length)
+        if (start >= to) continue
+        const answer = await commit('text.mark', { id, range: [start, to], mark, units: 'utf16', ...(value === true ? {} : { value }) })
+        if (!answer) return
+      }
+    },
+    [commit],
+  )
+
   const commitText = useCallback(
-    (value: string) => {
+    (value: string, marks: readonly TextMark[]) => {
       const current = editing
       setEditing(null)
       // The keys go back to the canvas (Undo, Delete) once the box closes.
@@ -482,18 +501,27 @@ export function BoardCanvas(props: Props) {
         if (!value.trim()) return
         const at = toWorldFromScreen(current.left, current.top, viewport.current)
         const parent = frameUnder(at)
-        void commit('element.create', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...styleFor('text', latest.current.drawStyle), ...(parent ? { parent } : {}) }] }).then((answer) => {
+        void commit('element.create', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...styleFor('text', latest.current.drawStyle), ...(parent ? { parent } : {}) }] }).then(async (answer) => {
           const created = (answer?.created as string[] | undefined) ?? []
           if (created.length) latest.current.onSelection(created)
+          if (created.length === 1 && marks.length) await commitMarks(created[0], value, marks)
         })
         return
       }
       const element = sync.view.elements.get(current.id)
-      if (!element || element.text === value) return
-      if (current.kind === 'connector') void commit('connector.setLabel', { id: current.id, text: value })
-      else void commit('element.setText', { id: current.id, text: value })
+      if (!element) return
+      const id = current.id
+      if (element.text === value) {
+        if (marks.length) void commitMarks(id, value, marks)
+        return
+      }
+      if (current.kind === 'connector') void commit('connector.setLabel', { id, text: value })
+      else
+        void commit('element.setText', { id, text: value }).then((answer) => {
+          if (answer && marks.length) return commitMarks(id, value, marks)
+        })
     },
-    [commit, editing, sync],
+    [commit, commitMarks, editing, sync],
   )
 
   /** Adds a branch to `node` (a child, or with `sibling` a sibling), selects it and opens its text. */
@@ -1276,6 +1304,7 @@ export function BoardCanvas(props: Props) {
       groups: elements.some((element) => element.kind === 'group'),
     }
   }, [menu, readOnly, view, tick])
+  const markLabels = useMemo(() => ({ bar: t('marks'), bold: t('markBold'), italic: t('markItalic'), link: t('markLink'), address: t('markLinkAddress') }), [t])
 
   return (
     <div ref={container} className="board-canvas" tabIndex={0} data-testid="board-canvas" data-tool={tool} style={{ cursor }}>
@@ -1396,7 +1425,7 @@ export function BoardCanvas(props: Props) {
           </g>
         </g>
       </svg>
-      {editing ? <TextEditor key={`${editing.id}:${editing.left}:${editing.top}`} editing={editing} placeholder={t('textPlaceholder')} onCommit={commitText} onCancel={() => {
+      {editing ? <TextEditor key={`${editing.id}:${editing.left}:${editing.top}`} editing={editing} placeholder={t('textPlaceholder')} labels={markLabels} onCommit={commitText} onCancel={() => {
             setEditing(null)
             container.current?.focus({ preventScroll: true })
           }} /> : null}

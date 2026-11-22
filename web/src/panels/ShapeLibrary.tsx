@@ -1,20 +1,18 @@
 /**
  * The shape library: every shape of `shapeType` in the library's four groups (basic, flowchart,
  * arrows, marks), with a search by name. The groups and each shape's picture are the engine's
- * (`shape.previews`: the renderer's own outline of each shape), so the panel has no shape table or
- * drawing of its own and cannot disagree with the canvas. A click makes the shape the shape tool's;
- * the rail's shape slot lights for it (`railId`).
+ * (`shape.previews`: the renderer's own outline of each shape, asked for once when the board opens,
+ * `board/sync.ts`), so the panel has no shape table or drawing of its own and cannot disagree with
+ * the canvas. A click makes the shape the shape tool's; the rail's shape slot lights for it
+ * (`railId`).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { PanelSection, useKitEditor } from '@kition/sdk/editor'
 
 /** `shape.previews`'s answer. */
-type Previews = { groups: { id: string; shapes: { shape: string; svg: string }[] }[] }
+export type Previews = { groups: { id: string; shapes: { shape: string; svg: string }[] }[] }
 
-/** How often the panel asks again while the engine has not opened the board yet (every 200 ms). */
-const TRIES = 100
-
-function isPreviews(value: unknown): value is Previews {
+export function isPreviews(value: unknown): value is Previews {
   const groups = (value as { groups?: unknown } | null)?.groups
   return Array.isArray(groups) && groups.every((group) => typeof group?.id === 'string' && Array.isArray(group.shapes))
 }
@@ -31,27 +29,9 @@ function Picture({ svg }: { svg: string }) {
   return <span ref={node} className="board-library-picture" aria-hidden="true" />
 }
 
-export function ShapeLibrary({ active, onPick }: { active: string | null; onPick: (shape: string) => void }) {
-  const { t, query } = useKitEditor()
-  const [previews, setPreviews] = useState<Previews | null>(null)
-  const [tries, setTries] = useState(0)
+export function ShapeLibrary({ previews, active, onPick }: { previews: Previews | null; active: string | null; onPick: (shape: string) => void }) {
+  const { t } = useKitEditor()
   const [search, setSearch] = useState('')
-
-  // Asked once; again only while the engine has not answered (the board is still opening).
-  useEffect(() => {
-    if (previews) return undefined
-    let current = true
-    let timer: number | undefined
-    void query<Previews>('shape.previews').then((answer) => {
-      if (!current) return
-      if (isPreviews(answer)) setPreviews(answer)
-      else if (tries < TRIES) timer = window.setTimeout(() => setTries((n) => n + 1), 200)
-    })
-    return () => {
-      current = false
-      if (timer !== undefined) window.clearTimeout(timer)
-    }
-  }, [previews, query, tries])
 
   // The groups with the shapes whose name holds the search, in the person's language.
   const shown = useMemo(() => {

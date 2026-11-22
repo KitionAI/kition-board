@@ -36,8 +36,8 @@ import { ExportDialog } from './panels/ExportDialog'
 import { PageTabs, type PageTab } from './panels/PageTabs'
 import { TemplateGallery } from './panels/TemplateGallery'
 import { MindMapSection, type MindNodeState } from './panels/MindMapSection'
-import { ShapeLibrary } from './panels/ShapeLibrary'
-import { StylePanel, type StyleTarget } from './panels/StylePanel'
+import { ShapeLibrary, isPreviews } from './panels/ShapeLibrary'
+import { StylePanel, type ShapeChoice, type StyleTarget } from './panels/StylePanel'
 import { HIGHLIGHT_STYLE, PICTURE_EXTENSIONS, TOOLS, railId, type Tool } from './tools'
 
 /** What the editor reads from the engine's `inspect()`. */
@@ -329,6 +329,40 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     [editor, styleTarget, tool],
   )
 
+  // The engine's shape library (`shape.previews`), asked for once when the board opened.
+  const previews = useMemo(() => (sync && isPreviews(sync.previews) ? sync.previews : null), [sync])
+  // Selected plain or flow-chart shapes, none locked, can take another shape from the library.
+  const shapeChoice = useStable(useMemo<ShapeChoice | null>(() => {
+    if (!sync || !previews || readOnly || tool !== 'select' || !selection.length) return null
+    const types = new Set<string>()
+    for (const id of selection) {
+      const element = sync.view.elements.get(id)
+      if (!element || element.kind !== 'shape' || element.locked) return null
+      if (element.shapeStyle != null && element.shapeStyle !== 'default' && element.shapeStyle !== 'flow-node') return null
+      types.add(element.shapeType ?? 'rectangle')
+    }
+    const groups = previews.groups.map((group) => ({ id: group.id, shapes: group.shapes.map(({ shape }) => shape) }))
+    return { groups, value: types.size === 1 ? [...types][0] : null }
+    // The view changes in place; `change.revision` says when.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [change.revision, previews, readOnly, selection, sync, tool]))
+  /**
+   * Another shape for the selected shapes: one `element.update` per shape (the engine has no
+   * command that sets `shapeType` on several elements at once, so several shapes are as many undo
+   * steps); the keys go to the canvas again.
+   */
+  const changeShape = useCallback(
+    async (shape: string) => {
+      for (const id of selectionRef.current) {
+        const element = sync?.view.elements.get(id)
+        if (element?.kind === 'shape' && (element.shapeType ?? 'rectangle') !== shape) await editor.run('element.update', { id, set: { shapeType: shape } })
+      }
+      canvasApi.current?.focus()
+    },
+    [editor, selectionRef, sync],
+  )
+  const onShape = useCallback((shape: string) => void changeShape(shape), [changeShape])
+
   // A single selected mind-map node gets its map's controls in the panel.
   const mindNode = useStable(useMemo<MindNodeState | null>(() => {
     if (!sync || readOnly || selection.length !== 1) return null
@@ -425,14 +459,14 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     () => (
       <KitElement id="panel:style">
         <Panel side="right" width={232} title={t('style')} testId="board-style">
-          {readOnly ? null : <ShapeLibrary active={tool === 'shape' ? shapeType : null} onPick={pickShape} />}
-          <StylePanel target={readOnly ? null : styleTarget} onApply={applyStyle} />
+          {readOnly ? null : <ShapeLibrary previews={previews} active={tool === 'shape' ? shapeType : null} onPick={pickShape} />}
+          <StylePanel target={readOnly ? null : styleTarget} onApply={applyStyle} shape={shapeChoice} onShape={onShape} />
           {mindNode ? <MindMapSection node={mindNode} onGrow={grow} /> : null}
           {cardState ? <CardSection card={cardState} onRetarget={() => void retarget()} onCaption={() => canvasApi.current?.edit(cardState.id)} /> : null}
         </Panel>
       </KitElement>
     ),
-    [applyStyle, cardState, grow, mindNode, pickShape, readOnly, retarget, shapeType, styleTarget, t, tool],
+    [applyStyle, cardState, grow, mindNode, onShape, pickShape, previews, readOnly, retarget, shapeChoice, shapeType, styleTarget, t, tool],
   )
 
   return (

@@ -1,0 +1,26 @@
+format: 1
+id: board.editing/change-shape
+feature: board.editing
+intent: >-
+  Changing a shape's type from the style panel, through the development host (web/tests/editing.mjs
+  steps 10 and 11): with a rectangle selected, the panel's Shape section offers the library's 44
+  shapes in its four groups (basic, flowchart, arrows, marks, from the engine's shape.previews);
+  choosing the document is one element.update that keeps the shape's box and label and the connector
+  bound to it; one undo brings the rectangle back and the panel shows it again.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/editing.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

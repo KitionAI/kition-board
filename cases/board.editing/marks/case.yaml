@@ -1,0 +1,29 @@
+format: 1
+id: board.editing/marks
+feature: board.editing
+intent: >-
+  Bold, italic and link in a label, through the development host (web/tests/editing.mjs steps 12 to
+  14): while a shape's label is edited, a bar above the text box offers Bold, Italic and Link;
+  Cmd/Ctrl+B on a selected word presses Bold, and the commit stores a bold mark over exactly that
+  word (text.mark after element.setText), which the engine's fragment draws bold; reopened, the
+  stored bold shows pressed with the caret inside it; Cmd/Ctrl+K on another word takes an address in
+  the bar's field, and the commit stores the link with its address over that word only while the
+  bold and the text typed after the link survive; a Markdown label opens its text box without the
+  bar.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/editing.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

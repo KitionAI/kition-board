@@ -6,7 +6,12 @@
 // makes a copy at the drop, the canvas menu's order rows, its empty-canvas rows, a locked element's
 // rows (case board.editing/clipboard); a pasted PNG becomes one picture with a blob, one undo takes
 // it away, and a dropped PNG lands centred on the drop point (case board.editing/pictures); and a
-// read-only board neither cuts nor pastes. The harness is web/tests/flow.mjs's.
+// read-only board neither cuts nor pastes. Then, on a page of its own: the style panel's Shape
+// section turns a rectangle into a document with its box, label and connector kept, and one undo
+// brings the rectangle back (case board.editing/change-shape); Cmd/Ctrl+B on a selected word stores
+// a bold mark that the engine draws bold, a stored mark shows pressed and survives an edit
+// elsewhere, Cmd/Ctrl+K stores a link with its address, and a Markdown label shows no marks bar
+// (case board.editing/marks). The harness is web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
@@ -432,6 +437,158 @@ try {
     readOnlyDetail = `selected ${picked}; ${before.length} shown before, ${after.length} after; menu ${JSON.stringify(readOnlyMenu)}`
   }
   step('read-only: no paste, no cut', readOnlyHeld && JSON.stringify(readOnlyMenu) === JSON.stringify(['copy']) && viewerErrors.length === 0, `${readOnlyDetail} ${viewerErrors.join(' | ')}`)
+
+  // Changing a shape and marks in a label (cases board.editing/change-shape and board.editing/marks),
+  // on a page of its own at a known view: a rectangle R joined to a shape T by a connector, a label
+  // L to mark, and a Markdown label M, made by the agent (not the person's undo).
+  await viewer.close()
+  await page.bringToFront()
+  await page.keyboard.press('Escape')
+  const pageBeforeMarks = await personPage()
+  await newPage()
+  await until(async () => (await personPage()) !== pageBeforeMarks && (await shown()).length === 0)
+  await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
+  const marksPage = await personPage()
+  const madeForMarks = await ai([
+    {
+      command: 'element.create',
+      params: {
+        page: marksPage,
+        elements: [
+          { kind: 'shape', position: { x: 80, y: 120 }, size: { w: 200, h: 120 }, text: 'Report' },
+          { kind: 'shape', position: { x: 480, y: 120 }, size: { w: 160, h: 100 }, text: 'Archive' },
+          { kind: 'shape', position: { x: 80, y: 400 }, size: { w: 360, h: 120 }, text: 'Ship the plan' },
+          { kind: 'shape', position: { x: 520, y: 400 }, size: { w: 240, h: 120 }, text: '**Notes**', textFormat: 'markdown' },
+        ],
+      },
+    },
+  ])
+  const [rectangle, archive, labelled, markdown] = madeForMarks.completed[0].result.created
+  const joinedForShape = await ai([{ command: 'connector.create', params: { page: marksPage, from: { element: rectangle }, to: { element: archive } } }])
+  const shapeConnector = joinedForShape.completed[0].result.created[0]
+  await until(async () => (await shown()).length === 5)
+  const shapeType = kit.getByTestId('board-style-shapeType')
+
+  // 10. The style panel's Shape section offers the library's 44 shapes in its four groups; choosing
+  // the document changes R's shapeType and nothing else, and the connector stays bound to it.
+  await click(100, 140)
+  await until(async () => JSON.stringify(await selected()) === JSON.stringify([rectangle]))
+  const sectionShown = await until(async () => (await kit.getByTestId('board-style-shape').count()) === 1 && (await shapeType.inputValue()) === 'rectangle', 50)
+  const offered = sectionShown
+    ? await shapeType.evaluate((select) => ({ groups: [...select.querySelectorAll('optgroup')].map((group) => group.dataset.group), options: select.querySelectorAll('optgroup option').length }))
+    : null
+  const rectangleBefore = await storedOne(rectangle)
+  if (sectionShown) await shapeType.selectOption('document')
+  const changedShape = await until(async () => (await storedOne(rectangle))?.shapeType === 'document', 50)
+  const rectangleAfter = await storedOne(rectangle)
+  const connectorAfter = await storedOne(shapeConnector)
+  step(
+    'changing a rectangle to a document keeps its box, label and connector',
+    sectionShown &&
+      offered?.options === 44 &&
+      JSON.stringify(offered?.groups) === JSON.stringify(['basic', 'flowchart', 'arrows', 'marks']) &&
+      changedShape &&
+      JSON.stringify(boxOf(rectangleAfter)) === JSON.stringify(boxOf(rectangleBefore)) &&
+      rectangleAfter?.text === 'Report' &&
+      connectorAfter?.start?.binding?.target === rectangle &&
+      connectorAfter?.end?.binding?.target === archive,
+    `section ${sectionShown}, offered ${JSON.stringify(offered)}; ${JSON.stringify(rectangleBefore ?? null).slice(0, 160)} → ${JSON.stringify(rectangleAfter ?? null).slice(0, 160)}; connector ${JSON.stringify([connectorAfter?.start?.binding, connectorAfter?.end?.binding])}`,
+  )
+
+  // 11. One undo (the frame's Undo button) brings the rectangle back; the panel follows.
+  await kit.getByTestId('board-undo').click()
+  const shapeUndone = await until(async () => (await storedOne(rectangle))?.shapeType === 'rectangle', 50)
+  const panelFollows = await until(async () => (await shapeType.inputValue()) === 'rectangle', 30)
+  const connectorUndone = await storedOne(shapeConnector)
+  step(
+    'one undo brings the rectangle back',
+    shapeUndone && panelFollows && connectorUndone?.start?.binding?.target === rectangle,
+    `shapeType ${(await storedOne(rectangle))?.shapeType}, panel ${await shapeType.inputValue().catch(() => 'gone')}`,
+  )
+
+  // 12. Cmd/Ctrl+B on "the" in L's label: the bar's Bold is pressed, the commit stores a bold mark
+  // over the word, and the engine's fragment draws it bold.
+  const editor = kit.getByTestId('board-text-editor')
+  const openLabel = async (x, y) => {
+    await page.keyboard.press('Escape')
+    const at = await screen(x, y)
+    await page.mouse.dblclick(at.x, at.y)
+    return until(async () => (await editor.count()) === 1 && (await editor.evaluate((field) => field.ownerDocument.activeElement === field)), 50)
+  }
+  const runsOf = async (id) => (await storedOne(id))?.runs ?? []
+  const runWith = (runs, mark) => runs.find((run) => run.attributes?.[mark] != null) ?? null
+  const labelOpened = await openLabel(260, 460)
+  const barShown = labelOpened && (await kit.getByTestId('board-text-marks').count()) === 1
+  await editor.evaluate((field) => field.setSelectionRange(5, 8))
+  await page.keyboard.press(`${mod}+b`)
+  const pressedIs = (mark, value) => until(async () => (await kit.getByTestId(`board-text-${mark}`).getAttribute('aria-pressed')) === value, 20)
+  const boldPressed = await pressedIs('bold', 'true')
+  await page.keyboard.press('Enter')
+  const boldStored = await until(async () => runWith(await runsOf(labelled), 'bold')?.insert === 'the', 50)
+  const boldDrawn = await until(
+    async () =>
+      board(
+        (id) => [...document.querySelectorAll(`[data-id="${id}"] tspan`)].some((span) => Number(span.getAttribute('font-weight')) >= 700 && span.textContent === 'the'),
+        labelled,
+      ),
+    50,
+  )
+  step(
+    'bold on a selected word is stored as a mark and drawn bold',
+    barShown && boldPressed && boldStored && boldDrawn,
+    `bar ${barShown}, pressed ${boldPressed}, stored ${boldStored}, drawn ${boldDrawn}: ${JSON.stringify(await runsOf(labelled))} ${warnings.slice(-3).join(' | ')}`,
+  )
+
+  // 13. The stored bold shows pressed with the caret inside "the"; Cmd/Ctrl+K on "plan" takes an
+  // address in the bar's field, then "!" typed at the end: the commit keeps the bold, stores the
+  // link with its address over "plan" only, and the text.
+  const reopened = await openLabel(260, 460)
+  await editor.evaluate((field) => field.setSelectionRange(0, 0))
+  for (let i = 0; i < 6; i += 1) await page.keyboard.press('ArrowRight')
+  const storedPressed = await pressedIs('bold', 'true')
+  const italicOff = await pressedIs('italic', 'false')
+  await editor.evaluate((field) => field.setSelectionRange(9, 13))
+  await page.keyboard.press(`${mod}+k`)
+  const linkField = kit.getByTestId('board-text-link-url')
+  const fieldShown = await until(async () => (await linkField.count()) === 1, 30)
+  if (fieldShown) {
+    await linkField.fill('https://kition.ai/plan')
+    await linkField.press('Enter')
+  }
+  const backInText = await until(async () => (await linkField.count()) === 0 && (await editor.count()) === 1 && (await editor.evaluate((field) => field.ownerDocument.activeElement === field)), 30)
+  const linkPressed = await pressedIs('link', 'true')
+  await editor.evaluate((field) => field.setSelectionRange(field.value.length, field.value.length))
+  await page.keyboard.type('!')
+  await page.keyboard.press('Enter')
+  const linked = await until(async () => {
+    const element = await storedOne(labelled)
+    return element?.text === 'Ship the plan!' && runWith(element.runs ?? [], 'link')?.insert === 'plan'
+  }, 50)
+  const finalRuns = await runsOf(labelled)
+  const linkRun = runWith(finalRuns, 'link')
+  step(
+    'a link is stored with its address',
+    reopened &&
+      storedPressed &&
+      italicOff &&
+      fieldShown &&
+      backInText &&
+      linkPressed &&
+      linked &&
+      linkRun?.attributes?.link?.href === 'https://kition.ai/plan' &&
+      runWith(finalRuns, 'bold')?.insert === 'the' &&
+      !finalRuns.some((run) => run.insert.includes('!') && run.attributes != null),
+    `opened ${reopened}, stored bold pressed ${storedPressed}, italic off ${italicOff}, field ${fieldShown}, back ${backInText}, link pressed ${linkPressed}: ${JSON.stringify(finalRuns)} ${warnings.slice(-3).join(' | ')}`,
+  )
+
+  // 14. A Markdown label opens its text box without the bar.
+  const markdownOpened = await openLabel(640, 460)
+  const markdownBar = await kit.getByTestId('board-text-marks').count()
+  await page.keyboard.press('Escape')
+  const markdownClosed = await until(async () => (await editor.count()) === 0, 30)
+  const markdownKept = (await storedOne(markdown))?.text === '**Notes**'
+  step('a Markdown label shows no mark bar', markdownOpened && markdownBar === 0 && markdownClosed && markdownKept, `opened ${markdownOpened}, bars ${markdownBar}, closed ${markdownClosed}, text kept ${markdownKept}`)
+  step('no page errors while changing shapes and marking labels', errors.length === 0, errors.join(' | '))
 } catch (error) {
   step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)
 } finally {

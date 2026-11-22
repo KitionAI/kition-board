@@ -8,7 +8,7 @@
  * revisions the page already has); everything is fetched once at open, in batches of 500, so
  * panning and zooming fetch nothing (spike S2, 5.2).
  */
-import { parseSchema, randomActor, Replica } from '@kition/sdk/kdm'
+import { parseSchema, randomActor, Replica, type TextRun } from '@kition/sdk/kdm'
 import schemaJson from '../../../crates/kdm/kdm-model/model/schema.json'
 import type { Rect } from './geometry'
 import { BoardView } from './model'
@@ -104,6 +104,8 @@ export class BoardSync {
   private closed = false
   private lowLoaded = false
   private readonly listeners = new Set<(changed: ReadonlySet<string>) => void>()
+  /** `shape.previews`'s answer as the engine gave it at open (`null` when it failed). */
+  previews: unknown = null
 
   private constructor(
     readonly replica: Replica,
@@ -127,12 +129,15 @@ export class BoardSync {
   }
 
   /**
-   * The shapes' outlines from the engine, so the page derives bound ends as the engine does. A
-   * failed or empty answer leaves every end on the box.
+   * The shapes' outlines from the engine, so the page derives bound ends as the engine does; the
+   * answer is kept whole (`previews`) for the shape library and the style panel's Shape section,
+   * so the editor asks for it once. A failed or empty answer leaves every end on the box.
    */
   private async loadOutlines() {
     try {
-      const outlines = readOutlines(await this.engine.shapePreviews())
+      const answer = await this.engine.shapePreviews()
+      this.previews = answer
+      const outlines = readOutlines(answer)
       if (outlines.size) this.view.outlines = outlines
     } catch {
       // The box until a later open: the engine's fragments still draw the ends where they are.
@@ -201,6 +206,17 @@ export class BoardSync {
   /** The engine's line layout (`textMetrics`), for checking it against the browser. */
   textMetrics(request: string) {
     return this.engine.textMetrics(request)
+  }
+
+  /** An element's text as runs with equal marks (`bold`, `italic`, `link`), counted in UTF-16 code units. */
+  textRuns(id: string): TextRun[] {
+    return this.replica.exists(id) ? this.replica.textDelta(id, 'text') : []
+  }
+
+  /** An element's `textFormat` (`plain` or `markdown`), `null` when it has none. */
+  textFormat(id: string): string | null {
+    const format = this.replica.exists(id) ? this.replica.get(id, 'textFormat') : null
+    return typeof format === 'string' ? format : null
   }
 
   /** A picture's bytes. */
