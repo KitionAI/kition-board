@@ -7,6 +7,8 @@
 //! shape definitions of `boardElementDefinitions.ts`; the flowchart shapes follow the ISO 5807
 //! symbols.
 
+use kition_board_kdm::Rect;
+
 use crate::svg::num;
 
 /// Whether a shape is filled: the open shapes (`line`, `check`, the braces and the actor) are not.
@@ -38,6 +40,47 @@ fn rect(out: &mut String, w: f64, h: f64, rx: f64, paint: &str) {
 
 /// The part of an actor's box its figure takes, from the top; its label goes below.
 const ACTOR_HEIGHT: f64 = 0.72;
+
+/// The part of a `w` × `h` box a shape's label is laid out in, in the box's local frame: the whole
+/// box unless the outline leaves part of it empty or crossed (a callout's tail, a document's wave,
+/// a cylinder's top, a triangle's tip, a brace's side, an actor's figure).
+pub fn label_box(shape: &str, w: f64, h: f64) -> Rect {
+    let part = |x0: f64, y0: f64, x1: f64, y1: f64| Rect::new(w * x0, h * y0, w * x1, h * y1);
+    match shape {
+        "triangle" => part(0.15, 0.4, 0.85, 1.0),
+        "right-triangle" => part(0.0, 0.42, 0.7, 1.0),
+        "callout" => part(0.0, 0.0, 1.0, 0.75),
+        "cross" => part(0.0, 0.33, 1.0, 0.67),
+        // Right of the notch and left of the tip, about the label's middle line.
+        "chevron" => part(0.22, 0.0, 0.97, 1.0),
+        "document" => part(0.0, 0.0, 1.0, 0.82),
+        "multi-document" => part(0.0, 0.16, 0.88, 0.86),
+        "predefined-process" => part(0.12, 0.0, 0.88, 1.0),
+        "cylinder" => {
+            // Below the top's front edge (twice the ellipse's radius, as `outline` draws it).
+            let ry = (h * 0.15).min(w * 0.25);
+            Rect::new(0.0, 2.0 * ry, w, h)
+        }
+        "manual-input" => part(0.0, 0.25, 1.0, 1.0),
+        "off-page" => part(0.0, 0.0, 1.0, 0.7),
+        "stored-data" => part(0.1, 0.0, 0.85, 1.0),
+        "internal-storage" => {
+            let i = w.min(h) * 0.18;
+            Rect::new(i, i, w, h)
+        }
+        "brace-left" | "brace-right" => {
+            // Beside the brace when that leaves the label at least the brace's width.
+            let bw = brace_width(w, h);
+            match (w - bw >= bw, shape == "brace-left") {
+                (true, true) => Rect::new(bw, 0.0, w, h),
+                (true, false) => Rect::new(0.0, 0.0, w - bw, h),
+                (false, _) => Rect::new(0.0, 0.0, w, h),
+            }
+        }
+        "actor" => part(0.0, ACTOR_HEIGHT, 1.0, 1.0),
+        _ => Rect { x0: 0.0, y0: 0.0, x1: w, y1: h },
+    }
+}
 
 /// How wide a brace is drawn in a box `w` × `h`: the whole box when it is narrow, else 0.3 of its
 /// height.

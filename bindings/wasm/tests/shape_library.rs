@@ -112,3 +112,39 @@ fn an_unknown_shape_is_refused_and_a_known_one_survives_reopening() {
     let reopened = BoardDocument::open("Shapes.kboard", &bytes).unwrap();
     assert!(fragment(&reopened, &id).contains("A "), "the reopened cylinder still has its arcs");
 }
+
+/// The baseline of the first line of a fragment's label.
+fn first_baseline(svg: &str) -> f64 {
+    svg.split("<tspan").nth(1).and_then(|t| t.split("y=\"").nth(1)).and_then(|t| t.split('"').next()).unwrap().parse().unwrap()
+}
+
+#[test]
+fn a_callouts_label_stays_above_its_tail() {
+    let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
+    let made = doc
+        .execute(
+            "element.create",
+            json!({ "elements": [{ "kind": "shape", "shapeType": "callout", "position": [0, 0], "size": [200, 200], "text": "Hello" }] }),
+        )
+        .unwrap();
+    let svg = fragment(&doc, made["created"][0].as_str().unwrap());
+    // One line, centred in the upper three quarters (0 to 150): its baseline is near 80, where the
+    // whole box would put it near 105.
+    let y = first_baseline(&svg);
+    assert!(y < 95.0 && y > 40.0, "the label's baseline is at {y}: {svg}");
+}
+
+#[test]
+fn an_actors_label_is_under_its_figure() {
+    let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
+    let made = doc
+        .execute(
+            "element.create",
+            json!({ "elements": [{ "kind": "shape", "shapeType": "actor", "position": [0, 0], "size": [120, 200], "text": "Buyer" }] }),
+        )
+        .unwrap();
+    let svg = fragment(&doc, made["created"][0].as_str().unwrap());
+    // The figure takes the top 72% (to 144); the label's line is below it and inside the box.
+    let y = first_baseline(&svg);
+    assert!(y > 144.0 && y < 200.0, "the label's baseline is at {y}: {svg}");
+}

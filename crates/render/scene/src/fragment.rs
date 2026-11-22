@@ -84,7 +84,8 @@ pub fn label_pad(w: f64) -> f64 {
     12.0_f64.min(w / 6.0).max(2.0)
 }
 
-/// The lines of a shape's label, wrapped inside its padding.
+/// The lines of a shape's label, wrapped inside its padding in a label box `w` wide
+/// ([`shapes::label_box`]).
 pub fn shape_label(element: &Element, w: f64) -> (Style, Vec<Line>) {
     let style = font(element, LABEL_SIZE, label_weight(element));
     let max = (w - 2.0 * label_pad(w)).max(style.size);
@@ -197,20 +198,29 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
             if text_of(element, "shapeStyle") == Some("mind-node") && text_of(element, "mindMapDirection").is_some() {
                 root_marker(&mut out, h, &look.stroke);
             }
+            // The label is laid out in the part of the box its outline leaves free, centred there.
+            let area = shapes::label_box(shape, w, h);
+            let (lw, lh) = (area.width(), area.height());
             if shapes::supports_label(shape)
                 && !element.text.is_empty()
                 && let Some(paragraphs) = element.styled_text()
             {
                 let style = font(element, LABEL_SIZE, label_weight(element));
-                let lines = layout_rich(&paragraphs, style, Some((w - 2.0 * label_pad(w)).max(style.size)));
-                let top = (h - lines.iter().map(|line| line.height).sum::<f64>()) / 2.0;
-                let placed = place_rich(&lines, w, label_pad(w), top, text_of(element, "textAlign").unwrap_or("center"));
+                let lines = layout_rich(&paragraphs, style, Some((lw - 2.0 * label_pad(lw)).max(style.size)));
+                let top = area.y0 + (lh - lines.iter().map(|line| line.height).sum::<f64>()) / 2.0;
+                let placed: Vec<(f64, f64)> = place_rich(&lines, lw, label_pad(lw), top, text_of(element, "textAlign").unwrap_or("center"))
+                    .into_iter()
+                    .map(|(x, baseline)| (area.x0 + x, baseline))
+                    .collect();
                 local = local.union(rich_bounds(&lines, &placed));
                 rich_text_block(&mut out, &lines, &placed, &look.text, low);
             } else if shapes::supports_label(shape) && !element.text.is_empty() {
-                let (style, lines) = shape_label(element, w);
-                let top = (h - lines.len() as f64 * style.line_height()) / 2.0;
-                let placed = place(&lines, style, w, label_pad(w), top, text_of(element, "textAlign").unwrap_or("center"));
+                let (style, lines) = shape_label(element, lw);
+                let top = area.y0 + (lh - lines.len() as f64 * style.line_height()) / 2.0;
+                let mut placed = place(&lines, style, lw, label_pad(lw), top, text_of(element, "textAlign").unwrap_or("center"));
+                for placed in &mut placed {
+                    placed.x += area.x0;
+                }
                 for placed in &placed {
                     local = local.union(Rect::new(
                         placed.x,
