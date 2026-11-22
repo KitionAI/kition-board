@@ -571,7 +571,11 @@ export function BoardCanvas(props: Props) {
   const copyIds = (ids: readonly string[]) => {
     void clipboard.copy(latest.current.query, ids)
   }
+  /** Whether something among `ids`, or inside them, is locked: Cut and Delete do not apply (the canvas menu has them off). */
+  const lockedIn = (ids: readonly string[]) => ids.some((id) => sync.view.withDescendants(id).some((inside) => sync.view.elements.get(inside)?.locked))
+  /** Cut: nothing at all (no copy, the selection kept) when something in it is locked. */
   const cutIds = (ids: readonly string[]) => {
+    if (lockedIn(ids)) return
     void clipboard.copy(latest.current.query, ids).then((copied) => {
       if (!copied || latest.current.readOnly) return
       latest.current.onSelection([])
@@ -689,6 +693,7 @@ export function BoardCanvas(props: Props) {
     void commit('element.duplicate', { ids: [...ids], ...(offset ? { offset: [offset.x, offset.y] } : {}) }, done).then((answer) => selectMade(createdOf(answer)))
   }
   const deleteIds = (ids: readonly string[]) => {
+    if (lockedIn(ids)) return
     latest.current.onSelection([])
     void commit('element.delete', { ids: [...ids] })
   }

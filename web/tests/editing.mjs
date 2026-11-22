@@ -15,7 +15,8 @@
 // of a run of identical characters stays on it when the same character is typed before it
 // (regressions/issue-mark-offsets); a link typed with HTTPS:// is stored, and so are the marks after
 // it (regressions/issue-link-scheme); Cmd/Ctrl+K pressed again while the link field is open, then a
-// click on the canvas, closes the box (regressions/issue-link-field-blur). The harness is
+// click on the canvas, closes the box (regressions/issue-link-field-blur); Cmd/Ctrl+X and Delete on
+// a locked shape keep it and its selection (regressions/issue-locked-cut-key). The harness is
 // web/tests/flow.mjs's.
 // Run with the proxy variables unset: the dev server is on loopback.
 import { chromium, webkit } from 'playwright'
@@ -749,6 +750,43 @@ try {
     'Cmd/Ctrl+K again with the link field open, then a click on the canvas, commits and closes the box',
     fieldOpened && firstField && clickedBack && fieldFocused && fieldAddress === '' && fieldClosed && closingText === 'Close the box' && runWith(closingRuns, 'link') == null && pressWorks,
     `opened ${fieldOpened}, field ${firstField}, clicked back ${clickedBack}, field focused again ${fieldFocused} (address ${JSON.stringify(fieldAddress)}), closed ${fieldClosed}, text ${JSON.stringify(closingText)} ${JSON.stringify(closingRuns)}, next press selects ${pressWorks} (${JSON.stringify(await selected())}) ${warnings.slice(-3).join(' | ')}`,
+  )
+
+  // 18. Cmd/Ctrl+X and Delete on a locked shape (regressions/issue-locked-cut-key): as the canvas
+  // menu has Cut and Delete off, the keys do nothing: the shape stays and stays selected.
+  await page.keyboard.press('Escape')
+  const madeLocked = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 60, y: 420 }, size: { w: 160, h: 80 }, text: 'Kept' }] } }])
+  const [kept] = madeLocked.completed[0].result.created
+  await until(async () => (await shown()).includes(kept))
+  await ai([{ command: 'element.lock', params: { ids: [kept], locked: true } }])
+  // Once the lock is on the page, the shape's menu offers Unlock.
+  const lockShown = await until(async () => {
+    await page.keyboard.press('Escape')
+    await click(80, 440, { button: 'right' })
+    return (await menuOpen()) && (await menuRow('unlock').count()) === 1
+  }, 30)
+  await page.keyboard.press('Escape')
+  await click(80, 440)
+  const lockedSelected = await until(async () => JSON.stringify(await selected()) === JSON.stringify([kept]), 30)
+  const countLocked = await elementCount()
+  await page.keyboard.press(`${mod}+x`)
+  await page.waitForTimeout(1500)
+  const afterCut = { selection: await selected(), shown: (await shown()).includes(kept), count: await elementCount() }
+  await page.keyboard.press('Delete')
+  await page.waitForTimeout(1500)
+  const afterDelete = { selection: await selected(), shown: (await shown()).includes(kept), count: await elementCount() }
+  await ai([{ command: 'element.lock', params: { ids: [kept], locked: false } }])
+  step(
+    'Cmd/Ctrl+X and Delete on a locked shape do nothing and keep the selection',
+    lockShown &&
+      lockedSelected &&
+      JSON.stringify(afterCut.selection) === JSON.stringify([kept]) &&
+      afterCut.shown &&
+      afterCut.count === countLocked &&
+      JSON.stringify(afterDelete.selection) === JSON.stringify([kept]) &&
+      afterDelete.shown &&
+      afterDelete.count === countLocked,
+    `lock on the page ${lockShown}, selected ${lockedSelected}; ${countLocked} elements; after the cut ${JSON.stringify(afterCut)}; after Delete ${JSON.stringify(afterDelete)} ${warnings.slice(-3).join(' | ')}`,
   )
 } catch (error) {
   step('editing ran to the end', false, `${error instanceof Error ? error.stack : String(error)}${errors.length ? `\npage errors: ${errors.join(' | ')}` : ''}${warnings.length ? `\nwarnings: ${warnings.slice(-5).join(' | ').slice(0, 3000)}` : ''}\nlifecycle: ${lifecycle.slice(-8).join(' | ')}`)

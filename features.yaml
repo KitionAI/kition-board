@@ -167,7 +167,7 @@ features:
     paths: [web/src/board/clipboard.ts, web/src/canvas/CanvasMenu.tsx, web/src/canvas/BoardCanvas.tsx, web/src/canvas/TextEditor.tsx, web/src/panels/StylePanel.tsx, web/tests/editing.mjs]
     target: "Miro (web, 2026-11)"
     gap: "Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks. The box's marks follow the typing at its caret, but element.setText places a change of the stored text by comparing the old and new text from both ends (kition-sdk's diff_text), so an x typed inside a run of identical characters goes in at the run's end: a stored mark beside the run can take the typed character (marks made in the box are placed right)."
-    cases: [board.editing/clipboard, board.editing/pictures, board.editing/change-shape, board.editing/marks, regressions/issue-mark-offsets, regressions/issue-link-scheme, regressions/issue-link-field-blur]
+    cases: [board.editing/clipboard, board.editing/pictures, board.editing/change-shape, board.editing/marks, regressions/issue-mark-offsets, regressions/issue-link-scheme, regressions/issue-link-field-blur, regressions/issue-locked-cut-key]
     since: "2026-11-21"
   - id: board.text
     title: "Text on the board: marks on a text run"

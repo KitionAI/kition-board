@@ -1,0 +1,26 @@
+format: 1
+id: regressions/issue-locked-cut-key
+feature: board.editing
+intent: >-
+  Cmd/Ctrl+X and Delete on a selection that holds a locked element do nothing, as the canvas menu
+  has Cut and Delete off there: the element stays, stays selected, and nothing is copied
+  (web/tests/editing.mjs step 18). Before, the key copied the selection, cleared it, and then
+  element.delete was refused, so the person lost the selection for nothing. Found by the review of
+  c7a161c..b540d9d.
+layer: gate
+dimension: function
+source:
+  kind: issue
+  from: "review of c7a161c..b540d9d (BoardCanvas.tsx cutIds)"
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/editing.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/editing.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-22"
+timeout_s: 600
+requires: [chromium, webkit]
