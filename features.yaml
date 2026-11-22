@@ -208,9 +208,11 @@ features:
     title: "Nine arrowheads, and a bound end that meets its target's outline"
     dimension: [function]
     priority: P0
-    status: missing
+    status: partial
+    paths: [crates/render/scene/src/fragment.rs, crates/engine/model/src/fields.rs, web/src/board/style.ts, bindings/wasm/examples/arrowhead_sheet.rs]
     target: "Miro (web, 2026-11)"
-    gap: "3 arrowheads; ends meet the box, not the outline"
+    gap: "The nine arrowheads are built; bound ends meet the box, not the outline"
+    cases: [board.connectors/arrowheads]
     since: "2026-11-21"
   - id: board.cards
     title: "Cards that link to a file or a web page, and links retargeted when files move"

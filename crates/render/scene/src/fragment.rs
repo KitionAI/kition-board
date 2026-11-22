@@ -470,12 +470,58 @@ fn arrow_size(width: f64) -> (f64, f64) {
     (length, length * 0.45)
 }
 
-fn arrowhead(out: &mut String, kind: &str, tip: Point, direction: Point, look: &Look) {
+/// The radius of a `dot` or `circle-open` head on a line `width` wide.
+fn circle_radius(width: f64) -> f64 {
+    2.5 + width
+}
+
+/// How far back from the end the drawn line stops for `head`, so the line does not run into a
+/// closed head's point or through an open head.
+fn head_inset(head: &str, width: f64) -> f64 {
+    let (length, _) = arrow_size(width);
+    match head {
+        "arrow" => length * 0.8,
+        "triangle" | "triangle-open" => length,
+        "diamond" | "diamond-open" => 2.0 * length,
+        "circle-open" => 2.0 * circle_radius(width),
+        _ => 0.0,
+    }
+}
+
+/// How far a head reaches from the end it is drawn on.
+fn head_reach(head: &str, width: f64) -> f64 {
+    let (length, _) = arrow_size(width);
+    if head.starts_with("diamond") { 2.0 * length } else { length }
+}
+
+/// A closed outline through `points`, filled with `fill` and stroked with the line's colour.
+fn head_polygon(out: &mut String, points: &[Point], fill: &str, look: &Look, stroke_width: f64) {
+    let mut d = String::new();
+    for (index, point) in points.iter().enumerate() {
+        d.push_str(if index == 0 { "M " } else { " L " });
+        d.push_str(&format!("{} {}", num(point.x), num(point.y)));
+    }
+    out.push_str(&format!(
+        r#"<path d="{d} Z" fill="{fill}" stroke="{}" stroke-width="{}" stroke-linejoin="round"/>"#,
+        look.stroke,
+        num(stroke_width)
+    ));
+}
+
+/// The arrowhead `kind` with its tip on `tip`; `direction` is the unit direction the line arrives
+/// in (pointing toward the tip). Open heads are filled with `paper`, the colour behind labels, so
+/// nothing under them shows through.
+fn arrowhead(out: &mut String, kind: &str, tip: Point, direction: Point, look: &Look, paper: &str) {
+    let (length, half) = arrow_size(look.width);
+    let normal = Point::new(-direction.y, direction.x);
+    // The point `back` behind the tip along the line and `side` off it.
+    let at = |back: f64, side: f64| Point::new(tip.x - direction.x * back + normal.x * side, tip.y - direction.y * back + normal.y * side);
+    // A closed head's outline only rounds its corners; an open head's outline is what it draws, at
+    // most 3 wide so a heavy line's head stays open.
+    let (closed, open) = (look.width.min(2.0), look.width.min(3.0));
     match kind {
         "arrow" => {
-            let (length, half) = arrow_size(look.width);
             let base = Point::new(tip.x - direction.x * length, tip.y - direction.y * length);
-            let normal = Point::new(-direction.y, direction.x);
             out.push_str(&format!(
                 r#"<path d="M {} {} L {} {} L {} {} Z" fill="{}" stroke="{}" stroke-width="{}" stroke-linejoin="round"/>"#,
                 num(tip.x),
@@ -486,10 +532,56 @@ fn arrowhead(out: &mut String, kind: &str, tip: Point, direction: Point, look: &
                 num(base.y - normal.y * half),
                 look.stroke,
                 look.stroke,
-                num(look.width.min(2.0)),
+                num(closed),
             ));
         }
-        "dot" => out.push_str(&format!(r#"<circle cx="{}" cy="{}" r="{}" fill="{}"/>"#, num(tip.x), num(tip.y), num(2.5 + look.width), look.stroke)),
+        "dot" => out.push_str(&format!(
+            r#"<circle cx="{}" cy="{}" r="{}" fill="{}"/>"#,
+            num(tip.x),
+            num(tip.y),
+            num(circle_radius(look.width)),
+            look.stroke
+        )),
+        "triangle" | "triangle-open" => {
+            // Wider than `arrow` (near equilateral), so the two read apart.
+            let wide = length * 0.6;
+            let points = [tip, at(length, wide), at(length, -wide)];
+            match kind {
+                "triangle" => head_polygon(out, &points, &look.stroke, look, closed),
+                _ => head_polygon(out, &points, paper, look, open),
+            }
+        }
+        "diamond" | "diamond-open" => {
+            let points = [tip, at(length, half), at(2.0 * length, 0.0), at(length, -half)];
+            match kind {
+                "diamond" => head_polygon(out, &points, &look.stroke, look, closed),
+                _ => head_polygon(out, &points, paper, look, open),
+            }
+        }
+        "circle-open" => {
+            let r = circle_radius(look.width);
+            let centre = at(r, 0.0);
+            out.push_str(&format!(
+                r#"<circle cx="{}" cy="{}" r="{}" fill="{paper}" stroke="{}" stroke-width="{}"/>"#,
+                num(centre.x),
+                num(centre.y),
+                num(r),
+                look.stroke,
+                num(open)
+            ));
+        }
+        "bar" => {
+            let (a, b) = (at(0.0, half * 1.2), at(0.0, -half * 1.2));
+            out.push_str(&format!(
+                r#"<path d="M {} {} L {} {}" fill="none" stroke="{}" stroke-width="{}" stroke-linecap="round"/>"#,
+                num(a.x),
+                num(a.y),
+                num(b.x),
+                num(b.y),
+                look.stroke,
+                num(look.width)
+            ));
+        }
         _ => {}
     }
 }
@@ -504,8 +596,7 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
     };
     let start_head = text_of(element, "startArrowhead").unwrap_or("none");
     let end_head = text_of(element, "endArrowhead").unwrap_or("arrow");
-    let inset = |head: &str| if head == "arrow" { arrow_size(look.width).0 * 0.8 } else { 0.0 };
-    let drawn: Path = path.trimmed(inset(start_head), inset(end_head));
+    let drawn: Path = path.trimmed(head_inset(start_head, look.width), head_inset(end_head, look.width));
     let mut out = format!(
         r#"<path d="{}" fill="none" stroke="transparent" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round" class="kb-hit"/>"#,
         path.d(),
@@ -513,13 +604,15 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
     );
     out.push_str(&format!(r#"<path d="{}" fill="none"{}/>"#, drawn.d(), stroke_attrs(&look)));
     let solid = Look { dash: None, ..look.clone() };
+    let paper = style::named(PAPER, options.colors);
     if let Some(direction) = path.end_direction() {
-        arrowhead(&mut out, end_head, path.end(), direction, &solid);
+        arrowhead(&mut out, end_head, path.end(), direction, &solid, &paper);
     }
     if let Some(direction) = path.start_direction() {
-        arrowhead(&mut out, start_head, path.start, direction, &solid);
+        arrowhead(&mut out, start_head, path.start, direction, &solid, &paper);
     }
-    let mut bounds = grow(Rect::of_points(&path.hull()).unwrap_or_default(), arrow_size(look.width).0.max(7.0));
+    let reach = head_reach(start_head, look.width).max(head_reach(end_head, look.width));
+    let mut bounds = grow(Rect::of_points(&path.hull()).unwrap_or_default(), reach.max(7.0));
     if !element.text.is_empty() {
         let polyline: Vec<Point> = std::iter::once(path.start).chain(path.segs.iter().map(route::Seg::end)).collect();
         let at = route::along(&polyline, number_of(element, "labelPosition").unwrap_or(0.5)).unwrap_or(path.start);
@@ -529,12 +622,11 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
         let height = lines.len() as f64 * style.line_height();
         let rect = Rect::new(at.x - widest / 2.0 - 6.0, at.y - height / 2.0 - 3.0, at.x + widest / 2.0 + 6.0, at.y + height / 2.0 + 3.0);
         out.push_str(&format!(
-            r#"<rect x="{}" y="{}" width="{}" height="{}" rx="4" fill="{}"/>"#,
+            r#"<rect x="{}" y="{}" width="{}" height="{}" rx="4" fill="{paper}"/>"#,
             num(rect.x0),
             num(rect.y0),
             num(rect.width()),
-            num(rect.height()),
-            style::named(PAPER, options.colors)
+            num(rect.height())
         ));
         let placed = place(&lines, style, widest, 0.0, at.y - height / 2.0, "center");
         let shifted: Vec<_> = placed

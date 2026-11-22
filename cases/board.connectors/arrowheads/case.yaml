@@ -1,0 +1,20 @@
+format: 1
+id: board.connectors/arrowheads
+feature: board.connectors.ends
+intent: >-
+  Each of the nine arrowheads (none, arrow, dot, filled and open triangle, filled and open diamond,
+  open circle, bar) is drawn as itself at the end it is set on; open heads are hollow (the paper of
+  either scheme), closed heads filled; a zero-length connector draws every head without NaN; an
+  unknown arrowhead is refused.
+layer: unit
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/arrowheads.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: arrowheads }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-21"

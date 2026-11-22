@@ -15,7 +15,7 @@ The difference column is the feature's recorded gap.
 | `board.agent.observe` An agent reads the flow and answers on the board | P0 | has | — | — |
 | `board.agent.recover` An agent fixes what the check reports | P0 | has | — | — |
 | `board.connectors` Connectors bound to elements, with labels and waypoints | P0 | has | Miro (web, 2026-11) | — |
-| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | missing | Miro (web, 2026-11) | 3 arrowheads; ends meet the box, not the outline |
+| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | partial | Miro (web, 2026-11) | The nine arrowheads are built; bound ends meet the box, not the outline |
 | `board.drawing` Freehand strokes | P0 | has | — | — |
 | `board.editing` Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label | P0 | missing | Miro (web, 2026-11) | engine commands exist; the editor has no shortcut or menu for them |
 | `board.elements` Create, select, move, resize, rotate, style, group, stack and lock elements | P0 | has | Miro (web, 2026-11) | — |

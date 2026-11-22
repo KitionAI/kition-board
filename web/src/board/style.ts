@@ -34,7 +34,7 @@ export const STROKE_SIZES = ['s', 'm', 'l', 'xl'] as const
 export const FONT_FAMILIES = ['sans', 'serif', 'mono'] as const
 export const TEXT_ALIGNS = ['left', 'center', 'right'] as const
 export const CONNECTOR_TYPES = ['straight', 'elbow', 'curved'] as const
-export const ARROWHEADS = ['none', 'arrow', 'dot'] as const
+export const ARROWHEADS = ['none', 'arrow', 'dot', 'triangle', 'triangle-open', 'diamond', 'diamond-open', 'circle-open', 'bar'] as const
 
 /** The style fields each kind takes (fields.rs `kind_fields`, style fields only). */
 const USES: Record<Kind, readonly StyleField[]> = {
