@@ -10,7 +10,6 @@ land work, then this list. The comparison with the target application is in
 ## Features not done
 
 - `board.agent.guard` (P0, partial): Independent file writers preserve per-call premises. Measured on kition-sdk 2ce294a1 (the kit pins f5ea478): the SDK permits stale numeric/implicit page destinations and deleted page gaps; raw z-index writes and deletion coverage hold (their waiting_for_sdk tests pass). Scoped hierarchy facts and z-order windows give false refusals; removed/moved derived dependencies can report changed instead of deleted/relocated. waiting_for_sdk tests keep their necessity expectations. Undo and redo hold the objects and fields of the step they take back or put back. All 83 independent reading rows run on flat and nested boards.
-- `board.connectors.ends` (P0, partial): Nine arrowheads, and a bound end that meets its target's outline. The nine arrowheads and outline ends are built; the outline ends' cases have not passed a CI run yet.
 - `board.editing` (P0, partial): Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label. Copy, cut, paste, Alt-drag duplicate, the canvas menu and pasted and dropped pictures are built, with their cases not yet through a CI run; Alt duplicates when pressed during a drag, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Still to come: changing a shape's type and the bold, italic and link bar in a label (the next task).
 - `board.agent.environment` (P1, partial): Offline environment tasks use board words and valid model values. Seed 7 gives 100 verified tasks but no creates. Element.kind is a creation-only register a raw batch create gives (limits12); whether Page replay comparison treats fresh UUIDs as the same objects on the pinned kition-sdk is not measured. Rich-text scalars and derived fields replay.
 - `board.cards` (P1, partial): Cards that link to a file or a web page, and links retargeted when files move. Link cards (card.create with `url`) survive save and reopen (bindings/wasm/tests/round_trip.rs); file cards need a lent file and are covered by the command tests only, not by a round trip.
@@ -21,8 +20,9 @@ land work, then this list. The comparison with the target application is in
 
 ## Differences on working features
 
+- `board.connectors.ends`: Ends meet the outline of ellipses and polygon shapes; a star, cloud, heart, cylinder and the other curved shapes still meet their box.
 - `board.images`: Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs.
 
 ## Catalogue
 
-The catalogue has 31 features: 22 `has`, 9 not yet (9 `partial`).
+The catalogue has 31 features: 23 `has`, 8 not yet (8 `partial`).

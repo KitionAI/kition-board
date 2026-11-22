@@ -15,7 +15,7 @@ The difference column is the feature's recorded gap.
 | `board.agent.observe` An agent reads the flow and answers on the board | P0 | has | — | — |
 | `board.agent.recover` An agent fixes what the check reports | P0 | has | — | — |
 | `board.connectors` Connectors bound to elements, with labels and waypoints | P0 | has | Miro (web, 2026-11) | — |
-| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | partial | Miro (web, 2026-11) | The nine arrowheads and outline ends are built; the outline ends' cases have not passed a CI run yet |
+| `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | has | Miro (web, 2026-11) | Ends meet the outline of ellipses and polygon shapes; a star, cloud, heart, cylinder and the other curved shapes still meet their box |
 | `board.drawing` Freehand strokes | P0 | has | — | — |
 | `board.editing` Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label | P0 | partial | Miro (web, 2026-11) | Copy, cut, paste, Alt-drag duplicate, the canvas menu and pasted and dropped pictures are built, with their cases not yet through a CI run; Alt duplicates when pressed during a drag, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Still to come: changing a shape's type and the bold, italic and link bar in a label (the next task). |
 | `board.elements` Create, select, move, resize, rotate, style, group, stack and lock elements | P0 | has | Miro (web, 2026-11) | — |
@@ -42,6 +42,6 @@ The difference column is the feature's recorded gap.
 
 | Priority | has | partial | missing |
 | --- | ---: | ---: | ---: |
-| P0 | 14 | 3 | 0 |
+| P0 | 15 | 2 | 0 |
 | P1 | 8 | 5 | 0 |
 | P2 | 0 | 1 | 0 |
