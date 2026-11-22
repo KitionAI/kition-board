@@ -13,7 +13,8 @@
     "test:flow": "node tests/flow.mjs chromium && node tests/flow.mjs webkit",
     "test:pages": "node tests/pages.mjs chromium && node tests/pages.mjs webkit",
     "test:shapes": "node tests/shapes.mjs chromium && node tests/shapes.mjs webkit",
-    "test:editing": "node tests/editing.mjs chromium && node tests/editing.mjs webkit"
+    "test:editing": "node tests/editing.mjs chromium && node tests/editing.mjs webkit",
+    "test:proof": "node tests/proof.mjs chromium && node tests/proof.mjs webkit"
   },
   "dependencies": {
     "@kition/sdk": "npm:@kitionstage/sdk@0.5.2-stage.2",

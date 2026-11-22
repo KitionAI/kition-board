@@ -31,14 +31,14 @@ The difference column is the feature's recorded gap.
 | `board.agent.preview` An agent's preview of a board is drawn by the engine with the fonts the kit ships (board_inspect preview: true) | P1 | has | — | — |
 | `board.cards` Cards that link to a file or a web page, and links retargeted when files move | P1 | partial | — | Link cards (card.create with `url`) survive save and reopen (bindings/wasm/tests/round_trip.rs); file cards need a lent file and are covered by the command tests only, not by a round trip. |
 | `board.collab.live` People co-edit a board live (shapes, text, connectors, frames, cards, groups, z-order) and converge | P1 | partial | — | The engine side is done: every edit is a KDM change with stable ids, imports repair deterministically, and the convergence suite and the board's own scenarios pass on 2 to 5 replicas. Not yet: presence (the editor does not list `presence`, so cursors and selections are not shared or drawn), a gesture or text box over an element another person deletes is not cancelled before its commit fails, and there is no two-editor browser check (no workspace host in web/tests). |
-| `board.export` Export the board | P1 | partial | — | The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen. |
-| `board.history` Undo and redo | P1 | partial | — | The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen. |
+| `board.export` Export the board | P1 | partial | — | The editor case board.export/editor (web/tests/proof.mjs: PNG, SVG and PDF from the export dialog, written through the host; a library shape drawn as itself in the SVG) has not yet been through a CI run. |
+| `board.history` Undo and redo | P1 | partial | — | The editor case board.history/editor (web/tests/proof.mjs: create, move, style and delete undone and redone one by one with the keys and the frame's buttons, then saved and reopened) has not yet been through a CI run. |
 | `board.mindmap` Mind maps: lay out, add children and siblings, collapse, set direction | P1 | has | — | — |
 | `board.platform.brand` The embedded editor uses the canonical kit palette | P1 | has | — | — |
 | `board.platform.color-scheme` The board follows the host's color scheme: in dark, the canvas, the default ink, the colour tokens, the selection handles, the cards (their bodies, preview stand-ins and badge glyphs) and the minimap are drawn for a dark surface, live, nothing moving; a file's own colours, exports, previews and thumbnails stay as they are | P1 | has | — | — |
 | `board.platform.display-modes` The editor in every display mode: Menus by default, Single line and Classic open on Edit, Focus shows only the board and leaves on Escape | P1 | has | — | — |
 | `board.platform.document-identity` A host reads the document id a .kboard carries and forks a copied board into a new document with no history (document.identity, document.fork; Kit Process Protocol 5.6) | P1 | has | — | — |
-| `board.templates` Insert a template | P2 | partial | — | The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen. |
+| `board.templates` Insert a template | P2 | partial | — | The editor case board.templates/editor (web/tests/proof.mjs: each of the six templates from the gallery, one undo step, back with redo, all six after save and reopen) has not yet been through a CI run. |
 
 | Priority | has | partial | missing |
 | --- | ---: | ---: | ---: |

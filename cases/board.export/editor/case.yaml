@@ -1,0 +1,26 @@
+format: 1
+id: board.export/editor
+feature: board.export
+intent: >-
+  The export dialog end to end, through the development host (web/tests/proof.mjs, its export
+  steps): with a cylinder alone on the shown page, the dialog's PNG, SVG and PDF each write a new
+  file next to the board through the host (host/exportFile), and the files are what they say (the
+  PNG signature, an svg root, %PDF-); the SVG draws the cylinder as itself, its body and the front
+  edge of its top as curved paths (usvg writes the engine's arcs as cubic curves), not as its box.
+layer: gate
+dimension: conversion
+source:
+  kind: synthetic
+  from: web/tests/proof.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/proof.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/proof.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

@@ -1,0 +1,28 @@
+format: 1
+id: board.history/editor
+feature: board.history
+intent: >-
+  Undo and redo end to end in the editor, through the development host (web/tests/proof.mjs, its
+  history steps): the person draws a rectangle (element.create), moves it (element.move), fills it
+  green from the style panel (element.style) and deletes it (element.delete); four undos, by
+  Cmd/Ctrl+Z and the frame's Undo button in turn, bring back each earlier state (filled, moved,
+  drawn, nothing), and four redos, by Cmd/Ctrl+Shift+Z and the Redo button, go forward through them
+  again; after one more undo the board is saved and reopened, and the shape is there, moved and
+  filled.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/proof.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/proof.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/proof.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]

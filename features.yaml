@@ -267,7 +267,9 @@ features:
     priority: P2
     status: partial
     commands: [template.insert]
-    gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
+    paths: [web/src/panels/TemplateGallery.tsx, web/tests/proof.mjs]
+    gap: "The editor case board.templates/editor (web/tests/proof.mjs: each of the six templates from the gallery, one undo step, back with redo, all six after save and reopen) has not yet been through a CI run."
+    cases: [board.templates/editor]
     since: "2026-11-17"
   - id: board.export
     title: "Export the board"
@@ -275,9 +277,9 @@ features:
     priority: P1
     status: partial
     commands: [file.export]
-    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/scene.rs, crates/render/scene/src/export.rs]
-    gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
-    cases: [regressions/issue-1, regressions/issue-agent-export]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/scene.rs, crates/render/scene/src/export.rs, web/src/panels/ExportDialog.tsx, web/tests/proof.mjs]
+    gap: "The editor case board.export/editor (web/tests/proof.mjs: PNG, SVG and PDF from the export dialog, written through the host; a library shape drawn as itself in the SVG) has not yet been through a CI run."
+    cases: [regressions/issue-1, regressions/issue-agent-export, board.export/editor]
     since: "2026-11-17"
   - id: board.history
     title: "Undo and redo"
@@ -285,7 +287,7 @@ features:
     priority: P1
     status: partial
     commands: [edit.undo, edit.redo]
-    paths: [bindings/wasm/src/lib.rs, bindings/wasm/tests/undo_cancelled_group.rs]
-    gap: "The engine has these commands; no case yet shows the area working end to end in the editor and surviving save and reopen."
-    cases: [regressions/issue-undo-cancelled-group]
+    paths: [bindings/wasm/src/lib.rs, bindings/wasm/tests/undo_cancelled_group.rs, web/tests/proof.mjs]
+    gap: "The editor case board.history/editor (web/tests/proof.mjs: create, move, style and delete undone and redone one by one with the keys and the frame's buttons, then saved and reopened) has not yet been through a CI run."
+    cases: [regressions/issue-undo-cancelled-group, board.history/editor]
     since: "2026-11-17"

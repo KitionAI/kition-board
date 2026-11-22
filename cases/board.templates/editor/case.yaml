@@ -1,0 +1,25 @@
+format: 1
+id: board.templates/editor
+feature: board.templates
+intent: >-
+  Templates end to end in the editor, through the development host (web/tests/proof.mjs, its
+  templates step): each of the six templates (mind map, flow chart, roadmap, kanban, retrospective,
+  storyboard) is placed from the template gallery as one template.insert; one undo takes the whole
+  template away and one redo puts it back; the board saved after all six reopens with every element.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/proof.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/proof.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/proof.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-21"
+timeout_s: 600
+requires: [chromium, webkit]
