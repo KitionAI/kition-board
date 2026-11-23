@@ -3,6 +3,11 @@
 Changes to Kition Board, newest first. A version is the kit package version in `kit.json`;
 each package is published with a `package-v<version>` tag.
 
+## Unreleased
+
+- A `.kboard` file holds the board's content, not its history (kition-sdk rule M16b): `content.bin`, a sealed content snapshot (the state, the same document id and element ids, of the history only a `system` seal), and the pictures the board shows. No change log, no deleted text or elements, no overwritten values, no names of the people or agents who edited; `meta.json` holds only the format, kit, KDM and schema versions and the document id. The history stays in the host's history store. Files of the earlier layout (`snapshot.bin` and `changes/`) are not read.
+- A board opens on the host's stored replica with its file taken in: as it is when the store has the file's version, with the file's changes when the store missed only them, and otherwise with the file's state written by element id as one import step.
+
 ## 0.1.5
 
 - An undo group whose changes come to nothing (a `model.batch` that moves a shape and moves it back, or types in a sticky note and deletes it again) is no Undo step of its own: one Undo takes back the edit before it, as before kition-sdk 6b4d471 (kition-sdk 6672663, KitModel M12).

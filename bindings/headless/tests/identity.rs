@@ -1,9 +1,10 @@
 //! `document.identity` and `document.fork` (Kit Process Protocol section 5.6, KitModel M7a)
-//! through the real `kition-board` process: a `.kboard` embeds its replica (`snapshot.bin` and the
-//! change entries after it, design note 2.1), so a byte copy of a file is the same document. A host
-//! reads the identity a file carries without parsing the board, and forks a file into a new
-//! document: a new docId (in the replica and in `meta.json`'s copy), the same pages, elements, ids
-//! and text, no change entries and no history, and everything else in the file as it was.
+//! through the real `kition-board` process: a `.kboard` embeds its replica as the document's
+//! content (`content.bin`, a content snapshot with no history, design note 2.1), so a byte copy of
+//! a file is the same document. A host reads the identity a file carries without parsing the
+//! board, and forks a file into a new document: a new docId (in the replica and in `meta.json`'s
+//! copy), the same pages, elements, ids and text, no history, and everything else in the file as
+//! it was.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
@@ -18,7 +19,7 @@ use serde_json::{Value, json};
 
 const LIMIT: Duration = Duration::from_secs(30);
 
-/// Text of an element deleted before the fork: in the source's bytes (its snapshot), not the fork's.
+/// Text of an element deleted before the save: in the session's history, in neither file.
 const SECRET: &str = "SECRET-DELETED-BEFORE-THE-FORK";
 
 fn workspace(name: &str) -> PathBuf {
@@ -34,8 +35,8 @@ async fn launch(dir: &Path) -> HeadlessKit {
     HeadlessKit::launch(options).await.unwrap()
 }
 
-/// A board saved twice: first with two shapes and the secret one (the snapshot), then with the
-/// secret shape deleted (one change entry), and an entry this build does not know.
+/// A board saved twice: first with two shapes and the secret one, then, opened again, with the
+/// secret shape deleted, and an entry this build does not know.
 fn board() -> Vec<u8> {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let made = doc
@@ -53,8 +54,8 @@ fn board() -> Vec<u8> {
     let mut doc = BoardDocument::open("Plan.kboard", &first).unwrap();
     doc.execute("element.delete", json!({ "ids": [secret] })).unwrap();
     let saved = doc.save(None).unwrap();
+    assert!(holds(&kition_kit::session::__snapshot(&doc).unwrap(), SECRET), "the control: the session's history holds the deleted text");
     let mut parts = kition_board_kboard::read(&saved).unwrap();
-    assert_eq!(parts.changes.len(), 1, "the deletion is a change entry after the snapshot");
     parts.extra.push(("notes/kept.txt".into(), b"an entry another program wrote".to_vec()));
     kition_board_kboard::write(&parts).unwrap()
 }
@@ -128,15 +129,15 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     assert_ne!(draft["documentId"], state["documentId"], "{draft}");
     kit.request("document.close", json!({ "documentId": state["documentId"] }), LIMIT).await.unwrap();
 
-    // The fork's file: the new id in meta.json too, no change entries, everything else kept.
+    // The fork's file: the new id in meta.json too, sealed content, everything else kept.
     let (source_bytes, fork_bytes) = (std::fs::read(dir.join("Plan.kboard")).unwrap(), std::fs::read(dir.join("Fork.kboard")).unwrap());
     let (source, forked) = (kition_board_kboard::read(&source_bytes).unwrap(), kition_board_kboard::read(&fork_bytes).unwrap());
     assert_eq!(forked.meta.doc_id, fork_id, "meta.json's copy of the docId is the fork's");
-    assert!(forked.changes.is_empty() && forked.meta.changes.is_empty(), "a fork has no change log");
-    assert!(whole_history(&source_bytes), "the source is a full replica");
+    assert!(Replica::load(kition_board_kdm::schema(), &forked.content, ActorId::random()).unwrap().is_sealed(), "the fork's content is sealed");
+    // A content file does not carry the whole history (S20): its history starts at its seal.
+    assert!(!whole_history(&source_bytes), "the source's file holds its content, not its history");
     assert!(whole_history(&fork_bytes), "the fork's replica carries its whole history: a sync room may start from it");
-    assert_eq!(forked.meta.title, source.meta.title);
-    assert_eq!(forked.meta.app, source.meta.app);
+    assert_eq!((forked.meta.kit.as_str(), forked.meta.schema_version), (source.meta.kit.as_str(), source.meta.schema_version));
     assert_eq!(forked.blobs, source.blobs);
     assert_eq!(forked.extra, source.extra, "entries the board does not know are kept");
 
@@ -147,22 +148,16 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     let edited = opened.save(None).unwrap();
     let reopened = BoardDocument::open("Fork.kboard", &edited).unwrap();
     assert_eq!((reopened.doc_id(), reopened.model().element_count()), (fork_id.clone(), opened.model().element_count()));
-    assert!(whole_history(&edited), "an edited, saved and reopened fork still carries its whole history");
-    // A small edit on a larger board is a change entry after the snapshot, not a compaction: still so.
-    let mut moved = BoardDocument::open("Fork.kboard", &edited).unwrap();
-    let many: Vec<Value> =
-        (0..40).map(|n| json!({ "kind": "shape", "position": [n * 100, 600], "text": format!("Shape {n} of a larger board") })).collect();
-    let new = moved.execute("element.create", json!({ "elements": many })).unwrap()["created"][0].clone();
-    let created = moved.save(None).unwrap();
-    let mut moved = BoardDocument::open("Fork.kboard", &created).unwrap();
-    moved.execute("element.move", json!({ "ids": [new], "delta": [5, 0] })).unwrap();
-    let moved = moved.save(None).unwrap();
-    let parts = kition_board_kboard::read(&moved).unwrap();
-    assert_eq!(parts.changes.len(), 1, "the move is a change entry after the snapshot");
-    assert!(whole_history(&moved), "a fork with change entries after its snapshot still carries its whole history");
+    // Edited and saved, the fork's file holds its content from the new seal on, not the whole
+    // history: known only from that file, the host makes its current version its birth.
+    assert!(!whole_history(&edited), "an edited fork's file holds its content, not its history");
+    let content = kition_board_kboard::read(&edited).unwrap().content;
+    let mut reborn = Replica::load(kition_board_kdm::schema(), &content, ActorId::random()).unwrap();
+    assert!(reborn.rebirth().unwrap());
+    assert!(reborn.carries_whole_history() && reborn.doc_id().to_string() == fork_id);
 
-    // No history: the deleted shape's text is in the source's bytes and not in the fork's.
-    assert!(holds(&source_bytes, SECRET), "the source keeps its history");
+    // No history: the deleted shape's text is in neither file.
+    assert!(!holds(&source_bytes, SECRET), "the source's file holds no deleted content");
     assert!(!holds(&fork_bytes, SECRET), "deleted content does not travel");
 
     // A fork of a fork is a third document with the same content.
@@ -175,8 +170,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     again_doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [300, 300], "text": "Again" }] })).unwrap();
     let again_edited = again_doc.save(None).unwrap();
     let again_reopened = BoardDocument::open("Again.kboard", &again_edited).unwrap();
-    assert_eq!(again_reopened.doc_id(), again);
-    assert!(whole_history(&again_edited), "and still does after an edit, a save and a reopen");
+    assert_eq!(again_reopened.doc_id(), again, "and keeps its id after an edit, a save and a reopen");
 
     // A fork never replaces a file.
     let taken = kit.fork("Plan.kboard", "Fork.kboard", LIMIT).await.unwrap_err();

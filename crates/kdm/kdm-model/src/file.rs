@@ -1,29 +1,27 @@
-//! The `.kboard` file as a replica (design note 2.3): [`open_file`] reads the container
-//! (`kition-board-kboard`), loads the snapshot, imports the listed changes in order, collects the
-//! blobs and repairs once; it never writes. [`save_file`] re-emits the snapshot and the change
-//! entries it read or wrote byte for byte, appends one entry with the changes since, and writes the
-//! blobs the state references, or writes a fresh snapshot and no entries once the log has grown
-//! past the compaction thresholds (`kition_board_kboard::wants_compaction`). Nothing a save writes
-//! is re-encoded.
+//! The `.kboard` file as a replica (design note 2.3): the file holds the document's **content**, not
+//! its history (kition-sdk data model 7.3, rule M16b). [`save_file`] writes the replica's content
+//! snapshot (its state, and of its history only a `system` seal) and the blobs the state
+//! references; [`open_file`] loads it as the same document (same docId, same object ids) and
+//! repairs once; it never writes. The history lives in the host's history store (`snapshot()` of
+//! the live replica), never in the file.
+//!
+//! A file opens on top of the replica the host stored for its document through kition-sdk's
+//! `kition_kit::session::take_file` (data model 7.3).
 //!
 //! Follows kition-layout's `crates/kdm/kdm-model/src/file.rs`, the same scheme for `.klayout`.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
-use kition_board_kboard::{self as kboard, App, Container, Meta, SnapshotRef};
-use kition_kit::kdm::{ActorId, KDM_VERSION, ObjectId, Origin, Replica, Version};
+use kition_board_kboard::{self as kboard, Container, Meta};
+use kition_kit::kdm::{ActorId, KDM_VERSION, KdmError, ObjectId, Origin, Replica, Tx, Version};
 use kition_kit::session::{KitError, Result};
 
 use crate::{BoardModel, DanglingEnd, KIT, schema};
 
-/// What a document's file holds, so the next save re-emits it and appends what changed since.
+/// What a document's file holds besides its content.
 #[derive(Clone, Debug)]
 pub struct FileBase {
-    snapshot: Arc<Vec<u8>>,
-    snapshot_version: Version,
-    changes: Vec<Arc<Vec<u8>>>,
-    /// The replica version the file's snapshot and changes add up to.
+    /// The replica version the file's content holds (its seal included).
     version: Version,
     doc_id: String,
     /// Entries this build does not know, written back as they were.
@@ -34,16 +32,6 @@ impl FileBase {
     /// The replica version the file holds.
     pub fn version(&self) -> &Version {
         &self.version
-    }
-
-    /// How many change entries the file has after its snapshot.
-    pub fn change_entries(&self) -> usize {
-        self.changes.len()
-    }
-
-    /// The bytes of the file's snapshot entry.
-    pub fn snapshot(&self) -> &[u8] {
-        &self.snapshot
     }
 }
 
@@ -58,6 +46,15 @@ pub struct OpenedFile {
     /// The connector ends the file had bound to nothing they can be bound to, which the repair
     /// detached (rule V6), by page: `board_check` reports them while they stay detached.
     pub detached: Vec<(ObjectId, DanglingEnd)>,
+}
+
+/// A save: the file's bytes, what the file then holds, and the seal the save made.
+pub struct SavedFile {
+    pub bytes: Vec<u8>,
+    pub base: FileBase,
+    /// The seal of the fallback in [`save_file`] (a replica nobody sealed): changes to import into
+    /// the replica once the file is stored. `None` on the direct path.
+    pub seal: Option<Vec<u8>>,
 }
 
 /// The connector ends of `replica` that rule V6 would detach, with their pages.
@@ -75,71 +72,54 @@ fn damaged(error: impl std::fmt::Display) -> KitError {
     KitError::new(format!("damaged: {error}"))
 }
 
-/// Opens a `.kboard` file as a replica of `actor`. Answers `not-a-board: …`, `damaged: …` or
+/// The container's parts with the replica its content loads as, checked against `meta.json`.
+fn read(bytes: &[u8], actor: ActorId) -> Result<(Container, Replica)> {
+    let parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
+    let replica = load(&parts.content, actor)?;
+    let doc_id = replica.doc_id().to_string();
+    if parts.meta.doc_id != doc_id {
+        return Err(damaged(format!("meta.json names document {}, the content {doc_id}", parts.meta.doc_id)));
+    }
+    Ok((parts, replica))
+}
+
+/// Opens a `.kboard` file as a replica of `actor`: the document the file holds, with its docId and
+/// object ids, and of its history only the seal. Answers `not-a-board: …`, `damaged: …` or
 /// `newer-version: …` for files it does not open.
 pub fn open_file(bytes: &[u8], actor: ActorId) -> Result<OpenedFile> {
-    let parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
-    let mut replica = load(&parts.snapshot, actor)?;
-    for change in &parts.changes {
-        replica.import_changes(change).map_err(damaged)?;
-    }
+    let (parts, mut replica) = read(bytes, actor)?;
     let version = replica.version();
     let doc_id = replica.doc_id().to_string();
-    if !parts.meta.doc_id.is_empty() && parts.meta.doc_id != doc_id {
-        return Err(damaged(format!("meta.json names document {}, the snapshot {doc_id}", parts.meta.doc_id)));
-    }
-    let snapshot_version = Version::decode(&kboard::base64_decode(&parts.meta.snapshot.version)).unwrap_or_else(|_| Version::empty());
     let detached = dangling_ends(&replica)?;
     repair_once(&mut replica)?;
     replica.take_changed();
-    let base = FileBase {
-        snapshot: Arc::new(parts.snapshot),
-        snapshot_version,
-        changes: parts.changes.into_iter().map(Arc::new).collect(),
-        version,
-        doc_id,
-        extra: parts.extra,
-    };
+    let base = FileBase { version, doc_id, extra: parts.extra };
     Ok(OpenedFile { replica, base, blobs: parts.blobs, detached })
 }
 
-/// The replica a `.kboard` file embeds, as one KDM snapshot (`document.identity`, KitModel M7a):
-/// `snapshot.bin` with the listed change entries imported, or `None` for an empty file (one made
-/// for the kit before it saved a board there). Answers `not-a-board: …`, `damaged: …` or
-/// `newer-version: …` for other bytes, as [`open_file`] does; never repairs, never writes.
+/// The replica a `.kboard` file embeds (`document.identity`, KitModel M7a): its content snapshot,
+/// or `None` for an empty file (one made for the kit before it saved a board there). Answers
+/// `not-a-board: …`, `damaged: …` or `newer-version: …` for other bytes, as [`open_file`] does;
+/// never repairs, never writes.
 pub fn embedded_replica(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
     if bytes.is_empty() {
         return Ok(None);
     }
-    let parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
-    let mut replica = load(&parts.snapshot, ActorId::random())?;
-    for change in &parts.changes {
-        replica.import_changes(change).map_err(damaged)?;
-    }
-    let doc_id = replica.doc_id().to_string();
-    if !parts.meta.doc_id.is_empty() && parts.meta.doc_id != doc_id {
-        return Err(damaged(format!("meta.json names document {}, the snapshot {doc_id}", parts.meta.doc_id)));
-    }
-    if parts.changes.is_empty() {
-        return Ok(Some(parts.snapshot));
-    }
-    Ok(Some(replica.snapshot()?))
+    let (parts, _) = read(bytes, ActorId::random())?;
+    Ok(Some(parts.content))
 }
 
 /// `bytes` (a `.kboard` file) holding the document `snapshot` instead of its own (`document.fork`,
-/// KitModel M7a): `snapshot.bin` is `snapshot`, there are no change entries, `meta.json`'s copies of
-/// the docId and the snapshot version are the snapshot's, and the blobs are the ones its state
-/// references (what a save writes, design note 2.3), so no earlier identity or history stays in
-/// the file. Everything else (the title, `app`, entries this build does not know) is kept.
+/// KitModel M7a): `content.bin` is the snapshot's content (a copy's birth is its seal, so a copy
+/// adds no change), `meta.json`'s docId the snapshot's, and the blobs the ones its state
+/// references, so no earlier identity stays in the file. Entries this build does not know are kept.
 pub fn replace_replica(bytes: &[u8], snapshot: &[u8]) -> Result<Vec<u8>> {
     let mut parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
-    let replica = load(snapshot, ActorId::random())?;
+    let mut replica = load(snapshot, ActorId::random())?;
     let referenced = BoardModel::read(&replica)?.image_hashes();
     parts.blobs.retain(|hash, _| referenced.contains(hash));
     parts.meta.doc_id = replica.doc_id().to_string();
-    parts.meta.snapshot.version = kboard::base64_encode(&replica.version().encode());
-    parts.snapshot = snapshot.to_vec();
-    parts.changes.clear();
+    parts.content = replica.content_snapshot()?;
     kboard::write(&parts).map_err(|error| KitError::new(error.to_string()))
 }
 
@@ -147,21 +127,20 @@ pub fn replace_replica(bytes: &[u8], snapshot: &[u8]) -> Result<Vec<u8>> {
 /// `damaged: …` when it does not load.
 fn load(snapshot: &[u8], actor: ActorId) -> Result<Replica> {
     Replica::load(schema(), snapshot, actor).map_err(|error| match error {
-        kition_kit::kdm::KdmError::NewerSchema { .. } => KitError::new(format!("newer-version: {error}")),
-        kition_kit::kdm::KdmError::Schema(_) => KitError::new(format!("not-a-board: {error}")),
+        KdmError::NewerSchema { .. } => KitError::new(format!("newer-version: {error}")),
+        KdmError::Schema(_) => KitError::new(format!("not-a-board: {error}")),
         other => damaged(other),
     })
 }
 
-/// Runs the repair (V1–V9) in a `system` transaction labelled `repair`, written only when there is
-/// something to repair. Answers whether it wrote.
-pub fn repair_once(replica: &mut Replica) -> Result<bool> {
+/// Runs `write` in one transaction of `replica` with `origin`, keeping the kit's error.
+fn transact(replica: &mut Replica, origin: &Origin, write: impl FnOnce(&mut Tx<'_>) -> Result<bool>) -> Result<bool> {
     let mut failed = None;
-    let result = replica.transact(&Origin::system("repair"), |tx| {
-        crate::validate::repair(tx).map_err(|error| {
+    let result = replica.transact(origin, |tx| {
+        write(tx).map_err(|error| {
             let message = error.to_string();
             failed = Some(error);
-            kition_kit::kdm::KdmError::Engine(message)
+            KdmError::Engine(message)
         })
     });
     match (result, failed) {
@@ -170,49 +149,67 @@ pub fn repair_once(replica: &mut Replica) -> Result<bool> {
     }
 }
 
-/// The file `replica` saves to, on top of `base` (what it opened from or last saved, when it is the
-/// same document), with `blobs` (what the state references): the bytes, and what the file then
-/// holds. A save that has nothing new appends nothing.
-pub fn save_file(
-    replica: &Replica,
-    title: &str,
-    blobs: BTreeMap<String, Vec<u8>>,
-    base: Option<&FileBase>,
-    app_version: &str,
-) -> Result<(Vec<u8>, FileBase)> {
-    let doc_id = replica.doc_id().to_string();
+/// Runs the repair (V1–V9) in a `system` transaction labelled `repair`, written only when there is
+/// something to repair. Answers whether it wrote.
+pub fn repair_once(replica: &mut Replica) -> Result<bool> {
+    transact(replica, &Origin::system("repair"), crate::validate::repair)
+}
+
+/// The actor that seals a copy of a replica at `version` (the fallback in [`save_file`]): one
+/// per version, so saving one version twice writes the same seal, and two versions never share a
+/// seal's change id.
+fn seal_actor(version: &Version) -> ActorId {
+    let hash = kboard::sha256_hex(&version.encode());
+    let value = hash.get(..16).and_then(|hex| u64::from_str_radix(hex, 16).ok()).unwrap_or(0) >> 1;
+    ActorId::from_u64(value).unwrap_or_else(|_| ActorId::random())
+}
+
+/// What a save writes as `content.bin`: the bytes, the version they hold, and the seal made for
+/// them on a copy, if any.
+struct Content {
+    bytes: Vec<u8>,
+    version: Version,
+    seal: Option<Vec<u8>>,
+}
+
+/// The content `replica` saves as. The direct path: the host sealed the replica
+/// (`KitDocument::prepare_save`, `KitSession::seal`), and its own content snapshot is written.
+fn content(replica: &Replica) -> Result<Content> {
     let version = replica.version();
+    if replica.is_sealed() {
+        return Ok(Content { bytes: replica.sealed_content_snapshot()?, version, seal: None });
+    }
+    // FALLBACK, delete once the kit editor's `@kition/*` release that calls `prepareSave` before
+    // `save` is in `web/pnpm-lock.yaml`: until then the editor saves a replica nobody sealed, and
+    // `save` sees it read-only. The content of a copy sealed under an actor derived from the
+    // version (the same version gives the same bytes); `mark_saved` imports the seal.
+    let mut sealed = replica.fork(seal_actor(&version))?;
+    sealed.seal()?;
+    let seal = sealed.export_changes(&version)?;
+    Ok(Content { bytes: sealed.sealed_content_snapshot()?, version: sealed.version(), seal: Some(seal) })
+}
+
+/// The file `replica` saves to, with `blobs` (what the state references), and `base` (what its file
+/// holds, when it is the same document, for the entries this build does not know): the bytes,
+/// what the file then holds, and the seal the fallback made. A sealed replica (the direct path)
+/// saves its own content snapshot, the same bytes for the same version.
+pub fn save_file(replica: &Replica, blobs: BTreeMap<String, Vec<u8>>, base: Option<&FileBase>) -> Result<SavedFile> {
+    let doc_id = replica.doc_id().to_string();
     let base = base.filter(|base| base.doc_id == doc_id);
-    let (mut snapshot, mut snapshot_version, mut changes, extra) = match base {
-        Some(base) => (base.snapshot.clone(), base.snapshot_version.clone(), base.changes.clone(), base.extra.clone()),
-        None => (Arc::new(replica.snapshot()?), version.clone(), Vec::new(), Vec::new()),
-    };
-    if let Some(base) = base
-        && base.version != version
-    {
-        changes.push(Arc::new(replica.export_changes(&base.version)?));
-    }
-    let plain: Vec<Vec<u8>> = changes.iter().map(|change| (**change).clone()).collect();
-    if base.is_some() && kboard::wants_compaction(snapshot.len(), &plain) {
-        snapshot = Arc::new(replica.snapshot()?);
-        snapshot_version = version.clone();
-        changes = Vec::new();
-    }
+    let Content { bytes: content, version, seal } = content(replica)?;
+    let extra = base.map(|base| base.extra.clone()).unwrap_or_default();
     let parts = Container {
         meta: Meta {
+            kit: KIT.to_owned(),
             kdm: KDM_VERSION,
             schema_version: replica.schema().schema_version,
             doc_id: doc_id.clone(),
-            title: title.to_owned(),
-            snapshot: SnapshotRef { entry: String::new(), version: kboard::base64_encode(&snapshot_version.encode()) },
-            app: App { kit: KIT.to_owned(), version: app_version.to_owned() },
             ..Default::default()
         },
-        snapshot: (*snapshot).clone(),
-        changes: changes.iter().map(|change| (**change).clone()).collect(),
+        content,
         blobs,
         extra: extra.clone(),
     };
     let bytes = kboard::write(&parts).map_err(|error| KitError::new(error.to_string()))?;
-    Ok((bytes, FileBase { snapshot, snapshot_version, changes, version, doc_id, extra }))
+    Ok(SavedFile { bytes, base: FileBase { version, doc_id, extra }, seal })
 }

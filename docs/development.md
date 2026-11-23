@@ -28,7 +28,8 @@ Board in your own app, start with the [README](../README.md).
 
 - **One replica, one file.** A board is a KDM replica (`crates/kdm/kdm-model/model/schema.json`,
   schema `kit.board` v2). A `.kboard` file (`application/vnd.kition.board+zip`) is a ZIP holding
-  the replica's snapshot, its change log and the pictures as blobs; a save appends what changed.
+  the replica's content (its state, sealed, no history) and the pictures it shows as blobs; the
+  history stays in the host's history store.
   New files are `Untitled board.kboard`. The details are in [design.md](design.md).
 - **One engine everywhere.** The engine implements kition-sdk's `KitDocument` on a KDM session
   (engine contract 2). It runs in the page as WebAssembly in a Web Worker under the kit's own

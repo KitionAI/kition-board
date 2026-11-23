@@ -4,17 +4,18 @@
 //! | --- | --- | --- |
 //! | `mimetype` | STORE, first, no extra field | the ASCII bytes `application/vnd.kition.board+zip` |
 //! | `meta.json` | DEFLATE | [`Meta`] |
-//! | `snapshot.bin` | STORE | a KDM snapshot envelope of the document at the last compaction |
-//! | `changes/<seq>.bin` | STORE | KDM change envelopes, in replay order (`000001`, `000002`, …) |
+//! | `content.bin` | STORE | the document's content: a KDM content snapshot (its state, and of its history only the seal) |
 //! | `blobs/<sha256>` | STORE | one blob's bytes, named by the lower-case hex SHA-256 its KDM value carries |
 //!
+//! The file holds no history (kition-sdk data model 7.3, rule M16b): no change log, no deleted
+//! content, no person's or agent's origin. The history lives in the host's history store.
 //! Any other entry with a safe name is kept byte for byte and written back ([`Container::extra`]).
-//! This crate knows bytes only: what the snapshot and changes hold is the KDM's business
-//! (`kition-board-kdm` opens them).
+//! This crate knows bytes only: what `content.bin` holds is the KDM's business
+//! (`kition-board-kdm` opens it).
 //!
 //! The reader refuses, opening nothing and never panicking: a missing or wrong `mimetype` first
-//! entry ([`ContainerError::NotABoard`]); a missing `meta.json` or `snapshot.bin`, a listed change
-//! entry that is missing, an entry name with `..`, `\`, a leading `/` or a drive letter, duplicate
+//! entry ([`ContainerError::NotABoard`]); a missing `meta.json` or `content.bin`, an entry name
+//! with `..`, `\`, a leading `/` or a drive letter, duplicate
 //! names, encrypted entries, ZIP64, more than [`MAX_ENTRIES`] entries, an entry over
 //! [`MAX_ENTRY_BYTES`] or a whole archive over [`MAX_TOTAL_BYTES`] uncompressed, a `meta.json`
 //! deflated more than [`MAX_META_RATIO`]:1, and a blob whose bytes do not hash to its name
@@ -44,11 +45,8 @@ pub const MAX_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
 pub const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 /// The largest deflate ratio `meta.json` may have.
 pub const MAX_META_RATIO: u64 = 100;
-/// A save writes a fresh snapshot instead of appending once there are more change entries than
-/// this (board design note 2.3, a proposed threshold).
-pub const COMPACT_ENTRIES: usize = 200;
 
-const SNAPSHOT: &str = "snapshot.bin";
+const CONTENT: &str = "content.bin";
 const META: &str = "meta.json";
 
 /// Why bytes are not a readable `.kboard` file.
@@ -65,51 +63,29 @@ pub enum ContainerError {
     TooNew(u32),
 }
 
-/// `meta.json`.
+/// `meta.json`: what identifies and describes the content, nothing that changes with a save (no
+/// time, no counter, no version of the writer).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Meta {
     pub format: String,
     pub format_version: u32,
+    /// The kit the file is for (`kit.board`).
+    pub kit: String,
     /// The KDM version, a copy for hosts that do not load the KDM.
     pub kdm: u32,
     /// The `kit.board` schema version, a copy.
     pub schema_version: u32,
     /// The KDM document id, a copy (so a host can index the file without the engine).
     pub doc_id: String,
-    /// The board's title, a copy for file lists.
-    #[serde(default)]
-    pub title: String,
-    pub snapshot: SnapshotRef,
-    /// The change entries in replay order.
-    #[serde(default)]
-    pub changes: Vec<String>,
-    #[serde(default)]
-    pub app: App,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct SnapshotRef {
-    pub entry: String,
-    /// Base64 of the KDM version the snapshot holds.
-    #[serde(default)]
-    pub version: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct App {
-    pub kit: String,
-    #[serde(default)]
-    pub version: String,
 }
 
 /// The parts of a `.kboard` file.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Container {
     pub meta: Meta,
-    pub snapshot: Vec<u8>,
-    /// The listed change entries' bytes, in replay order.
-    pub changes: Vec<Vec<u8>>,
+    /// `content.bin`: the KDM content snapshot.
+    pub content: Vec<u8>,
     /// Blob bytes by their SHA-256 (lower-case hex).
     pub blobs: BTreeMap<String, Vec<u8>>,
     /// Entries this build does not know, by name, kept byte for byte.
@@ -119,11 +95,6 @@ pub struct Container {
 /// SHA-256 as lower-case hex.
 pub fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-/// The name of change entry `seq` (from 1).
-pub fn change_entry(seq: usize) -> String {
-    format!("changes/{seq:06}.bin")
 }
 
 /// Whether `bytes` start like a `.kboard` container: a ZIP whose first local entry is a stored
@@ -228,8 +199,7 @@ pub fn read(bytes: &[u8]) -> Result<Container, ContainerError> {
         entries.push((name, data));
     }
     let mut meta_bytes = None;
-    let mut snapshot = None;
-    let mut by_name: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    let mut content = None;
     let mut blobs = BTreeMap::new();
     let mut extra = Vec::new();
     for (name, data) in entries {
@@ -238,15 +208,13 @@ pub fn read(bytes: &[u8]) -> Result<Container, ContainerError> {
         }
         if name == META {
             meta_bytes = Some(data);
-        } else if name == SNAPSHOT {
-            snapshot = Some(data);
+        } else if name == CONTENT {
+            content = Some(data);
         } else if let Some(hash) = name.strip_prefix("blobs/") {
             if sha256_hex(&data) != hash {
                 return Err(damaged(format!("{name}: the bytes do not match their hash")));
             }
             blobs.insert(hash.to_owned(), data);
-        } else if name.starts_with("changes/") {
-            by_name.insert(name, data);
         } else {
             extra.push((name, data));
         }
@@ -262,29 +230,19 @@ pub fn read(bytes: &[u8]) -> Result<Container, ContainerError> {
         return Err(ContainerError::TooNew(u32::try_from(version).unwrap_or(u32::MAX)));
     }
     let meta: Meta = serde_json::from_value(raw).map_err(|error| damaged(format!("meta.json: {error}")))?;
-    if meta.snapshot.entry != SNAPSHOT {
-        return Err(damaged(format!("the snapshot entry is {}, not {SNAPSHOT}", meta.snapshot.entry)));
-    }
-    let snapshot = snapshot.ok_or_else(|| damaged("no snapshot.bin"))?;
-    let mut changes = Vec::with_capacity(meta.changes.len());
-    for name in &meta.changes {
-        // An entry on disk but not listed is ignored (and dropped at the next save); a listed one
-        // that is missing makes the file damaged.
-        changes.push(by_name.remove(name).ok_or_else(|| damaged(format!("{name} is listed but missing")))?);
-    }
-    Ok(Container { meta, snapshot, changes, blobs, extra })
+    let content = content.ok_or_else(|| damaged("no content.bin"))?;
+    Ok(Container { meta, content, blobs, extra })
 }
 
-/// Writes a `.kboard` file: the entries in the order of the crate docs. `meta.changes`,
-/// `meta.format`, `meta.formatVersion` and `meta.snapshot.entry` are set here.
+/// Writes a `.kboard` file: the entries in the order of the crate docs, unknown entries last.
+/// `meta.format` and `meta.formatVersion` are set here. The same parts give the same bytes (no
+/// entry carries a time).
 pub fn write(container: &Container) -> Result<Vec<u8>, ContainerError> {
     let io = |error: std::io::Error| damaged(error.to_string());
     let zip_io = |error: zip::result::ZipError| damaged(error.to_string());
     let mut meta = container.meta.clone();
     meta.format = FORMAT.to_owned();
     meta.format_version = FORMAT_VERSION;
-    meta.snapshot.entry = SNAPSHOT.to_owned();
-    meta.changes = (1..=container.changes.len()).map(change_entry).collect();
     let mut out = Cursor::new(Vec::new());
     {
         let mut zip = zip::ZipWriter::new(&mut out);
@@ -295,17 +253,13 @@ pub fn write(container: &Container) -> Result<Vec<u8>, ContainerError> {
         zip.start_file(META, deflate).map_err(zip_io)?;
         let json = serde_json::to_vec_pretty(&meta).map_err(|error| damaged(error.to_string()))?;
         zip.write_all(&json).map_err(io)?;
-        zip.start_file(SNAPSHOT, stored).map_err(zip_io)?;
-        zip.write_all(&container.snapshot).map_err(io)?;
-        for (name, bytes) in meta.changes.iter().zip(&container.changes) {
-            zip.start_file(name.as_str(), stored).map_err(zip_io)?;
-            zip.write_all(bytes).map_err(io)?;
-        }
+        zip.start_file(CONTENT, stored).map_err(zip_io)?;
+        zip.write_all(&container.content).map_err(io)?;
         for (hash, bytes) in &container.blobs {
             zip.start_file(format!("blobs/{hash}"), stored).map_err(zip_io)?;
             zip.write_all(bytes).map_err(io)?;
         }
-        let known = |name: &str| name == "mimetype" || name == META || name == SNAPSHOT || name.starts_with("changes/") || name.starts_with("blobs/");
+        let known = |name: &str| name == "mimetype" || name == META || name == CONTENT || name.starts_with("blobs/");
         for (name, bytes) in &container.extra {
             if !safe_name(name) || known(name) {
                 continue;
@@ -318,17 +272,9 @@ pub fn write(container: &Container) -> Result<Vec<u8>, ContainerError> {
     Ok(out.into_inner())
 }
 
-/// Whether a save should write a fresh snapshot instead of appending: the change entries together
-/// exceed a quarter of the snapshot, or there are more than [`COMPACT_ENTRIES`] of them (the
-/// board's proposed thresholds, design note 2.3).
-pub fn wants_compaction(snapshot_len: usize, changes: &[Vec<u8>]) -> bool {
-    let total: usize = changes.iter().map(Vec::len).sum();
-    changes.len() > COMPACT_ENTRIES || total.saturating_mul(4) > snapshot_len
-}
-
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-/// Standard base64 with padding (`meta.json`'s `snapshot.version`).
+/// Standard base64 with padding.
 pub fn base64_encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

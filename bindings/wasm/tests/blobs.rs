@@ -50,6 +50,8 @@ fn pictures_travel_in_the_file() {
 #[test]
 fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
     let mut a = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
+    // As a host saves: sealed first (`prepare_save`), so the file's seal is the session's own.
+    a.prepare_save().unwrap();
     let mut b = BoardDocument::open("Plan.kboard", &a.save(None).unwrap()).unwrap();
     let since = b.version().encode();
     let hash = add_picture(&mut a, PICTURE);
@@ -98,25 +100,49 @@ fn a_board_opens_from_a_stored_replica_and_its_blobs() {
 }
 
 #[test]
-fn saves_append_to_the_file_the_document_opened() {
+fn saves_write_the_content_the_document_holds_now() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
-    // Enough content that one more shape stays under the compaction threshold.
     let shapes: Vec<_> = (0..40).map(|x| json!({ "kind": "shape", "position": { "x": x * 30, "y": 400 }, "size": { "w": 20, "h": 20 } })).collect();
     doc.execute("element.create", json!({ "elements": shapes })).unwrap();
+    doc.prepare_save().unwrap();
     let first = doc.save(None).unwrap();
     doc.mark_saved();
+    doc.prepare_save().unwrap();
+    assert_eq!(doc.save(None).unwrap(), first, "a save of the version the file holds writes the same bytes");
     let mut doc = BoardDocument::open("Plan.kboard", &first).unwrap();
     doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 0, "y": 0 }, "size": { "w": 50, "h": 50 } }] }))
         .unwrap();
+    doc.prepare_save().unwrap();
     let second = doc.save(None).unwrap();
     assert!(doc.dirty(), "save leaves the document dirty until mark_saved");
     doc.mark_saved();
+    assert!(!doc.dirty());
     let parts = kboard::read(&second).unwrap();
-    assert_eq!(parts.snapshot, kboard::read(&first).unwrap().snapshot);
-    assert_eq!(parts.changes.len(), 1);
-    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 90, "y": 0 }, "size": { "w": 50, "h": 50 } }] }))
-        .unwrap();
-    let third = kboard::read(&doc.save(None).unwrap()).unwrap();
-    assert_eq!(third.changes.len(), 2, "the next save appends to what mark_saved recorded");
-    assert_eq!(third.changes[0], parts.changes[0]);
+    assert_ne!(parts.content, kboard::read(&first).unwrap().content);
+    doc.prepare_save().unwrap();
+    assert_eq!(doc.save(None).unwrap(), second, "a sealed session saves the same bytes");
+    assert_eq!(BoardDocument::open("Plan.kboard", &second).unwrap().model().element_count(), 41);
+}
+
+/// Only the blobs the current state references travel in the file: a picture deleted before the
+/// save leaves its bytes behind, though the history still references them.
+#[test]
+fn a_deleted_picture_leaves_its_bytes_out_of_the_file() {
+    let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
+    let kept = add_picture(&mut doc, PICTURE);
+    let other: &[u8] = b"\x89PNG\r\n\x1a\n another picture";
+    let gone = add_picture(&mut doc, other);
+    let model = doc.model();
+    let id = model.pages()[0]
+        .elements
+        .iter()
+        .find(|id| model.element(id).and_then(|element| element.image.as_ref()).is_some_and(|image| image.hash == gone))
+        .unwrap()
+        .clone();
+    doc.execute("element.delete", json!({ "ids": [id.as_str()] })).unwrap();
+    let parts = kboard::read(&doc.save(None).unwrap()).unwrap();
+    assert!(parts.blobs.contains_key(&kept));
+    assert!(!parts.blobs.contains_key(&gone), "the deleted picture's bytes are not in the file");
+    let back = BoardDocument::open("Plan.kboard", &kboard::write(&parts).unwrap()).unwrap();
+    assert!(back.missing_blobs().is_empty(), "the board the file holds misses nothing");
 }

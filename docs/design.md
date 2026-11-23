@@ -11,9 +11,10 @@ Protocol rows.
 - The kit is a Rust engine implementing kition-sdk's `KitDocument` over `kition_kit::session`
   (engine contract 2), compiled to WebAssembly (`kition-board-kit`, `bindings/wasm`) for the
   editor and built as the headless `kition-board` executable (`bindings/headless`) for agents.
-- **The replica is the document.** A `.kboard` file is a ZIP of the KDM snapshot, its change log
-  and the blobs (section 2). A save re-emits what it read byte for byte and appends one change
-  entry.
+- **The replica is the document; the file holds its content, not its history.** A `.kboard` file
+  is a ZIP of the replica's content snapshot (its state, and of its history only a `system` seal)
+  and the blobs the state references (section 2; kition-sdk rule M16b). The history lives in the
+  host's history store. A save of the version the file holds writes the same bytes.
 - **Bound connector ends are derived** from the target's box and the stored anchor (1.4).
 - **Repairs are deterministic** (1.5).
 - **The editor draws nothing of its own:** it draws each element with the engine's SVG fragment
@@ -149,7 +150,7 @@ Kit-standard has no `atomic` groups (`spec/sets/model.md`: `json` is "for couple
 Rule: **when an end has a `binding` whose target exists on the same page, every reader (the engine's view, render, export, inspect, check) computes the end point from the target's `position`, `size`, `rotation`, `shapeType` and the `anchor`: it is the point where the ray from the target box's centre through the anchor's point leaves the target's outline; the stored `point` is ignored.** Commands still write the freshly computed `point` (so a reader of the raw KDM JSON, such as `state_json` or a third-party tool, sees a near value), but nothing depends on it being current.
 
 - The outline (`kition_board_kdm::outline::outline_point`, the one derivation every reader and every cache write goes through): the ellipse inscribed in the box for `ellipse`, `summing-junction` and `or-junction`; the polygon of `outline::POLYGONS` for a shape in that table, and the hexagon and the parallelogram with the insets they are drawn with; for the curved `document`, `delay`, `display` and `stored-data`, whose curves are fixed fractions of the box, the polygon of `outline::CURVES`, each Bezier of the drawing sampled at equal steps (within 0.3% of the box of the drawn curve; used for ends only, the renderer still draws the curves); the box for every other shape (the star, cloud, heart, cylinder, pill, multi-document, note, the single arrows, the open marks) and every other kind. Rectangles, sticky notes, frames, cards, pictures and text therefore resolve exactly to the anchor's point on the box, as they always did. An anchor at the centre, a box with a zero side, or anything not finite resolves to the anchor's point on the box.
-- The anchor stays a point on the box (`nearest_edge_anchor` picks it when a connector is dropped on an element's body, facing the other end), so a board written before ends met outlines keeps its anchors and draws its ends on the outline without any write; a save of it without edits appends nothing. A new `shapeType` (`element.update`) writes the bound ends' cached points on the new outline in the same command.
+- The anchor stays a point on the box (`nearest_edge_anchor` picks it when a connector is dropped on an element's body, facing the other end), so a board written before ends met outlines keeps its anchors and draws its ends on the outline without any write; a save of it without edits writes the same bytes. A new `shapeType` (`element.update`) writes the bound ends' cached points on the new outline in the same command.
 - The editor derives the same point with the outlines the engine answers in `shape.previews` (`outline` per shape; `web/src/board/outline.ts`); until that answer arrives it uses the box.
 
 - No repair transaction runs after a merge: two people who move the two shapes of a connector at once converge to positions, and the connector is drawn between them, with no system change to sync.
@@ -181,7 +182,7 @@ Not repaired: a missing blob (it may arrive late; drawn as a placeholder, report
 - **P1:** one object per element; no element data in a `map`.
 - **P3:** an interactive transaction touches at most 10,000 objects; a command or paste over that is refused with `board.too-many-objects` (`invalid-params`), never split silently.
 - **P4:** the KDM runs inside the WebAssembly module.
-- **Crash recovery:** the `.kboard` container keeps the saved snapshot and the change log (section 2), from which a board recovers its changes.
+- **Crash recovery:** the host's history store (`<workspace>/.kition/docs/<docId>/`) keeps the replica's history; the `.kboard` file keeps the content as last saved (section 2).
 
 ## 2. The `.kboard` file (H12)
 
@@ -193,11 +194,12 @@ A ZIP archive (PKZIP, no ZIP64). Entries, in this order:
 | --- | --- | --- | --- |
 | `mimetype` | STORE, first entry, no extra field | the ASCII bytes `application/vnd.kition.board+zip`, no newline | yes |
 | `meta.json` | DEFLATE | section 2.2 | yes |
-| `snapshot.bin` | STORE | a KDM snapshot envelope (M16, M17) of the document at the last compaction | yes |
-| `changes/<seq>.bin` | STORE | KDM change envelopes (M14, M17): what the replica committed after the previous entry; `<seq>` is a zero-padded decimal, `000001`, `000002`, … | no |
-| `blobs/<sha256>` | STORE | the bytes of one blob, named by the lower-case hex sha256 the KDM `blob` value carries; no extension (the MIME is in the KDM value) | as referenced |
+| `content.bin` | STORE | the document's content: a KDM content snapshot envelope (M16b, M17), the state with, of the history, only the seal | yes |
+| `blobs/<sha256>` | STORE | the bytes of one blob the state references, named by the lower-case hex sha256 the KDM `blob` value carries; no extension (the MIME is in the KDM value) | as referenced |
 
-`mimetype` first, uncompressed, is the ODF/EPUB convention: a host or the requirement N7 check reads the first local header (the name `mimetype` at byte offset 30, the 32-byte MIME from offset 38) and knows a `.kboard` without unzipping. KDM envelopes are already compact binary (Loro), and pictures are already compressed, so only `meta.json` is deflated.
+`mimetype` first, uncompressed, is the ODF/EPUB convention: a host or the requirement N7 check reads the first local header (the name `mimetype` at byte offset 30, the 32-byte MIME from offset 38) and knows a `.kboard` without unzipping. KDM envelopes are already compact binary (Loro), and pictures are already compressed, so only `meta.json` is deflated. No entry carries a time, so the same parts give the same bytes.
+
+**No history in the file** (owner, 2026-11-22; kition-sdk data model 7.3, rule M16b). `content.bin` is `Replica::content_snapshot()`, never `snapshot()`: the current state, the same docId and object ids, and of the history only one `system` change labelled `content-seal` (zero timestamp). No deleted text or elements, no overwritten value, no person's or agent's origin; what survives is the actor numbers inside element ids and the seal's lamport number. There is no change log and no compaction. The history (every change, for undo across sessions, sync and drafts) is the host's: the desktop app keeps it in `<workspace>/.kition/docs/<docId>/` (`host/replicaRead`, `host/replicaWrite`), and the editor worker stores the session's full `snapshot()` there after it takes the file's bytes.
 
 ### 2.2 `meta.json`
 
@@ -205,39 +207,36 @@ A ZIP archive (PKZIP, no ZIP64). Entries, in this order:
 {
   "format": "kition.board",
   "formatVersion": 1,
+  "kit": "kit.board",
   "kdm": 1,
   "schemaVersion": 2,
-  "docId": "8c1e…",
-  "title": "Q4 plan",
-  "snapshot": { "entry": "snapshot.bin", "version": "<base64 of the KDM version vector>" },
-  "changes": ["changes/000001.bin", "changes/000002.bin"],
-  "app": { "kit": "kit.board", "version": "0.1.0" }
+  "docId": "8c1e…"
 }
 ```
 
 | Field | Use |
 | --- | --- |
 | `format`, `formatVersion` | the container; a newer `formatVersion` is refused as too new |
-| `kdm`, `schemaVersion` | copies for hosts that do not load KDM; the engine trusts the snapshot's own meta (M5, M20) and refuses a mismatch as `not-a-board` |
-| `docId` | copy of the KDM `docId` (M7) so a host can index the file without the engine |
-| `title` | copy of `Board.title` for file lists and placeholders |
-| `snapshot.version`, `changes` | the replay order; an entry on disk but not listed is ignored (and dropped at the next compaction); a listed entry that is missing makes the file damaged |
-| `app` | who wrote it, for support |
+| `kit` | the kit the file is for |
+| `kdm`, `schemaVersion` | copies for hosts that do not load KDM; the engine trusts the content's own meta (M5, M20) and refuses a mismatch as `not-a-board` |
+| `docId` | copy of the KDM `docId` (M7) so a host can index the file without the engine; it must name the content's document, or the file is damaged |
 
-There is no thumbnail in the file: it would be rewritten on every save and duplicate what the engine's `render` gives.
+Only what identifies and describes the content: no time, no per-save counter, no writer version, no title copy (the title is in the content), no thumbnail (it would be rewritten on every save and duplicate what the engine's `render` gives).
 
-### 2.3 Save, open, compaction
+### 2.3 Save, open, a file and its history
 
-- **Open:** check `mimetype`, read `meta.json`, load `snapshot.bin`, import each listed change entry in order, register the blobs found under `blobs/`, then validate (1.5). Opening never writes the file.
-- **Save** (`save()` returns the whole file, the host writes it, `markSaved` after; contract E4): the engine keeps the bytes of `snapshot.bin` and of the change entries it read or wrote, so a save re-emits them unchanged, appends one entry with the changes since the last entry, and writes the blobs the replica references. Nothing is re-encoded, so a save stays small however many pictures the board holds.
-- **Compaction:** when the change entries together exceed a quarter of `snapshot.bin`, or there are more than 200 of them, a save writes a fresh snapshot and no change entries. Blobs the replica's retained state does not reference are dropped only at compaction.
+- **Save** (`prepareSave()`, then `save()` returns the whole file, the host writes it, `markSaved` after; contract E4, kition-sdk rules E4/H4): `prepareSave` seals the live replica (`KitSession::seal`: unless its last change is a seal, one `system` change labelled `content-seal` on top of every head; no edit, no undo step, no revision), and `save` writes its `sealed_content_snapshot()` as `content.bin` with the blobs the current state references (a picture deleted before the save leaves its bytes out, though the history still references them; the host's store keeps them for undo). The seal is in the replica the host stores and syncs; Undo after a save takes back the last edit. A save with nothing changed seals nothing and writes the same bytes. `KitModel::export` writes the same file from a replica its session sealed.
+- **The one fallback** (delete it once the kit editor's `@kition/*` release that calls `prepareSave` is in `web/pnpm-lock.yaml`): a `save` nobody called `prepareSave` for finds the replica unsealed and, seeing it read-only, writes the content of a copy sealed under an actor derived from the version (the same version gives the same bytes); `markSaved` imports that seal into the session. Headless hosts call `prepare_save` and never take it.
+- **Open** (`open`, no store): check `mimetype`, read `meta.json`, load `content.bin` (a shallow replica rooted at the seal: same docId, version and object ids, which edits, takes later changes and merges like any replica; changes from before the seal it does not hold are `history-missing`), register the blobs, then validate (1.5). Opening never writes the file.
+- **Open with the stored replica** (`openWithReplica(name, bytes, snapshot, blobs)`; `kition_kit::session::take_file`, the contract of kition-sdk's `KitModel.openReplica`): the stored replica, with the file taken into it. When the store has the file's version (the usual case), the stored replica opens as it is, with its whole history. When the file's history starts at a version the store has (the store missed only the seal), the file's changes are imported. When the file was saved from changes the store never saw (edited on another machine, or the store is older), the file's state is written over the stored replica as one `system` transaction labelled `import`, keyed by object id: objects only the file has are created under their ids, differing fields set (`kition_kit::session::write_state`: text by character and mark, lists by item), objects the file lacks deleted. A file of another document, or a stored replica that does not open, opens as the file alone.
+- **A document known only from its file** (no store, no room) is a shallow replica whose history starts at the seal; the host calls `rebirth()` before it starts a room from it (sync protocol S20). The kit never does.
 - **Crash safety:** the host writes atomically (temp file + rename); the engine never edits the file in place.
-- **External changes:** a file changed on disk while open is merged: the new file is opened as a replica and its changes are imported.
-- **Identity and forks** (Kit Process Protocol 5.6, KitModel M7a; `kition_board_kdm::file::embedded_replica` and `replace_replica`, served as `document.identity` and `document.fork`): the file embeds its replica, so a byte copy is the same document. Its identity is the docId of `snapshot.bin` with the listed changes imported (`meta.json`'s copy must agree, or the file is damaged); an empty file has none. A fork writes the SDK's copy under a new docId (no history) as `snapshot.bin`, no change entries, `meta.json`'s `docId` and `snapshot.version` set to the copy's, and the blobs its state references; the title, `app` and unknown entries are kept. Cards' `target.docId` name other documents and stay as they are.
+- **External changes** (`reconcile_reread`): a file changed on disk while open is taken into the live replica as in "open with the stored replica" (its changes when its history starts inside this replica's, else its state as one `system` `import` transaction), keeping the undo histories and the page the editor shows.
+- **Identity and forks** (Kit Process Protocol 5.6, KitModel M7a; `kition_board_kdm::file::embedded_replica` and `replace_replica`, served as `document.identity` and `document.fork`): the file embeds its replica as its content, so a byte copy is the same document. Its identity is the docId of `content.bin` (`meta.json`'s copy must agree, or the file is damaged); an empty file has none. A fork writes the content of the SDK's copy under a new docId (born at its root, so it carries its whole history and may start a room) as `content.bin`, `meta.json`'s `docId` set to the copy's, and the blobs its state references; unknown entries are kept. Cards' `target.docId` name other documents and stay as they are.
 
 ### 2.4 Limits and damaged files (Q7, E2)
 
-The reader refuses, as `not-a-board` or `damaged` (opens nothing, never panics): a missing or wrong `mimetype`; a missing `meta.json` or `snapshot.bin`; a listed change entry that is missing; an entry name containing `..`, `\`, a leading `/`, or a drive letter; duplicate names; encrypted entries; ZIP64; more than 100,000 entries; a declared uncompressed size over 2 GiB for the archive or 512 MiB for one entry; a deflate ratio over 100:1 on `meta.json`; a blob whose bytes do not hash to its name. The limits are guards, not measured sizes.
+The reader refuses, as `not-a-board` or `damaged` (opens nothing, never panics): a missing or wrong `mimetype`; a missing `meta.json` or `content.bin` (so a file of the old layout, a snapshot and a change log, is not read); a `meta.json` whose `docId` is not the content's; an entry name containing `..`, `\`, a leading `/`, or a drive letter; duplicate names; encrypted entries; ZIP64; more than 100,000 entries; a declared uncompressed size over 2 GiB for the archive or 512 MiB for one entry; a deflate ratio over 100:1 on `meta.json`; a blob whose bytes do not hash to its name. The limits are guards, not measured sizes.
 
 **Unknown entries** (another safe name) are kept byte for byte and written back on save, and the file opens normally (F4).
 
@@ -247,7 +246,7 @@ The reader refuses, as `not-a-board` or `damaged` (opens nothing, never panics):
 
 ### 2.6 Tests that define the file
 
-Zip round trip (open → save → open gives the same `state_json`, M15); save after one edit appends exactly one entry and leaves `snapshot.bin` bytes identical; compaction at the threshold; blob round trip and late blobs; the refusals in 2.4 as synthetic damaged files; an unknown entry survives a save (`crates/kdm/kdm-model/tests/file.rs`); open and save at 5,000 elements within a time budget (`crates/kdm/kdm-model/tests/perf.rs`).
+Zip round trip (open → save → open gives the same `state_json`, M15); a save of the version the file holds writes the same bytes; the repair on open is in the next save; a file taken into a stored replica by its changes and by its state; the refusals in 2.4 as synthetic damaged files; an unknown entry survives a save (`crates/kdm/kdm-model/tests/file.rs`, `crates/formats/kboard/src/tests.rs`); no history in the file: the content, read through the engine, holds one change (the seal) and none of a typed-then-deleted text, a deleted element and an overwritten value (each found in the full snapshot first); an unchanged board saves to the same bytes; a file opened without a store keeps its docId and object ids and edits; a replica from the file and one with the whole history converge; Undo after a save takes back the last edit; opening on a stored replica that has the file's version, and on one that does not (`bindings/wasm/tests/content_file.rs`, feature `board.file.content-only`); only referenced blobs in the file (`bindings/wasm/tests/blobs.rs`); open and save at 5,000 elements within a time budget (`crates/kdm/kdm-model/tests/perf.rs`).
 
 ## 3. Cards (H5, KHP-0005)
 

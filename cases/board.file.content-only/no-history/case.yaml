@@ -1,0 +1,25 @@
+format: 1
+id: board.file.content-only/no-history
+feature: board.file.content-only
+intent: >-
+  A board whose history holds typed-then-deleted text, a deleted element and an overwritten value
+  saves to a .kboard whose content entry, read through the engine, holds one change (the
+  system content-seal) and none of those strings, each found in the session's full snapshot
+  first; an unchanged board saves to the same bytes, twice, after markSaved and from the file
+  opened again; through the headless kit, which seals before every save, an agent's batches save
+  files holding only the seal and answer what they changed.
+layer: gate
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/content_file.rs (the_file_holds_the_content_and_of_the_history_only_the_seal, an_unchanged_board_saves_to_the_same_bytes), bindings/headless/tests/content_file.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: content_file, filter: the_file_holds_the_content_and_of_the_history_only_the_seal }
+  - cargo-test: { package: kition-board-kit, test: content_file, filter: an_unchanged_board_saves_to_the_same_bytes }
+  - cargo-test: { package: kition-board, test: content_file }
+expected:
+  - actual: out:cargo-test
+    compare: exit
+    value: 0
+since: "2026-11-22"

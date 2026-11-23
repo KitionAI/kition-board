@@ -3,7 +3,6 @@
 //! board whose stored point is still on the box draws on the outline and saves nothing new.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
-use kition_board_kboard as kboard;
 use kition_board_kdm::{End, Point};
 use kition_board_kit::BoardDocument;
 use kition_kit::KitDocument;
@@ -108,9 +107,9 @@ fn a_stored_point_on_the_box_is_drawn_on_the_outline_and_never_repaired() {
     let end = route_end(&fragment(&opened, &connector));
     assert!(off_diamond(end) < 1e-3, "the end {end:?} is drawn on the diamond");
     assert!(!dark(&opened, 500.0, 100.0));
-    // Derived, not repaired (design note 1.4): a save without edits appends nothing.
+    // Derived, not repaired (design note 1.4): a save without edits writes the same bytes.
     let again = opened.save(None).unwrap();
-    assert_eq!(kboard::read(&again).unwrap().changes, kboard::read(&first).unwrap().changes, "the save appended a change");
+    assert_eq!(again, first, "the save wrote a change");
     assert_eq!(stored_end(&opened, &connector).point, Point::new(500.0, 100.0));
 }
 

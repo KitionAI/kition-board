@@ -718,6 +718,8 @@ fn commands_on_two_replicas_converge() {
     let mut a_doc = board();
     let a = shape(&mut a_doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut a_doc, 300.0, 0.0, 100.0, 50.0);
+    // As a host saves: sealed first (`prepare_save`), so the file's seal is the session's own.
+    a_doc.prepare_save().unwrap();
     let file = a_doc.save(None).unwrap();
     let mut other = BoardDocument::open("Plan.kboard", &file).unwrap();
     let since_a = a_doc.version().encode();

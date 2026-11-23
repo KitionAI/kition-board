@@ -1,6 +1,6 @@
 format: 1
 kit: board
-updated: "2026-11-21"
+updated: "2026-11-22"
 gate_budget_s: 600
 protected: ["conformance/expected/**"]
 features:
@@ -124,6 +124,14 @@ features:
     paths: [bindings/headless/src/lib.rs, bindings/headless/src/main.rs, bindings/wasm/src/collab.rs, crates/kdm/kdm-model/src/file.rs, kit.json]
     cases: [board.platform.document-identity/fork, board.platform.document-identity/no-replica]
     since: "2026-11-20"
+  - id: board.file.content-only
+    title: "A .kboard holds the board's content, not its history: a sealed content snapshot and the blobs the state references, no change log, no deleted content, no origins (kition-sdk rule M16b); it opens as the same document alone or on the host's stored replica"
+    dimension: [platform, data-safety]
+    priority: P0
+    status: has
+    paths: [crates/formats/kboard/src/lib.rs, crates/kdm/kdm-model/src/file.rs, bindings/wasm/src/lib.rs, bindings/wasm/src/collab.rs, bindings/wasm/tests/content_file.rs, bindings/headless/tests/content_file.rs, crates/kdm/kdm-model/tests/file.rs]
+    cases: [board.file.content-only/no-history, board.file.content-only/reopen-and-converge]
+    since: "2026-11-22"
   - id: board.collab.live
     title: People co-edit a board live (shapes, text, connectors, frames, cards, groups, z-order) and converge
     dimension: [collab, data-safety]

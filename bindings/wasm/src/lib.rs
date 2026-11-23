@@ -1,8 +1,8 @@
 //! `kition-board-kit`: the Board kit's engine (`kit.board`) on the Kition SDK, engine contract 2.
 //!
-//! A board is a KDM replica (`kition-board-kdm`); a `.kboard` file is a ZIP holding the replica's
-//! snapshot, its change log and its blobs, and a save appends what changed since the file was read
-//! or last written. Commands are transactions of the replica (`kition_kit::session::KitSession`);
+//! A board is a KDM replica (`kition-board-kdm`); a `.kboard` file is a ZIP holding the
+//! document's content (the replica's content snapshot: its state, no history) and its blobs. The
+//! history stays with the host (`snapshot`), never in the file. Commands are transactions of the replica (`kition_kit::session::KitSession`);
 //! the same document runs in the page as WebAssembly under the kit's editor (`web/`) and headless as
 //! `kition-board`.
 
@@ -37,9 +37,6 @@ pub const SANDBOXED: &[&str] = &["card.create", "card.setTarget", "image.insert"
 /// The formats a board exports to (`kit.json` `exports`, KHP A41), as `file.export` writes them.
 pub const EXPORTS: &[&str] = &["png", "svg", "pdf"];
 
-/// The version `meta.json` records as the writer.
-pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// The person a command from the in-page editor runs for when the host names none.
 fn local_person() -> Origin {
     Origin::person("person:local")
@@ -51,14 +48,15 @@ pub struct BoardDocument {
     /// The session's blob store (a clone shares it), enumerable for saves and the blob exchange.
     blobs: SharedBlobs,
     blob_log: BlobLog,
-    /// What the file holds: the base the next save appends to.
+    /// What the file holds: a save of its version writes the same bytes.
     base: Option<FileBase>,
     /// The connector ends the file had dangling, which opening detached (`board_check` reports
     /// them while they stay detached).
     detached: Vec<(ObjectId, DanglingEnd)>,
     /// What the file holds after the last `save`, taken as the base by `mark_saved` once the host
-    /// has stored those bytes (edits made in between stay unsaved).
-    saving: Mutex<Option<FileBase>>,
+    /// has stored those bytes (edits made in between stay unsaved), with the seal the save made on
+    /// a copy, which `mark_saved` takes into the session.
+    saving: Mutex<Option<(FileBase, Option<Vec<u8>>)>>,
     /// The page the editor shows (view state, `inspect().page`). It keeps naming a page another
     /// writer, an undo or a delete removed (an agent's command there is refused, and a redo or an
     /// undo that brings the page back shows it again); meanwhile the editor shows `fallback`.
@@ -369,19 +367,24 @@ impl KitDocument for BoardDocument {
             .collect()
     }
 
-    /// The board as a `.kboard` file: what the file held, byte for byte, plus one change entry
-    /// with what changed since (or a fresh snapshot at compaction). `name`, when given, must be a
-    /// `.kboard` name.
+    /// The board as a `.kboard` file: the document's content (no history, rule M16b) and the
+    /// blobs its state references; the same bytes as the file holds while the document is at the
+    /// file's version. `name`, when given, must be a `.kboard` name.
+    ///
+    /// The content is sealed (kition-sdk data model 7.3): hosts call [`KitDocument::prepare_save`]
+    /// first, which seals the session, and the file holds the replica's own content snapshot. The
+    /// one fallback, for an editor that does not call `prepareSave` yet: a replica nobody sealed
+    /// saves the content of a sealed copy, and [`KitDocument::mark_saved`] takes that seal into
+    /// the session (`kition_board_kdm::file::save_file`).
     fn save(&self, name: Option<&str>) -> Result<Vec<u8>, String> {
         if let Some(name) = name {
             check_name(name)?;
         }
-        let model = self.session.model();
-        let (bytes, base) = file::save_file(self.session.replica(), model.title(), self.file_blobs(), self.base.as_ref(), APP_VERSION)?;
+        let saved = file::save_file(self.session.replica(), self.file_blobs(), self.base.as_ref())?;
         if let Ok(mut saving) = self.saving.lock() {
-            *saving = Some(base);
+            *saving = Some((saved.base, saved.seal));
         }
-        Ok(bytes)
+        Ok(saved.bytes)
     }
 
     /// `board_check` (design note 5.3): broken references, missing pictures, overflowing labels and
@@ -415,34 +418,63 @@ impl KitDocument for BoardDocument {
         self.put_back(saved)
     }
 
+    /// Seals the session (rule M16b) so `save` writes its content snapshot, and the seal is in the
+    /// replica the host stores and syncs: a `system` change, no edit, no undo step, no revision.
+    fn prepare_save(&mut self) -> Result<(), String> {
+        self.session.seal()?;
+        Ok(())
+    }
+
     /// Takes an outside save of the file this clean session read (`fresh`, the file read again)
-    /// into the live replica instead of replacing it. A `.kboard` file is the replica's own
-    /// history, so the file's difference is exactly the changes it holds beyond this replica's
-    /// version: they are imported as they are, by their writers' origins and outside both undo
-    /// histories, and repaired like any import. Object ids, the undo histories, the page the
-    /// editor shows and the blobs stay; the file read becomes the base of the next save. A file
-    /// that does not extend this replica's history (another document, or one written from other
-    /// changes) is not reconciled (`false`, nothing changed). Refuses, changing nothing, when the
-    /// file deleted the page the editor shows (`deleted active page`), and when the changes do not
-    /// import.
+    /// into the live replica instead of replacing it. A `.kboard` file holds the document's
+    /// content and, of its history, only the seal (rule M16b): when its history starts at a
+    /// version this replica has, the file's difference is the changes it holds beyond it, imported
+    /// as they are; otherwise (another writer saved changes this replica never saw) it is the
+    /// file's state, written by object id as one `system` transaction labelled `import`. Either
+    /// way it stays outside both undo histories and is repaired like any import. Object ids, the
+    /// undo histories, the page the editor shows and the blobs stay; the file read becomes the
+    /// base of the next save; the file is what the document now holds, also when it was saved
+    /// from another history than this replica's (after an earlier reread written by state). A
+    /// file of another document is not reconciled (`false`, nothing changed). Refuses, changing
+    /// nothing, when the file deleted the page the editor shows (`deleted active page`), and when
+    /// the changes do not import.
     fn reconcile_reread(&mut self, fresh: &Self) -> Result<bool, String> {
-        let ours = self.session.version();
-        if fresh.session.replica().doc_id() != self.session.replica().doc_id() || !fresh.session.version().includes(&ours) {
+        if fresh.session.replica().doc_id() != self.session.replica().doc_id() {
             return Ok(false);
         }
         if self.active_page.as_ref().is_some_and(|page| fresh.model().page(page).is_none()) {
             return Err("deleted active page".into());
         }
-        let changes = fresh.session.export_changes(&ours)?;
-        // Imported into a copy first, so changes that do not import leave this session as it was.
-        self.session.fork(ActorId::random(), Box::new(self.blobs.clone()))?.import_changes(&changes)?;
+        let ours = self.session.version();
+        let difference = if ours.includes(&fresh.session.version()) {
+            Difference::None
+        } else if fresh.session.replica().reaches(&ours) {
+            let changes = fresh.session.export_changes(&ours)?;
+            // Imported into a copy first, so changes that do not import leave this session as it was.
+            self.session.fork(ActorId::random(), Box::new(self.blobs.clone()))?.import_changes(&changes)?;
+            Difference::Changes(changes)
+        } else {
+            Difference::State(kition_kit::session::state(self.session.replica())?, kition_kit::session::state(fresh.session.replica())?)
+        };
         let blobs_before = self.blobs.len();
         for hash in fresh.blobs.hashes() {
             if let Some(bytes) = BlobSource::get(&fresh.blobs, &hash) {
                 self.blobs.insert(&hash, &bytes)?;
             }
         }
-        KitSessionDocument::import_changes(self, &changes)?;
+        match difference {
+            Difference::None => {}
+            Difference::Changes(changes) => {
+                KitSessionDocument::import_changes(self, &changes)?;
+            }
+            Difference::State(before, after) if before != after => {
+                let schema = kition_board_kdm::schema();
+                let ((), damage) =
+                    self.session.execute(&Origin::system("import"), |_, tx| kition_kit::session::write_state(tx, &schema, &before, &after))?;
+                self.changed(&damage);
+            }
+            Difference::State(..) => {}
+        }
         self.log_new_blobs(blobs_before);
         self.base.clone_from(&fresh.base);
         self.detached.clone_from(&fresh.detached);
@@ -459,12 +491,29 @@ impl KitDocument for BoardDocument {
         self.set_call_context(context)
     }
 
+    /// Records the last save as what the file holds, and takes the seal that save made into the
+    /// session (no edit: the state, the revision and the undo histories stay as they are).
     fn mark_saved(&mut self) {
-        if let Some(base) = self.saving.get_mut().ok().and_then(Option::take) {
+        if let Some((base, seal)) = self.saving.get_mut().ok().and_then(Option::take) {
+            // The fallback's seal (see `save`; delete with it once the kit editor calls
+            // `prepareSave`). One that does not import leaves the session as it was.
+            if let Some(seal) = seal {
+                let _ = self.session.import_changes(&seal);
+            }
             self.base = Some(base);
         }
         self.saved = self.revision;
     }
+}
+
+/// How a file read again reaches the live replica ([`KitDocument::reconcile_reread`]).
+enum Difference {
+    /// The replica has every change of the file.
+    None,
+    /// The changes the file holds beyond the replica: its history reaches the replica's version.
+    Changes(Vec<u8>),
+    /// The file was saved from changes the replica lacks: the replica's state and the file's.
+    State(kition_kit::session::State, kition_kit::session::State),
 }
 
 impl BoardDocument {

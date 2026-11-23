@@ -45,11 +45,15 @@ impl BoardDocument {
         self.session.replica().doc_id().to_string()
     }
 
-    /// Opens a board with the replica the host stored for it (`snapshot`) and that replica's blobs
-    /// (a blob bundle). Empty `bytes` open the replica alone. When both are given and are the same
-    /// document, the file's changes are merged into the stored replica, so edits the file has and
-    /// the replica lacks (and the other way round) are both kept; a file of another document, or a
-    /// replica that does not open, leaves the file as [`KitDocument::open`] opens it.
+    /// Opens a board with the replica the host stored for it (`snapshot`, its history) and that
+    /// replica's blobs (a blob bundle). Empty `bytes` open the replica alone. When both are given
+    /// and are the same document, the file (which holds the content and no history) is taken into
+    /// the stored replica (`kition_kit::session::take_file`): nothing when the replica has the file's version;
+    /// the changes the file holds beyond it when the file's history starts at a version the replica
+    /// has; and otherwise (the file was saved elsewhere, from changes the store never saw) the
+    /// file's state, as one `system` transaction keyed by object id. Edits the replica has and the
+    /// file lacks are kept. A file of another document, or a replica that does not open, leaves the
+    /// file as [`KitDocument::open`] opens it.
     pub fn open_with_replica(name: &str, bytes: &[u8], snapshot: &[u8], blobs: &[u8]) -> Result<Self, String> {
         check_name(name)?;
         let store = SharedBlobs::default();
@@ -72,8 +76,7 @@ impl BoardDocument {
         }
         match stored {
             Ok(mut replica) if replica.doc_id() == opened.replica.doc_id() => {
-                let changes = opened.replica.export_changes(&Version::empty()).map_err(|error| error.to_string())?;
-                replica.import_changes(&changes).map_err(|error| format!("damaged: {error}"))?;
+                kition_kit::session::take_file(&mut replica, &opened.replica).map_err(|error| format!("damaged: {error}"))?;
                 let detached = file::dangling_ends(&replica)?;
                 file::repair_once(&mut replica)?;
                 replica.take_changed();

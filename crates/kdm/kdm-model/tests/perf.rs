@@ -1,7 +1,7 @@
 //! Open and save at 5,000 elements (design note 2.6): a fresh save, an open, and the save after one
-//! edit, which appends one change entry instead of re-encoding the board. Kition's TypeScript board
-//! re-encoded the whole snapshot as base64 on every save: 85.5 ms at 5,000 elements (board
-//! evaluation, Node bench). The budgets here are guards for unoptimised test builds on a loaded
+//! edit, which writes the content snapshot of a sealed copy (the file holds no history, rule M16b).
+//! Kition's TypeScript board re-encoded the whole snapshot as base64 on every save: 85.5 ms at
+//! 5,000 elements (board evaluation, Node bench). The budgets here are guards for unoptimised test builds on a loaded
 //! machine; the measured times are printed (`cargo test --release -p kition-board-kdm --test perf
 //! -- --nocapture`).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
@@ -49,7 +49,8 @@ fn timed<R>(label: &str, f: impl FnOnce() -> R) -> (R, Duration) {
 #[test]
 fn open_and_save_at_5000_elements() {
     let replica = big_board();
-    let ((bytes, _), fresh) = timed("fresh save", || save_file(&replica, "Big", BTreeMap::new(), None, "0.0.0").unwrap());
+    let (saved, fresh) = timed("fresh save", || save_file(&replica, BTreeMap::new(), None).unwrap());
+    let bytes = saved.bytes;
     println!("file: {} bytes", bytes.len());
     let (opened, open) = timed("open", || open_file(&bytes, ActorId::random()).unwrap());
     let base = opened.base;
@@ -61,10 +62,11 @@ fn open_and_save_at_5000_elements() {
         add(tx, &page, shape(0.0, 4000.0, 30.0, 30.0));
         Ok(())
     });
-    let ((appended, _), append) =
-        timed("save after one edit", || save_file(session.replica(), "Big", BTreeMap::new(), Some(&base), "0.0.0").unwrap());
-    assert_eq!(kition_board_kboard::read(&appended).unwrap().changes.len(), 1);
-    for (label, took) in [("fresh save", fresh), ("open", open), ("append save", append)] {
+    let (edited, edit) = timed("save after one edit", || save_file(session.replica(), BTreeMap::new(), Some(&base)).unwrap());
+    assert!(edited.seal.is_some(), "the edit is sealed for the file");
+    assert_ne!(edited.bytes, bytes);
+    let (_, unchanged) = timed("save with no edit", || save_file(&replica, BTreeMap::new(), Some(&saved.base)).unwrap());
+    for (label, took) in [("fresh save", fresh), ("open", open), ("save after an edit", edit), ("save with no edit", unchanged)] {
         assert!(took < Duration::from_secs(10), "{label} took {took:?}");
     }
 }

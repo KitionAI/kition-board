@@ -9,7 +9,7 @@
 //!   targets (design note 1.4).
 //! - [`validate`]: rules V1–V9, the deterministic repair after open, import, undo and redo (1.5).
 //! - [`blobs`]: the blob store and the blob bundle hosts exchange.
-//! - [`file`]: the `.kboard` file as a replica: open, and save by appending to the change log (2.3).
+//! - [`file`]: the `.kboard` file as the document's content (no history): open, save, and take a file into a replica that holds its history (2.3).
 //! - [`outline`]: the polygon shapes' outlines, as fractions of the element's box.
 //!
 //! Ported from Kition's `packages/board-editor/src/kdm` and `packages/board-kit/src/engine`.
@@ -121,9 +121,11 @@ impl KitModel for BoardModel {
         Ok(opened.replica)
     }
 
-    /// The board as a fresh `.kboard` file (a snapshot, no change entries).
+    /// The board as a `.kboard` file: its content snapshot (no history) and the blobs its state
+    /// references. Seal the replica first (`KitSession::seal`, rule M16b); a replica that is not
+    /// sealed saves the content of a sealed copy, whose seal stays out of this replica.
     fn export(&self, replica: &Replica, _name: &str, blobs: &dyn BlobSource) -> Result<Vec<u8>> {
-        file::save_file(replica, self.title(), referenced_blobs(self, blobs), None, env!("CARGO_PKG_VERSION")).map(|(bytes, _)| bytes)
+        file::save_file(replica, referenced_blobs(self, blobs), None).map(|saved| saved.bytes)
     }
 }
 
