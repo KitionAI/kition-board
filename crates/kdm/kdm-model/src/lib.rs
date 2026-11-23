@@ -1,4 +1,4 @@
-//! The Board kit's document on the Kit Data Model: schema `kit.board` v2 (`model/schema.json`,
+//! The Board kit's document on the Kit Data Model: schema `kit.board` 1 (`model/schema.json`,
 //! `docs/design.md` section 1).
 //!
 //! A board is one `Board` object (fixed id [`root_id`]) with an ordered list of `Page`s, each with
@@ -137,7 +137,7 @@ mod tests {
     fn the_schema_file_parses_and_names_the_kit() {
         let schema = schema();
         assert_eq!(schema.kit, KIT);
-        assert_eq!(schema.schema_version, 2);
+        assert_eq!(schema.schema_version, 1);
         assert_eq!(schema.root, BOARD);
         assert_eq!(schema_json(), SCHEMA);
     }

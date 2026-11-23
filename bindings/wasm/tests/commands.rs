@@ -1,7 +1,7 @@
 //! The board's commands through the document (design note 5.1; ports of Kition's
 //! `boardCommands.spec.ts`, `boardHierarchy.spec.ts`, `boardBindingEngine.spec.ts`,
 //! `boardLayout.spec.ts`, `boardClipboard.spec.ts` and `whiteboardAgentPatch.spec.ts` for the
-//! v2 model). Every command has a case; every command survives empty and malformed parameters
+//! board model). Every command has a case; every command survives empty and malformed parameters
 //! (E3) and every agent command has a valid parameter schema (E5).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 

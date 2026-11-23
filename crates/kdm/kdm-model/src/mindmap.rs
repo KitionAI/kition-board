@@ -7,7 +7,7 @@
 //! descendants and the branches to them.
 //!
 //! Ported from Kition's `packages/board-editor/src/lib/whiteboardMindMap.ts`
-//! (`buildWhiteboardMindMapTopology`, `getWhiteboardMindMapPresentation`) for schema v2.
+//! (`buildWhiteboardMindMapTopology`, `getWhiteboardMindMapPresentation`), for the board schema.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 

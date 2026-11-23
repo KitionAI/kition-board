@@ -1,4 +1,4 @@
-# Board kit design: schema `kit.board` v2, `.kboard`, cards, editor interface, commands
+# Board kit design: schema `kit.board` 1, `.kboard`, cards, editor interface, commands
 
 This is the design reference of the Board kit: the KDM schema, the `.kboard` file, cards, the
 editor's interface to the engine, and the commands, agent tools and check catalogue. Code
@@ -20,7 +20,7 @@ Protocol rows.
 - **The editor draws nothing of its own:** it draws each element with the engine's SVG fragment
   and sends every change as one engine command at the end of a gesture (section 4).
 
-## 1. Schema `kit.board` v2
+## 1. Schema `kit.board` 1
 
 ### 1.1 The schema
 
@@ -30,7 +30,7 @@ Protocol rows.
 {
   "kdm": 1,
   "kit": "kit.board",
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "root": "Board",
   "types": {
     "Board": { "fields": {
@@ -209,7 +209,7 @@ A ZIP archive (PKZIP, no ZIP64). Entries, in this order:
   "formatVersion": 1,
   "kit": "kit.board",
   "kdm": 1,
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "docId": "8c1e…"
 }
 ```

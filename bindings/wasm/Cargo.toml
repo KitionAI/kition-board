@@ -24,6 +24,9 @@ serde_json = { workspace = true }
 base64 = { workspace = true }
 
 [dev-dependencies]
+# Counted ids for the tests and the sample builders (examples), with `KITION_REPRODUCIBLE_IDS`;
+# never in the shipped engine (kition-sdk data model, reproducible ids).
+kition-kit = { workspace = true, features = ["reproducible-ids"] }
 # The showcase sample builder (examples/showcase.rs) saves its thumbnails.
 image = { version = "0.25", default-features = false, features = ["png"] }
 kition-board-kboard = { workspace = true }

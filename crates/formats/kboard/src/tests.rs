@@ -3,7 +3,7 @@ use super::*;
 fn sample() -> Container {
     let blob = b"\x89PNG fake".to_vec();
     Container {
-        meta: Meta { kit: "kit.board".into(), kdm: 1, schema_version: 2, doc_id: "doc-1".into(), ..Default::default() },
+        meta: Meta { kit: "kit.board".into(), kdm: 1, schema_version: 1, doc_id: "doc-1".into(), ..Default::default() },
         content: b"content bytes".to_vec(),
         blobs: BTreeMap::from([(sha256_hex(&blob), blob)]),
         extra: vec![("later/thing.json".into(), b"{}".to_vec())],

@@ -43,7 +43,7 @@ fn a_board_round_trips_through_its_file() {
     assert_eq!(back.replica().doc_id(), a.replica().doc_id());
     let parts = kboard::read(&bytes).unwrap();
     assert_eq!(parts.meta.doc_id, a.replica().doc_id().to_string());
-    assert_eq!(parts.meta.schema_version, 2);
+    assert_eq!(parts.meta.schema_version, 1);
     assert_eq!(parts.meta.kit, "kit.board");
     let content = Replica::load(kition_board_kdm::schema(), &parts.content, ActorId::random()).unwrap();
     assert!(content.is_sealed(), "the content is sealed");

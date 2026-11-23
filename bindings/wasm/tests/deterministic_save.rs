@@ -1,6 +1,8 @@
-//! A document built by the same commands saves the same bytes when `SOURCE_DATE_EPOCH` is set, as
-//! a showcase sample or a gating test builds it: the replica's actor and the document id come from
-//! a counter in the process instead of randomness. Each build runs in a process of its own: this
+//! A document built by the same commands saves the same bytes in a reproducible build, as a
+//! showcase sample or a gating test builds it: with kition-kit's `reproducible-ids` feature (a
+//! dev-dependency only) and `KITION_REPRODUCIBLE_IDS` set, the replica's actor and the document id
+//! come from a counter in the process instead of randomness. `SOURCE_DATE_EPOCH` alone leaves ids
+//! random (kition-sdk 8d56412). Each build runs in a process of its own: this
 //! test starts itself several times. Found rebuilding the showcase: every board sample saved
 //! other bytes on each build.
 
@@ -40,6 +42,7 @@ fn build_in_a_process(path: &PathBuf) -> Vec<u8> {
     let status = Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "child_builds_a_document", "--test-threads=1", "--quiet"])
         .env("SOURCE_DATE_EPOCH", "1794182400")
+        .env("KITION_REPRODUCIBLE_IDS", "1794182400")
         .env(OUT, path)
         .status()
         .unwrap();

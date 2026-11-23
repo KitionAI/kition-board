@@ -3,7 +3,7 @@
 //! and every other register as stored.
 //!
 //! Ported from Kition's `packages/board-editor/src/kdm/boardKdmRead.ts` (`elementFromFields`,
-//! `bindingsOf`) for schema v2.
+//! `bindingsOf`), for the board schema.
 
 use std::collections::BTreeMap;
 

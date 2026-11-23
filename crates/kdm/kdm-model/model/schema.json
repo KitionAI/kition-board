@@ -1,7 +1,7 @@
 {
   "kdm": 1,
   "kit": "kit.board",
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "root": "Board",
   "types": {
     "Board": {

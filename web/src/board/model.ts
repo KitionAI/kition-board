@@ -4,7 +4,7 @@
  * The editor reads geometry, hierarchy and culling bounds here and never writes the replica:
  * every change is an engine command.
  *
- * The read side of Kition's `packages/board-editor/src/kdm/boardKdmRead.ts`, for schema v2 and the
+ * The read side of Kition's `packages/board-editor/src/kdm/boardKdmRead.ts`, for the board schema and the
  * rules of `crates/kdm/kdm-model/src/view.rs`.
  */
 import type { Replica } from '@kition/sdk/kdm'

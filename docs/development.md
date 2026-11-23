@@ -27,7 +27,7 @@ Board in your own app, start with the [README](../README.md).
 ## The file and the engine
 
 - **One replica, one file.** A board is a KDM replica (`crates/kdm/kdm-model/model/schema.json`,
-  schema `kit.board` v2). A `.kboard` file (`application/vnd.kition.board+zip`) is a ZIP holding
+  schema `kit.board` 1). A `.kboard` file (`application/vnd.kition.board+zip`) is a ZIP holding
   the replica's content (its state, sealed, no history) and the pictures it shows as blobs; the
   history stays in the host's history store.
   New files are `Untitled board.kboard`. The details are in [design.md](design.md).
