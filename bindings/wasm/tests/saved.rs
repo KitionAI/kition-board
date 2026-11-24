@@ -5,8 +5,9 @@ use kition_kit::{KitDocument, session::KitSessionDocument};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
-fn check(doc: &BoardDocument, label: &str) -> Value {
+fn check(doc: &mut BoardDocument, label: &str) -> Value {
     let state = doc.session().replica().state_json().unwrap();
+    doc.prepare_save().unwrap();
     let saved = doc.save(None).unwrap();
     let back = BoardDocument::open("Invariant.kboard", &saved).unwrap();
     assert_eq!(state, back.session().replica().state_json().unwrap(), "replica after {label}");
@@ -51,7 +52,7 @@ fn every_fixture_and_representative_command_reopens_as_the_exact_in_memory_state
     let mut commands = 0;
     for path in &paths {
         let mut doc = BoardDocument::open("Invariant.kboard", &std::fs::read(path).unwrap()).unwrap();
-        check(&doc, "open");
+        check(&mut doc, "open");
         let made = run(
             &mut doc,
             "element.create",

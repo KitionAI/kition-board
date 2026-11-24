@@ -24,6 +24,7 @@ fn direct_and_exchange_batches_refresh_cached_area_and_pixels() {
         }
         assert!(doc.width() > width, "cached area must follow a direct={direct} batch");
         assert_ne!(doc.render(0.0, 0.0, 1.0, 100, 100).unwrap(), pixels, "cached pixels must follow a direct={direct} batch");
+        doc.prepare_save().unwrap();
         let back = BoardDocument::open("Cache.kboard", &doc.save(None).unwrap()).unwrap();
         assert_eq!(doc.model(), back.model());
         assert_eq!(doc.width(), back.width());

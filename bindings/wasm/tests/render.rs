@@ -84,6 +84,7 @@ fn it_never_reads_or_moves_the_shown_page_and_answers_the_same_bytes() {
     assert_eq!(render(&mut doc, call.clone()), first, "the shown page changed the picture");
     doc.execute("page.activate", json!({ "page": ideas })).unwrap();
     // The saved board, reopened, draws the same bytes.
+    doc.prepare_save().unwrap();
     let mut reopened = BoardDocument::open("Plan.kboard", &doc.save(None).unwrap()).unwrap();
     assert_eq!(render(&mut reopened, call), first, "a reopened board draws the same bytes");
 }

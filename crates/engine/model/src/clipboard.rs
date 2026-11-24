@@ -1,7 +1,7 @@
 //! Copies of elements: the clipboard payload (`clipboard.copy`, `element.paste`), and the same
 //! machinery for `element.duplicate` and `page.duplicate`.
 //!
-//! The payload (`application/x-kition-board+json`, version 2) lists elements with a `ref` (their
+//! The payload (`application/x-kition-board+json`, version 1) lists elements with a `ref` (their
 //! id where they were copied) and their fields; `parent` and binding targets name refs. Pasting
 //! makes new ids, keeps references inside the payload, keeps a binding to an element outside it
 //! when that element is on the destination page, and frees the end otherwise.
@@ -24,7 +24,7 @@ use crate::params::{self, MAX_OBJECTS, Result, invalid};
 /// The payload's MIME type, as the editor puts it on the system clipboard.
 pub const PAYLOAD_TYPE: &str = "application/x-kition-board+json";
 /// The payload version.
-pub const PAYLOAD_VERSION: u64 = 2;
+pub const PAYLOAD_VERSION: u64 = 1;
 
 /// One element as the payload holds it.
 pub fn element_json(element: &Element) -> Value {

@@ -91,7 +91,8 @@ fn a_card_on_the_board_it_was_made_for_is_not_changed() {
     let _lending = LENDING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let lent = std::env::temp_dir().join(format!("kition-board-changed-{}", std::process::id()));
     std::fs::create_dir_all(&lent).unwrap();
-    let target = BoardDocument::create("Target.kboard", 1920, 1080).unwrap();
+    let mut target = BoardDocument::create("Target.kboard", 1920, 1080).unwrap();
+    target.prepare_save().unwrap();
     std::fs::write(lent.join("Target.kboard"), target.save(None).unwrap()).unwrap();
     kition_kit::host::set_root(Some(lent.clone()));
     kition_kit::host::set_folder("");

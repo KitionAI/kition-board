@@ -35,7 +35,7 @@ fn payload() -> Value {
             last = Some(format!("e{i}"));
         }
     }
-    json!({ "type": "application/x-kition-board+json", "version": 2, "elements": elements })
+    json!({ "type": "application/x-kition-board+json", "version": 1, "elements": elements })
 }
 
 fn ms(since: Instant) -> f64 {

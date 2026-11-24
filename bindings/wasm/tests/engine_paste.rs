@@ -23,7 +23,7 @@ fn run(doc: &mut BoardDocument, command: &str, params: Value) -> Value {
 }
 
 fn payload(elements: Value) -> Value {
-    json!({"type":"application/x-kition-board+json","version":2,"elements":elements})
+    json!({"type":"application/x-kition-board+json","version":1,"elements":elements})
 }
 
 fn paste(doc: &mut BoardDocument, elements: Value, at: Option<[f64; 2]>) -> Vec<String> {
@@ -41,11 +41,12 @@ fn stored_end(doc: &BoardDocument, id: &str, terminal: &str) -> End {
 
 /// What the board shows after saving and opening the file again: the open-time repair changes
 /// nothing on a healthy board.
-fn reopened(doc: &BoardDocument) -> BoardModel {
+fn reopened(doc: &mut BoardDocument) -> BoardModel {
+    doc.prepare_save().unwrap();
     BoardDocument::open("Paste.kboard", &doc.save(None).unwrap()).unwrap().model().clone()
 }
 
-fn healthy(doc: &BoardDocument, what: &str) {
+fn healthy(doc: &mut BoardDocument, what: &str) {
     assert_eq!(&reopened(doc), doc.model(), "{what}: the repair would change the pasted board");
 }
 
@@ -70,7 +71,7 @@ fn a_pasted_binding_to_what_takes_none_is_freed() {
     let connector = &made[1];
     assert!(stored_end(&doc, connector, "start").binding.is_none(), "bound to a stroke");
     assert!(stored_end(&doc, connector, "end").binding.is_none(), "bound to a group");
-    healthy(&doc, "bindings");
+    healthy(&mut doc, "bindings");
 }
 
 /// A pasted anchor is clamped to [0, 1] (rule V7) as connector.create clamps one.
@@ -86,7 +87,7 @@ fn a_pasted_anchor_is_clamped() {
         None,
     );
     assert_eq!(stored_end(&doc, &made[1], "start").binding.unwrap().anchor, [1.0, 0.0]);
-    healthy(&doc, "anchor");
+    healthy(&mut doc, "anchor");
 }
 
 /// A pasted `parent` is kept only where it names a container of the payload and makes no cycle
@@ -107,7 +108,7 @@ fn a_pasted_parent_must_be_a_container() {
     let parent = |id: &str| doc.model().element(&ObjectId::from_string(id)).unwrap().parent.clone();
     assert_eq!(parent(&made[1]), None, "a shape contains nothing");
     assert!(parent(&made[2]).is_none() || parent(&made[3]).is_none(), "no cycle");
-    healthy(&doc, "parents");
+    healthy(&mut doc, "parents");
 }
 
 /// `at` puts the copies' top-left there, a connector's points counted.

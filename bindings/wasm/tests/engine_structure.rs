@@ -53,6 +53,7 @@ fn ungrouping_nested_groups_together_frees_every_member() {
             assert_eq!(parent(&doc, id), None, "outer_first={outer_first}: {id} keeps no deleted parent");
         }
         let saved = doc.model().clone();
+        doc.prepare_save().unwrap();
         let reopened = BoardDocument::open("Structure.kboard", &doc.save(None).unwrap()).unwrap();
         assert_eq!(reopened.model(), &saved, "outer_first={outer_first}: no repair on reopen");
     }

@@ -36,6 +36,7 @@ fn open(name: &str) -> (Headless<BoardDocument>, String, std::path::PathBuf) {
     for name in ["Ideas", "Later"] {
         board.execute("page.create", json!({ "name": name })).unwrap();
     }
+    board.prepare_save().unwrap();
     std::fs::write(root.join("Plan.kboard"), board.save(None).unwrap()).unwrap();
     let mut kit = kit();
     let folder = HostFolder::new(&root).unwrap();

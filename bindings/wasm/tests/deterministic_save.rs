@@ -27,6 +27,7 @@ fn build() -> Vec<u8> {
         ] }),
     )
     .unwrap();
+    doc.prepare_save().unwrap();
     doc.save(Some("plan.kboard")).unwrap()
 }
 

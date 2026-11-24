@@ -34,6 +34,7 @@ fn issue_draft_replica_blobs_a_board_opens_from_its_exported_replica_with_its_pi
     let root = std::fs::canonicalize(root).unwrap();
     let mut board = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     board.execute("image.insert", json!({ "data": PICTURE, "mime": "image/png", "position": [0, 0] })).unwrap();
+    board.prepare_save().unwrap();
     std::fs::write(root.join("Plan.kboard"), board.save(None).unwrap()).unwrap();
 
     let mut kit = Headless::<BoardDocument>::with_replica_port(

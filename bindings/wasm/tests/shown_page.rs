@@ -39,6 +39,7 @@ fn four_pages(doc: &mut BoardDocument) -> [String; 4] {
 fn showing_a_page_is_not_an_edit() {
     let mut doc = board();
     let [_, b, ..] = four_pages(&mut doc);
+    doc.prepare_save().unwrap();
     let saved = doc.save(Some(FILE)).unwrap();
     assert!(!saved.is_empty());
     doc.mark_saved();
@@ -109,6 +110,7 @@ fn an_agent_deleting_the_persons_page_leaves_them_on_its_neighbour() {
 fn a_co_editor_deleting_the_shown_page_leaves_the_editor_on_its_neighbour() {
     let mut live = board();
     let [a, b, c, _] = four_pages(&mut live);
+    live.prepare_save().unwrap();
     let bytes = live.save(Some(FILE)).unwrap();
     live.mark_saved();
     let mut peer = BoardDocument::open(FILE, &bytes).unwrap();

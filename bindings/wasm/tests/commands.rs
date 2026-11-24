@@ -537,9 +537,12 @@ fn cards_and_pictures_read_workspace_files_through_the_host() {
     let root = std::env::temp_dir().join(format!("kition-board-cards-{}", std::process::id()));
     std::fs::create_dir_all(root.join("plans")).unwrap();
     let mut doc = board();
+    doc.prepare_save().unwrap();
     let own = doc.save(None).unwrap();
     std::fs::write(root.join("plans/Self.kboard"), &own).unwrap();
-    let other = board().save(None).unwrap();
+    let mut other = board();
+    other.prepare_save().unwrap();
+    let other = other.save(None).unwrap();
     std::fs::write(root.join("plans/Map.kboard"), &other).unwrap();
     let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
     png.extend_from_slice(&1600u32.to_be_bytes());
@@ -585,6 +588,7 @@ fn cards_and_pictures_read_workspace_files_through_the_host() {
     fails(&mut doc, "image.insert", json!({ "file": "plans/chart.png", "mime": "image/jpeg" }), "invalid-params");
     fails(&mut doc, "image.insert", json!({ "file": "plans/missing.png" }), "invalid-params: cannot read");
     fails(&mut doc, "image.insert", json!({ "file": "../outside.png" }), "invalid-params: cannot read");
+    doc.prepare_save().unwrap();
     let saved = doc.save(None).unwrap();
     assert_eq!(kition_board_kboard::read(&saved).unwrap().blobs.len(), 2);
 
@@ -662,6 +666,7 @@ fn copy_and_paste_within_and_across_pages() {
     let connector = ids(&run(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
     let payload = run(&mut doc, "clipboard.copy", json!({ "ids": [a, connector] }));
     assert_eq!(payload["type"], "application/x-kition-board+json");
+    assert_eq!(payload["version"], 1, "the clipboard format is version 1");
     assert_eq!(payload["elements"].as_array().unwrap().len(), 2);
     let pasted = ids(&run(&mut doc, "element.paste", json!({ "payload": payload })));
     assert_eq!(element(&doc, &pasted[0]).position, Some(Point::new(24.0, 24.0)), "offset on the same page");
@@ -680,7 +685,7 @@ fn copy_and_paste_within_and_across_pages() {
     fails(
         &mut doc,
         "element.paste",
-        json!({ "payload": { "type": "application/x-kition-board+json", "version": 2, "elements": [{ "ref": "x", "kind": "shape", "position": "nowhere" }] } }),
+        json!({ "payload": { "type": "application/x-kition-board+json", "version": 1, "elements": [{ "ref": "x", "kind": "shape", "position": "nowhere" }] } }),
         "invalid-params",
     );
 }

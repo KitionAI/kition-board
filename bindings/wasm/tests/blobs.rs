@@ -38,6 +38,7 @@ fn add_picture(doc: &mut BoardDocument, bytes: &[u8]) -> String {
 fn pictures_travel_in_the_file() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let hash = add_picture(&mut doc, PICTURE);
+    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     let parts = kboard::read(&bytes).unwrap();
     assert_eq!(parts.blobs.get(&hash).map(Vec::as_slice), Some(PICTURE));
@@ -60,6 +61,7 @@ fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
     KitSessionDocument::import_changes(&mut b, &changes).unwrap();
     assert_eq!(b.missing_blobs(), vec![hash.clone()]);
     assert_eq!(b.inspect().unwrap()["missingBlobs"], json!([hash.clone()]));
+    b.prepare_save().unwrap();
     let without = kboard::read(&b.save(None).unwrap()).unwrap();
     assert!(without.blobs.is_empty(), "a save never invents bytes it lacks");
     // Then the blobs: only what b lacks.
@@ -70,6 +72,7 @@ fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
     assert!(b.revision() > revision);
     assert!(b.missing_blobs().is_empty());
     assert!(!b.add_blobs(&bundle).unwrap(), "adding them again changes nothing");
+    b.prepare_save().unwrap();
     assert_eq!(kboard::read(&b.save(None).unwrap()).unwrap().blobs.get(&hash).map(Vec::as_slice), Some(PICTURE));
     // A peer at the current version needs nothing; one with nothing needs every referenced blob.
     assert!(b.blobs_since(&b.version().encode()).unwrap().is_empty());
@@ -85,11 +88,13 @@ fn a_board_opens_from_a_stored_replica_and_its_blobs() {
     assert_eq!(alone.doc_id(), a.doc_id());
     assert!(alone.has_blob(&hash));
     // With the file too, edits only the file has are kept.
+    a.prepare_save().unwrap();
     let file = a.save(None).unwrap();
     let mut later = BoardDocument::open("Plan.kboard", &file).unwrap();
     later
         .execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 300 }, "size": { "w": 50, "h": 50 } }] }))
         .unwrap();
+    later.prepare_save().unwrap();
     let newer_file = later.save(None).unwrap();
     let both = BoardDocument::open_with_replica("Plan.kboard", &newer_file, &snapshot, &[]).unwrap();
     assert_eq!(both.doc_id(), a.doc_id());
@@ -140,6 +145,7 @@ fn a_deleted_picture_leaves_its_bytes_out_of_the_file() {
         .unwrap()
         .clone();
     doc.execute("element.delete", json!({ "ids": [id.as_str()] })).unwrap();
+    doc.prepare_save().unwrap();
     let parts = kboard::read(&doc.save(None).unwrap()).unwrap();
     assert!(parts.blobs.contains_key(&kept));
     assert!(!parts.blobs.contains_key(&gone), "the deleted picture's bytes are not in the file");

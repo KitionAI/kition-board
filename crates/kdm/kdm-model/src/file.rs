@@ -48,13 +48,10 @@ pub struct OpenedFile {
     pub detached: Vec<(ObjectId, DanglingEnd)>,
 }
 
-/// A save: the file's bytes, what the file then holds, and the seal the save made.
+/// A save: the file's bytes and what the file then holds.
 pub struct SavedFile {
     pub bytes: Vec<u8>,
     pub base: FileBase,
-    /// The seal of the fallback in [`save_file`] (a replica nobody sealed): changes to import into
-    /// the replica once the file is stored. `None` on the direct path.
-    pub seal: Option<Vec<u8>>,
 }
 
 /// The connector ends of `replica` that rule V6 would detach, with their pages.
@@ -155,48 +152,19 @@ pub fn repair_once(replica: &mut Replica) -> Result<bool> {
     transact(replica, &Origin::system("repair"), crate::validate::repair)
 }
 
-/// The actor that seals a copy of a replica at `version` (the fallback in [`save_file`]): one
-/// per version, so saving one version twice writes the same seal, and two versions never share a
-/// seal's change id.
-fn seal_actor(version: &Version) -> ActorId {
-    let hash = kboard::sha256_hex(&version.encode());
-    let value = hash.get(..16).and_then(|hex| u64::from_str_radix(hex, 16).ok()).unwrap_or(0) >> 1;
-    ActorId::from_u64(value).unwrap_or_else(|_| ActorId::random())
-}
-
-/// What a save writes as `content.bin`: the bytes, the version they hold, and the seal made for
-/// them on a copy, if any.
-struct Content {
-    bytes: Vec<u8>,
-    version: Version,
-    seal: Option<Vec<u8>>,
-}
-
-/// The content `replica` saves as. The direct path: the host sealed the replica
-/// (`KitDocument::prepare_save`, `KitSession::seal`), and its own content snapshot is written.
-fn content(replica: &Replica) -> Result<Content> {
-    let version = replica.version();
-    if replica.is_sealed() {
-        return Ok(Content { bytes: replica.sealed_content_snapshot()?, version, seal: None });
-    }
-    // FALLBACK, delete once the kit editor's `@kition/*` release that calls `prepareSave` before
-    // `save` is in `web/pnpm-lock.yaml`: until then the editor saves a replica nobody sealed, and
-    // `save` sees it read-only. The content of a copy sealed under an actor derived from the
-    // version (the same version gives the same bytes); `mark_saved` imports the seal.
-    let mut sealed = replica.fork(seal_actor(&version))?;
-    sealed.seal()?;
-    let seal = sealed.export_changes(&version)?;
-    Ok(Content { bytes: sealed.sealed_content_snapshot()?, version: sealed.version(), seal: Some(seal) })
-}
-
 /// The file `replica` saves to, with `blobs` (what the state references), and `base` (what its file
-/// holds, when it is the same document, for the entries this build does not know): the bytes,
-/// what the file then holds, and the seal the fallback made. A sealed replica (the direct path)
-/// saves its own content snapshot, the same bytes for the same version.
+/// holds, when it is the same document, for the entries this build does not know): the bytes and
+/// what the file then holds. The replica must be sealed first (`KitDocument::prepare_save`,
+/// `KitSession::seal`, which every host calls before a save): its own content snapshot is written,
+/// the same bytes for the same version. An unsealed replica answers `not-sealed: …`.
 pub fn save_file(replica: &Replica, blobs: BTreeMap<String, Vec<u8>>, base: Option<&FileBase>) -> Result<SavedFile> {
     let doc_id = replica.doc_id().to_string();
     let base = base.filter(|base| base.doc_id == doc_id);
-    let Content { bytes: content, version, seal } = content(replica)?;
+    if !replica.is_sealed() {
+        return Err(KitError::new("not-sealed: the replica is saved after its seal (prepareSave)"));
+    }
+    let version = replica.version();
+    let content = replica.sealed_content_snapshot()?;
     let extra = base.map(|base| base.extra.clone()).unwrap_or_default();
     let parts = Container {
         meta: Meta {
@@ -211,5 +179,5 @@ pub fn save_file(replica: &Replica, blobs: BTreeMap<String, Vec<u8>>, base: Opti
         extra: extra.clone(),
     };
     let bytes = kboard::write(&parts).map_err(|error| KitError::new(error.to_string()))?;
-    Ok(SavedFile { bytes, base: FileBase { version, doc_id, extra }, seal })
+    Ok(SavedFile { bytes, base: FileBase { version, doc_id, extra } })
 }

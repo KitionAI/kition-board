@@ -123,7 +123,7 @@ impl KitModel for BoardModel {
 
     /// The board as a `.kboard` file: its content snapshot (no history) and the blobs its state
     /// references. Seal the replica first (`KitSession::seal`, rule M16b); a replica that is not
-    /// sealed saves the content of a sealed copy, whose seal stays out of this replica.
+    /// sealed answers `not-sealed: …`.
     fn export(&self, replica: &Replica, _name: &str, blobs: &dyn BlobSource) -> Result<Vec<u8>> {
         file::save_file(replica, referenced_blobs(self, blobs), None).map(|saved| saved.bytes)
     }

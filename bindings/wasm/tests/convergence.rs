@@ -435,6 +435,7 @@ impl KitAdapter for BoardKit {
     }
 
     fn export_file(&self, doc: &mut BoardDocument) -> Result<Option<Vec<u8>>> {
+        doc.prepare_save().unwrap();
         doc.save(None).map(Some)
     }
 

@@ -134,6 +134,7 @@ pub fn fixture() -> (BoardDocument, Vec<(String, String)>) {
     role("$Q", other.clone());
     let q1 = created(&doc.execute("element.create", json!({"page":other,"elements":[{"kind":"shape","position":[0,0],"text":"Q1"}]})).unwrap());
     role("$Q1", q1[0].clone());
+    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     (BoardDocument::open("Read.kboard", &bytes).unwrap(), roles)
 }
@@ -414,6 +415,7 @@ fn nested_fixture() -> (BoardDocument, Vec<(String, String)>) {
     doc.execute("element.update", json!({"id":ids["$L"],"set":{"parent":ids["$G"]}})).unwrap();
     doc.execute("element.lock", json!({"ids":[ids["$L"]],"locked":true})).unwrap();
     roles.extend([("$FG".into(), text_of(&fg)), ("$GF".into(), text_of(&gf))]);
+    doc.prepare_save().unwrap();
     (BoardDocument::open("Nested.kboard", &doc.save(None).unwrap()).unwrap(), roles)
 }
 

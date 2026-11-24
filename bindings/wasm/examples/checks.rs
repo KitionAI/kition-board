@@ -33,6 +33,7 @@ fn created(value: &Value) -> String {
 fn board(name: &str, build: impl FnOnce(&mut BoardDocument) -> Result<(), String>) -> Result<Vec<u8>, String> {
     let mut doc = BoardDocument::create(name, 1920, 1080)?;
     build(&mut doc)?;
+    doc.prepare_save()?;
     doc.save(None)
 }
 
@@ -69,7 +70,7 @@ fn main() -> Result<(), String> {
         (
             "check-image-missing-blob.kboard",
             board("Pictures.kboard", |doc| {
-                let payload = json!({ "type": "application/x-kition-board+json", "version": 2, "elements": [{
+                let payload = json!({ "type": "application/x-kition-board+json", "version": 1, "elements": [{
                     "ref": "picture", "kind": "image", "position": { "x": 0, "y": 0 }, "size": { "w": 200, "h": 120 },
                     "image": { "hash": "0000000000000000000000000000000000000000000000000000000000000000", "mime": "image/png", "size": 67 },
                 }] });

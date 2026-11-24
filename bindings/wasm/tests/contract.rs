@@ -10,17 +10,19 @@ fn fixture() -> Vec<u8> {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 40, "y": 40 }, "size": { "w": 160, "h": 100 } }] }))
         .unwrap();
+    doc.prepare_save().unwrap();
     doc.save(None).unwrap()
 }
 
 #[test]
 fn keeps_the_kit_sdk_contract() {
+    // The edit, then the seal a host makes before the contract's save (`prepare_save`, no edit).
     kition_kit::testing::check_contract::<BoardDocument>(&fixture(), "Plan.kboard", |doc| {
         doc.execute(
             "element.create",
             json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 200 }, "size": { "w": 240, "h": 120 } }] }),
-        )
-        .map(|_| ())
+        )?;
+        doc.prepare_save()
     })
     .unwrap();
 }

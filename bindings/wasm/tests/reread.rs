@@ -26,6 +26,7 @@ fn x(doc: &BoardDocument, id: &Value) -> f64 {
 
 /// The board saved and marked saved, as a host stores it; answers the bytes.
 fn store(doc: &mut BoardDocument) -> Vec<u8> {
+    doc.prepare_save().unwrap();
     let bytes = doc.save(Some(FILE)).unwrap();
     doc.mark_saved();
     bytes
@@ -37,6 +38,7 @@ fn outside(bytes: &[u8], steps: &[(&str, Value)]) -> BoardDocument {
     for (command, params) in steps {
         other.execute(command, params.clone()).unwrap();
     }
+    other.prepare_save().unwrap();
     BoardDocument::open(FILE, &other.save(Some(FILE)).unwrap()).unwrap()
 }
 
@@ -64,6 +66,7 @@ fn an_outside_save_keeps_the_agents_undo_and_the_colleagues_edit() {
     assert_eq!(element(&live, &b).text, "Colleague", "undo keeps the colleague's edit");
 
     // The next save appends to the file read: it opens with both writers' work.
+    live.prepare_save().unwrap();
     let saved = BoardDocument::open(FILE, &live.save(Some(FILE)).unwrap()).unwrap();
     assert_eq!(x(&saved, &a), 0.0);
     assert_eq!(element(&saved, &b).text, "Colleague");
@@ -82,8 +85,10 @@ fn a_reread_keeps_the_shown_page_and_refuses_when_the_file_deleted_it() {
     let bytes = store(&mut live);
 
     let deleted = outside(&bytes, &[("page.delete", json!({"page":page}))]);
+    live.prepare_save().unwrap();
     let before = live.save(Some(FILE)).unwrap();
     assert_eq!(live.reconcile_reread(&deleted).unwrap_err(), "deleted active page");
+    live.prepare_save().unwrap();
     assert_eq!(live.save(Some(FILE)).unwrap(), before, "a refused reread changes nothing");
     assert_eq!(live.editor_state(), state);
 }
@@ -93,9 +98,12 @@ fn a_file_of_another_board_is_not_reconciled() {
     let mut live = BoardDocument::create(FILE, 1920, 1080).unwrap();
     live.execute("element.create", json!({"elements":[{"kind":"shape","position":[0,0],"text":"A"}]})).unwrap();
     store(&mut live);
-    let other = BoardDocument::create(FILE, 1920, 1080).unwrap();
+    let mut other = BoardDocument::create(FILE, 1920, 1080).unwrap();
+    other.prepare_save().unwrap();
     let other = BoardDocument::open(FILE, &other.save(Some(FILE)).unwrap()).unwrap();
+    live.prepare_save().unwrap();
     let before = live.save(Some(FILE)).unwrap();
     assert!(!live.reconcile_reread(&other).unwrap());
+    live.prepare_save().unwrap();
     assert_eq!(live.save(Some(FILE)).unwrap(), before);
 }

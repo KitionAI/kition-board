@@ -37,9 +37,11 @@ fn state(doc: &BoardDocument) -> Value {
 /// Saves, reopens and compares; then saves the reopened board and compares once more.
 fn round_trip(doc: &mut BoardDocument) -> BoardDocument {
     let before = state(doc);
+    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
-    let back = BoardDocument::open("Plan.kboard", &bytes).unwrap();
+    let mut back = BoardDocument::open("Plan.kboard", &bytes).unwrap();
     assert_eq!(state(&back), before, "the reopened board differs from the saved one");
+    back.prepare_save().unwrap();
     let again = back.save(None).unwrap();
     let twice = BoardDocument::open("Plan.kboard", &again).unwrap();
     assert_eq!(state(&twice), before, "a second save of the reopened board differs");

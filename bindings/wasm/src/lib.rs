@@ -54,9 +54,8 @@ pub struct BoardDocument {
     /// them while they stay detached).
     detached: Vec<(ObjectId, DanglingEnd)>,
     /// What the file holds after the last `save`, taken as the base by `mark_saved` once the host
-    /// has stored those bytes (edits made in between stay unsaved), with the seal the save made on
-    /// a copy, which `mark_saved` takes into the session.
-    saving: Mutex<Option<(FileBase, Option<Vec<u8>>)>>,
+    /// has stored those bytes (edits made in between stay unsaved).
+    saving: Mutex<Option<FileBase>>,
     /// The page the editor shows (view state, `inspect().page`). It keeps naming a page another
     /// writer, an undo or a delete removed (an agent's command there is refused, and a redo or an
     /// undo that brings the page back shows it again); meanwhile the editor shows `fallback`.
@@ -372,17 +371,16 @@ impl KitDocument for BoardDocument {
     /// file's version. `name`, when given, must be a `.kboard` name.
     ///
     /// The content is sealed (kition-sdk data model 7.3): hosts call [`KitDocument::prepare_save`]
-    /// first, which seals the session, and the file holds the replica's own content snapshot. The
-    /// one fallback, for an editor that does not call `prepareSave` yet: a replica nobody sealed
-    /// saves the content of a sealed copy, and [`KitDocument::mark_saved`] takes that seal into
-    /// the session (`kition_board_kdm::file::save_file`).
+    /// first, which seals the session, and the file holds the replica's own content snapshot. A
+    /// save the session was not sealed for answers `not-sealed: …`
+    /// (`kition_board_kdm::file::save_file`).
     fn save(&self, name: Option<&str>) -> Result<Vec<u8>, String> {
         if let Some(name) = name {
             check_name(name)?;
         }
         let saved = file::save_file(self.session.replica(), self.file_blobs(), self.base.as_ref())?;
         if let Ok(mut saving) = self.saving.lock() {
-            *saving = Some((saved.base, saved.seal));
+            *saving = Some(saved.base);
         }
         Ok(saved.bytes)
     }
@@ -491,15 +489,10 @@ impl KitDocument for BoardDocument {
         self.set_call_context(context)
     }
 
-    /// Records the last save as what the file holds, and takes the seal that save made into the
-    /// session (no edit: the state, the revision and the undo histories stay as they are).
+    /// Records the last save as what the file holds (no edit: the state, the revision and the undo
+    /// histories stay as they are).
     fn mark_saved(&mut self) {
-        if let Some((base, seal)) = self.saving.get_mut().ok().and_then(Option::take) {
-            // The fallback's seal (see `save`; delete with it once the kit editor calls
-            // `prepareSave`). One that does not import leaves the session as it was.
-            if let Some(seal) = seal {
-                let _ = self.session.import_changes(&seal);
-            }
+        if let Some(base) = self.saving.get_mut().ok().and_then(Option::take) {
             self.base = Some(base);
         }
         self.saved = self.revision;

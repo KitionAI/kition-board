@@ -50,9 +50,11 @@ fn board() -> Vec<u8> {
         )
         .unwrap();
     let secret = made["created"][2].clone();
+    doc.prepare_save().unwrap();
     let first = doc.save(None).unwrap();
     let mut doc = BoardDocument::open("Plan.kboard", &first).unwrap();
     doc.execute("element.delete", json!({ "ids": [secret] })).unwrap();
+    doc.prepare_save().unwrap();
     let saved = doc.save(None).unwrap();
     assert!(holds(&kition_kit::session::__snapshot(&doc).unwrap(), SECRET), "the control: the session's history holds the deleted text");
     let mut parts = kition_board_kboard::read(&saved).unwrap();
@@ -145,6 +147,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     let mut opened = BoardDocument::open("Fork.kboard", &fork_bytes).unwrap();
     assert_eq!(opened.doc_id(), fork_id);
     opened.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 300], "text": "New" }] })).unwrap();
+    opened.prepare_save().unwrap();
     let edited = opened.save(None).unwrap();
     let reopened = BoardDocument::open("Fork.kboard", &edited).unwrap();
     assert_eq!((reopened.doc_id(), reopened.model().element_count()), (fork_id.clone(), opened.model().element_count()));
@@ -168,6 +171,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     assert!(whole_history(&again_bytes), "a fork of a fork carries its whole history");
     let mut again_doc = BoardDocument::open("Again.kboard", &again_bytes).unwrap();
     again_doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [300, 300], "text": "Again" }] })).unwrap();
+    again_doc.prepare_save().unwrap();
     let again_edited = again_doc.save(None).unwrap();
     let again_reopened = BoardDocument::open("Again.kboard", &again_edited).unwrap();
     assert_eq!(again_reopened.doc_id(), again, "and keeps its id after an edit, a save and a reopen");

@@ -81,7 +81,7 @@ function bigPayload() {
       last = `e${i}`
     }
   }
-  return { type: 'application/x-kition-board+json', version: 2, elements }
+  return { type: 'application/x-kition-board+json', version: 1, elements }
 }
 
 try {
