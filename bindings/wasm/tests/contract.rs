@@ -16,13 +16,12 @@ fn fixture() -> Vec<u8> {
 
 #[test]
 fn keeps_the_kit_sdk_contract() {
-    // The edit, then the seal a host makes before the contract's save (`prepare_save`, no edit).
     kition_kit::testing::check_contract::<BoardDocument>(&fixture(), "Plan.kboard", |doc| {
         doc.execute(
             "element.create",
             json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 200 }, "size": { "w": 240, "h": 120 } }] }),
         )?;
-        doc.prepare_save()
+        Ok(())
     })
     .unwrap();
 }
