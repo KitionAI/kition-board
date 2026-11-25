@@ -1,5 +1,0 @@
-{"kdm":1,"kit":"kit.board","docId":"01a16848-e64c-70b8-b752-fab0ce81c2dd","schemaVersion":1,"objects":{
-"01a16848-e64c-70b8-b752-fab10b6d28eb":{"$type":"Page","elements":["01a16848-e64c-70b8-b752-fab281907308"],"name":"Page 1"},
-"01a16848-e64c-70b8-b752-fab281907308":{"$type":"Element","kind":"shape","position":{"x":0,"y":0},"shapeType":"rectangle","size":{"h":40,"w":80},"text":[{"insert":"A label far too long for its small box, on many lines"}]},
-"board":{"$type":"Board","pages":["01a16848-e64c-70b8-b752-fab10b6d28eb"],"title":"Overflow"}
-}}

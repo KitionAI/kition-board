@@ -93,7 +93,7 @@ fn a_file_of_another_board_is_not_reconciled() {
     let mut live = BoardDocument::create(FILE, 1920, 1080).unwrap();
     live.execute("element.create", json!({"elements":[{"kind":"shape","position":[0,0],"text":"A"}]})).unwrap();
     store(&mut live);
-    let mut other = BoardDocument::create(FILE, 1920, 1080).unwrap();
+    let other = BoardDocument::create(FILE, 1920, 1080).unwrap();
     let other = BoardDocument::open(FILE, &other.save(Some(FILE)).unwrap()).unwrap();
     let before = live.save(Some(FILE)).unwrap();
     assert!(!live.reconcile_reread(&other).unwrap());

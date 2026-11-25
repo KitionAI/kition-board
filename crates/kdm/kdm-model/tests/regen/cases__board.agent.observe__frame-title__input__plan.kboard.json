@@ -1,8 +1,0 @@
-{"kdm":1,"kit":"kit.board","docId":"01a18a90-f63b-766f-ba5b-794fcb84f314","schemaVersion":1,"objects":{
-"01a18a90-f63c-76bf-bdef-245dd84b017f":{"$type":"Page","elements":["01a18a90-f63d-74f3-bebb-52aee9e169c1","01a18a90-f63e-7428-86a6-6e44f54b183d","01a18a90-f63e-7428-86a6-6e459211c5e1","01a18a90-f63f-7732-949b-6134beda5069"],"name":"Page 1"},
-"01a18a90-f63d-74f3-bebb-52aee9e169c1":{"$type":"Element","kind":"frame","position":{"x":0,"y":0},"size":{"h":320,"w":640},"text":[{"insert":"Sprint"}]},
-"01a18a90-f63e-7428-86a6-6e44f54b183d":{"$type":"Element","kind":"shape","parent":"01a18a90-f63d-74f3-bebb-52aee9e169c1","position":{"x":60,"y":120},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Plan"}]},
-"01a18a90-f63e-7428-86a6-6e459211c5e1":{"$type":"Element","kind":"shape","parent":"01a18a90-f63d-74f3-bebb-52aee9e169c1","position":{"x":420,"y":120},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Build"}]},
-"01a18a90-f63f-7732-949b-6134beda5069":{"$type":"Element","end":{"binding":{"anchor":[0,0.5],"target":"01a18a90-f63e-7428-86a6-6e459211c5e1"},"point":[420,160]},"endArrowhead":"arrow","kind":"connector","start":{"binding":{"anchor":[1,0.5],"target":"01a18a90-f63e-7428-86a6-6e44f54b183d"},"point":[220,160]}},
-"board":{"$type":"Board","pages":["01a18a90-f63c-76bf-bdef-245dd84b017f"],"title":"Plan"}
-}}

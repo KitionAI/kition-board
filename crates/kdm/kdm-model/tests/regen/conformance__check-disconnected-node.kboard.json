@@ -1,6 +1,0 @@
-{"kdm":1,"kit":"kit.board","docId":"01a16848-e64d-76be-b587-68413c7c8da4","schemaVersion":1,"objects":{
-"01a16848-e64d-76be-b587-6842225f4208":{"$type":"Page","elements":["01a16848-e64d-76be-b587-6843e3e683e3","01a16848-e64e-745b-b4c7-e7b1a2bd7d78"],"name":"Page 1"},
-"01a16848-e64d-76be-b587-6843e3e683e3":{"$type":"Element","kind":"shape","position":{"x":0,"y":0},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Plan"}]},
-"01a16848-e64e-745b-b4c7-e7b1a2bd7d78":{"$type":"Element","kind":"shape","position":{"x":400,"y":0},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Build"}]},
-"board":{"$type":"Board","pages":["01a16848-e64d-76be-b587-6842225f4208"],"title":"Flow"}
-}}

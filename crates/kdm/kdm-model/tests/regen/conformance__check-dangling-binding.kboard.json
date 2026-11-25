@@ -1,7 +1,0 @@
-{"kdm":1,"kit":"kit.board","docId":"01a168df-fc56-7327-9f97-91eb0832eee9","schemaVersion":1,"objects":{
-"01a168df-fc56-7327-9f97-91ec5e5b0c97":{"$type":"Page","elements":["01a168df-fc56-7327-9f97-91edf2330d40","01a168df-fc56-7327-9f97-91ee25f85638","01a168df-fc56-7327-9f97-91efc076320c"],"name":"Page 1"},
-"01a168df-fc56-7327-9f97-91edf2330d40":{"$type":"Element","kind":"shape","position":{"x":0,"y":0},"shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Plan"}]},
-"01a168df-fc56-7327-9f97-91ee25f85638":{"$type":"Element","kind":"shape","position":{"x":400,"y":0},"shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Build"}]},
-"01a168df-fc56-7327-9f97-91efc076320c":{"$type":"Element","end":{"binding":{"anchor":[0,0.5],"target":"gone-element"},"point":[400,40]},"endArrowhead":"arrow","kind":"connector","start":{"binding":{"anchor":[1,0.5],"target":"01a168df-fc56-7327-9f97-91edf2330d40"},"point":[160,40]}},
-"board":{"$type":"Board","pages":["01a168df-fc56-7327-9f97-91ec5e5b0c97"],"title":"Dangling"}
-}}

@@ -1,7 +1,0 @@
-{"kdm":1,"kit":"kit.board","docId":"01a16848-e64d-76be-b587-683c31297873","schemaVersion":1,"objects":{
-"01a16848-e64d-76be-b587-683de03f5154":{"$type":"Page","elements":["01a16848-e64d-76be-b587-683efec08b74","01a16848-e64d-76be-b587-683fa3e1370f","01a16848-e64d-76be-b587-6840af5e08fa"],"name":"Page 1"},
-"01a16848-e64d-76be-b587-683efec08b74":{"$type":"Element","kind":"shape","position":{"x":0,"y":0},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Plan"}]},
-"01a16848-e64d-76be-b587-683fa3e1370f":{"$type":"Element","kind":"shape","position":{"x":80,"y":20},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Build"}]},
-"01a16848-e64d-76be-b587-6840af5e08fa":{"$type":"Element","end":{"binding":{"anchor":[0,0.25],"target":"01a16848-e64d-76be-b587-683fa3e1370f"},"point":[80,40]},"endArrowhead":"arrow","kind":"connector","start":{"binding":{"anchor":[1,0.75],"target":"01a16848-e64d-76be-b587-683efec08b74"},"point":[160,60]}},
-"board":{"$type":"Board","pages":["01a16848-e64d-76be-b587-683de03f5154"],"title":"Overlap"}
-}}

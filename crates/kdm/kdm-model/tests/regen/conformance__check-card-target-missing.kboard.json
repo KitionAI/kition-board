@@ -1,5 +1,0 @@
-{"kdm":1,"kit":"kit.board","docId":"01a16848-e647-7170-88e2-d9d7e8acb605","schemaVersion":1,"objects":{
-"01a16848-e649-715e-88c7-24c1e752aa7a":{"$type":"Page","elements":["01a16848-e64a-7474-bd9a-b8fad4e8dbb0"],"name":"Page 1"},
-"01a16848-e64a-7474-bd9a-b8fad4e8dbb0":{"$type":"Element","card":{"kind":"note","target":{"path":"plans/Missing.md"}},"kind":"card","position":{"x":0,"y":0},"size":{"h":200,"w":320}},
-"board":{"$type":"Board","pages":["01a16848-e649-715e-88c7-24c1e752aa7a"],"title":"Cards"}
-}}

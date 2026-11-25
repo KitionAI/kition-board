@@ -51,20 +51,3 @@ fn every_committed_sample_loads_and_saves_to_its_own_bytes() {
         assert_eq!(kit_save(&parts.content, parts.blobs), bytes, "{sample} saves to its own bytes");
     }
 }
-
-/// TEMPORARY (plain model sample conversion, deleted in the next commit): saves each converted
-/// `content.json` (`tests/regen/<path with / as __>.json`, written by kition-sdk's
-/// `tools/convert-content`) through the kit and prints the file as base64, then fails so CI shows
-/// the output.
-#[test]
-fn regenerate_samples() {
-    let regen = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/regen");
-    let mut printed = 0;
-    for sample in samples() {
-        let content = std::fs::read(regen.join(format!("{}.json", sample.replace('/', "__")))).unwrap();
-        let bytes = kit_save(&content, Default::default());
-        println!("REGEN {sample} {}", kboard::base64_encode(&bytes));
-        printed += 1;
-    }
-    panic!("REGEN printed {printed} samples");
-}

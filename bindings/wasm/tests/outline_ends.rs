@@ -87,7 +87,7 @@ fn an_end_at_a_diamonds_box_corner_meets_the_diamond() {
 
 #[test]
 fn the_end_is_the_same_after_save_and_reopen() {
-    let (mut doc, _, connector) = board();
+    let (doc, _, connector) = board();
     let before = fragment(&doc, &connector);
     let bytes = doc.save(None).unwrap();
     let reopened = BoardDocument::open("Ends.kboard", &bytes).unwrap();
