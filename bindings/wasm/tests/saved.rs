@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 
 fn check(doc: &mut BoardDocument, label: &str) -> Value {
     let state = doc.session().replica().state_json().unwrap();
-    doc.prepare_save().unwrap();
     let saved = doc.save(None).unwrap();
     let back = BoardDocument::open("Invariant.kboard", &saved).unwrap();
     assert_eq!(state, back.session().replica().state_json().unwrap(), "replica after {label}");

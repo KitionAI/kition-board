@@ -1,0 +1,11 @@
+{"kdm":1,"kit":"kit.board","docId":"01a1cef6-5ad9-7151-9fc8-ab973b099684","schemaVersion":1,"objects":{
+"01a1cef6-5adb-77d7-823a-abd15b5f077a":{"$type":"Page","elements":["01a1cef6-5ade-703b-9d65-4d56573cbb49","01a1cef6-5add-727c-8750-4e5cfaf0ec5d","01a1cef6-5add-727c-8750-4e5dab844504","01a1cef6-5ade-703b-9d65-4d554e052e60"],"name":"Plan"},
+"01a1cef6-5add-727c-8750-4e5cfaf0ec5d":{"$type":"Element","kind":"shape","parent":"01a1cef6-5ade-703b-9d65-4d56573cbb49","position":{"x":60,"y":120},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Plan"}]},
+"01a1cef6-5add-727c-8750-4e5dab844504":{"$type":"Element","kind":"shape","parent":"01a1cef6-5ade-703b-9d65-4d56573cbb49","position":{"x":420,"y":120},"shapeStyle":"flow-node","shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Build"}]},
+"01a1cef6-5ade-703b-9d65-4d554e052e60":{"$type":"Element","end":{"binding":{"anchor":[0,0.5],"target":"01a1cef6-5add-727c-8750-4e5dab844504"},"point":[420,160]},"endArrowhead":"arrow","kind":"connector","start":{"binding":{"anchor":[1,0.5],"target":"01a1cef6-5add-727c-8750-4e5cfaf0ec5d"},"point":[220,160]}},
+"01a1cef6-5ade-703b-9d65-4d56573cbb49":{"$type":"Element","kind":"frame","position":{"x":0,"y":0},"size":{"h":320,"w":640},"text":[{"insert":"Sprint"}]},
+"01a1cef6-5adf-70ae-a855-bed52ad2dc19":{"$type":"Page","elements":["01a1cef6-5adf-70ae-a855-bed7df6b4dd8","01a1cef6-5adf-70ae-a855-bed634009e5c"],"name":"Retro"},
+"01a1cef6-5adf-70ae-a855-bed634009e5c":{"$type":"Element","kind":"shape","parent":"01a1cef6-5adf-70ae-a855-bed7df6b4dd8","position":{"x":40,"y":80},"shapeStyle":"sticky","shapeType":"rectangle","size":{"h":120,"w":160},"text":[{"insert":"Demo"}]},
+"01a1cef6-5adf-70ae-a855-bed7df6b4dd8":{"$type":"Element","kind":"frame","position":{"x":0,"y":0},"size":{"h":320,"w":640},"text":[{"insert":"Went well"}]},
+"board":{"$type":"Board","pages":["01a1cef6-5adb-77d7-823a-abd15b5f077a","01a1cef6-5adf-70ae-a855-bed52ad2dc19"],"size":{"h":1080,"w":1920},"title":"retro"}
+}}

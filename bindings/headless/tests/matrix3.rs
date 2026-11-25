@@ -66,7 +66,6 @@ impl Board {
         for name in ["r", "v", "w"] {
             ids.insert(name, doc.execute("page.create", json!({"name":name})).unwrap()["page"].clone());
         }
-        doc.prepare_save().unwrap();
         std::fs::write(f.dir.path().join("Test.kboard"), doc.save(None).unwrap()).unwrap();
         Self { f, ids }
     }
@@ -534,7 +533,6 @@ async fn own_dependencies(waiting: bool) {
                     let added = doc.execute("mindmap.addChild", json!({"node":b.ids["n"],"text":"Grandchild"})).unwrap();
                     b.ids.insert("nn", added["node"].clone());
                     b.ids.insert("nn-edge", added["created"][0].clone());
-                    doc.prepare_save().unwrap();
                     std::fs::write(b.f.dir.path().join("Test.kboard"), doc.save(None).unwrap()).unwrap();
                 }
                 let p = params(&b, &row);
@@ -660,7 +658,6 @@ async fn named_targets_and_content_extremes(waiting: bool) {
                     )
                     .unwrap();
                 b.ids.insert("extreme", added["created"][0].clone());
-                doc.prepare_save().unwrap();
                 std::fs::write(b.f.dir.path().join("Test.kboard"), doc.save(None).unwrap()).unwrap();
             }
             let p = params(&b, &row);

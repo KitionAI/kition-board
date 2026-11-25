@@ -125,11 +125,11 @@ features:
     cases: [board.platform.document-identity/fork, board.platform.document-identity/no-replica]
     since: "2026-11-20"
   - id: board.file.content-only
-    title: "A .kboard holds the board's content, not its history: a sealed content snapshot and the blobs the state references, no change log, no deleted content, no origins (kition-sdk rule M16b); it opens as the same document alone or on the host's stored replica"
+    title: "A .kboard holds the board's content, not its history: content.json (the KDM content encoding, kition-sdk data model 7.4) and the blobs the state references, no change log, no deleted content, no version, no origins (kition-sdk rule M16b); it opens as the same document alone or on the host's stored replica"
     dimension: [platform, data-safety]
     priority: P0
     status: has
-    paths: [crates/formats/kboard/src/lib.rs, crates/kdm/kdm-model/src/file.rs, bindings/wasm/src/lib.rs, bindings/wasm/src/collab.rs, bindings/wasm/tests/content_file.rs, bindings/headless/tests/content_file.rs, crates/kdm/kdm-model/tests/file.rs, web/tests/history.mjs]
+    paths: [crates/formats/kboard/src/lib.rs, crates/kdm/kdm-model/src/file.rs, bindings/wasm/src/lib.rs, bindings/wasm/src/collab.rs, bindings/wasm/tests/content_file.rs, bindings/headless/tests/content_file.rs, crates/kdm/kdm-model/tests/file.rs, crates/kdm/kdm-model/tests/samples.rs, web/tests/history.mjs]
     cases: [board.file.content-only/no-history, board.file.content-only/reopen-and-converge]
     since: "2026-11-22"
   - id: board.collab.live
@@ -137,15 +137,15 @@ features:
     dimension: [collab, data-safety]
     priority: P1
     status: partial
-    paths: [crates/engine/model/src/lib.rs, crates/kdm/kdm-model/src/validate.rs, bindings/wasm/tests/convergence.rs, web/src/board/sync.ts, web/src/canvas/BoardCanvas.tsx]
+    paths: [crates/engine/model/src/lib.rs, crates/kdm/kdm-model/src/validate.rs, web/src/board/sync.ts, web/src/canvas/BoardCanvas.tsx]
     gap: >-
-      The engine side is done: every edit is a KDM change with stable ids, imports repair
-      deterministically, and the convergence suite and the board's own scenarios pass on 2 to 5
-      replicas. Not yet: presence (the editor does not list `presence`, so cursors and selections
-      are not shared or drawn), a gesture or text box over an element another person deletes is
-      not cancelled before its commit fails, and there is no two-editor browser check (no
-      workspace host in web/tests).
-    cases: [board.collab.live/converges, regressions/issue-coedit-local-edit-left-a-repair]
+      Kition Desktop is for one person since the plain document model (kition-sdk 91cf510, plan
+      2026-11-24): the KDM no longer merges concurrent edits, so the convergence suite and the
+      board's merge scenarios are gone; co-editing comes back with Kition One's server-ordered
+      changes. What stays: every edit is a KDM change with stable ids, the page's replica follows
+      the engine's changes in order, and a command leaves nothing for the repair to change. Not
+      yet: presence, a server-ordered change stream, and a two-editor browser check.
+    cases: [regressions/issue-coedit-local-edit-left-a-repair]
     since: "2026-11-17"
   - id: board.elements
     title: "Create, select, move, resize, rotate, style, group, stack and lock elements"

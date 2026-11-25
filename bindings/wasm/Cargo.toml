@@ -31,5 +31,3 @@ kition-kit = { workspace = true, features = ["reproducible-ids"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 kition-board-kboard = { workspace = true }
 kition-board-model = { workspace = true }
-# The Kition platform convergence suite (L6), on the same kition-sdk revision.
-kition-convergence = { workspace = true }

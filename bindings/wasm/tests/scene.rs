@@ -165,7 +165,6 @@ fn issue_1_create_sets_the_document_size_at_the_origin() {
     let thumbnail = doc.render(0.0, 0.0, 0.5, 600, 400).unwrap();
     assert_eq!(&thumbnail[(375 * 600 + 575) * 4..][..4], &[0, 0, 255, 255], "the whole document fits a half-size thumbnail");
 
-    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     let reopened = BoardDocument::open("Poster.kboard", &bytes).unwrap();
     assert_eq!((reopened.width(), reopened.height()), (1200, 800), "the size is saved");

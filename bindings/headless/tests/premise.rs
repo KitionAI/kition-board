@@ -46,7 +46,6 @@ fn board() -> Vec<u8> {
     doc.execute("frame.create", json!({ "box": [0, 400, 400, 640], "title": "Sprint", "children": inside["created"] })).unwrap();
     let ideas = doc.execute("page.create", json!({ "name": "Ideas" })).unwrap()["page"].clone();
     doc.execute("element.create", json!({ "page": ideas, "elements": [{ "kind": "shape", "position": [0, 0], "text": "Idea" }] })).unwrap();
-    doc.prepare_save().unwrap();
     doc.save(None).unwrap()
 }
 

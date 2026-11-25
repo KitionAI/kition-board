@@ -1,6 +1,5 @@
 //! Open and save at 5,000 elements (design note 2.6): a fresh save, an open, and the save after one
-//! edit, sealed first as a host saves, which writes the replica's content snapshot (the file holds
-//! no history, rule M16b).
+//! edit, each writing the replica's content (`content.json`; the file holds no history, rule M16b).
 //! Kition's TypeScript board re-encoded the whole snapshot as base64 on every save: 85.5 ms at
 //! 5,000 elements (board evaluation, Node bench). The budgets here are guards for unoptimised test builds on a loaded
 //! machine; the measured times are printed (`cargo test --release -p kition-board-kdm --test perf
@@ -49,11 +48,8 @@ fn timed<R>(label: &str, f: impl FnOnce() -> R) -> (R, Duration) {
 
 #[test]
 fn open_and_save_at_5000_elements() {
-    let mut replica = big_board();
-    let (saved, fresh) = timed("fresh save", || {
-        replica.seal().unwrap();
-        save_file(&replica, BTreeMap::new(), None).unwrap()
-    });
+    let replica = big_board();
+    let (saved, fresh) = timed("fresh save", || save_file(&replica, BTreeMap::new(), None).unwrap());
     let bytes = saved.bytes;
     println!("file: {} bytes", bytes.len());
     let (opened, open) = timed("open", || open_file(&bytes, ActorId::random()).unwrap());
@@ -66,13 +62,10 @@ fn open_and_save_at_5000_elements() {
         add(tx, &page, shape(0.0, 4000.0, 30.0, 30.0));
         Ok(())
     });
-    let (edited, edit) = timed("save after one edit", || {
-        session.seal().unwrap();
-        save_file(session.replica(), BTreeMap::new(), Some(&base)).unwrap()
-    });
-    assert!(session.replica().is_sealed(), "the edit is sealed for the file");
+    let (edited, edit) = timed("save after one edit", || save_file(session.replica(), BTreeMap::new(), Some(&base)).unwrap());
     assert_ne!(edited.bytes, bytes);
-    let (_, unchanged) = timed("save with no edit", || save_file(&replica, BTreeMap::new(), Some(&saved.base)).unwrap());
+    let (again, unchanged) = timed("save with no edit", || save_file(&replica, BTreeMap::new(), Some(&saved.base)).unwrap());
+    assert_eq!(again.bytes, bytes, "the unchanged board saves to the same bytes");
     for (label, took) in [("fresh save", fresh), ("open", open), ("save after an edit", edit), ("save with no edit", unchanged)] {
         assert!(took < Duration::from_secs(10), "{label} took {took:?}");
     }

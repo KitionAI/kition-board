@@ -10,7 +10,7 @@ use kition_kit::kdm::{ActorId, Replica};
 use serde_json::json;
 
 /// Gap 14 of the board evaluation: a connector bound to a shape follows the shape without any
-/// write to the connector, on this replica and on one that merged the move.
+/// write to the connector, on the replica that moved it and on one that took the move.
 #[test]
 fn bound_ends_are_derived_from_the_target() {
     let mut a = board();
@@ -28,7 +28,7 @@ fn bound_ends_are_derived_from_the_target() {
         tx.set(&target, "rotation", json!(90))?;
         Ok(())
     });
-    sync(&mut a, &mut b);
+    follow(&mut a, &b);
     for session in [&a, &b] {
         let model = session.model();
         let element = model.element(&connector).unwrap();
@@ -37,7 +37,7 @@ fn bound_ends_are_derived_from_the_target() {
         assert_eq!(model.route(element).len(), 2);
     }
     let mut replica = Replica::load(schema(), &a.snapshot().unwrap(), ActorId::random()).unwrap();
-    assert!(!file::repair_once(&mut replica).unwrap(), "no repair transaction after concurrent moves");
+    assert!(!file::repair_once(&mut replica).unwrap(), "no repair transaction after the move");
 }
 
 /// An end bound to an element on another page, or a deleted one, uses its stored point.
@@ -69,26 +69,16 @@ fn duplicates_and_dangling_entries_are_not_shown() {
         let gone = add(tx, &first, shape(0.0, 0.0, 10.0, 10.0));
         Ok((two, element, gone))
     });
-    let snapshot = a.snapshot().unwrap();
-    let mut x = Replica::load(schema(), &snapshot, ActorId::random()).unwrap();
-    let mut y = Replica::load(schema(), &snapshot, ActorId::random()).unwrap();
+    let mut x = Replica::load(schema(), &a.snapshot().unwrap(), ActorId::random()).unwrap();
+    // A raw write, without the session's repair: `gone` moves to the front and is deleted while
+    // still listed; `element` is also listed on page two.
     x.transact(&person(), |tx| {
-        // `gone` moves to the front while the other replica deletes it; `element` is also
-        // listed on page two.
         tx.list_move(&first, "elements", 1, 0)?;
         tx.list_insert(&two, "elements", 0, &element)?;
-        Ok(())
-    })
-    .unwrap();
-    y.transact(&person(), |tx| {
-        tx.list_remove(&first, "elements", 1)?;
         tx.delete(&gone)?;
         Ok(())
     })
     .unwrap();
-    // A raw merge, without the session's repair.
-    let from_y = y.export_changes(&x.version()).unwrap();
-    x.import_changes(&from_y).unwrap();
     let model = BoardModel::read(&x).unwrap();
     assert_eq!(model.element_count(), 1);
     assert_eq!(model.page_of(&element).unwrap().id, first, "shown at its first entry in board order");
@@ -125,7 +115,8 @@ fn boxes_cover_rotation_groups_strokes_and_measured_text() {
     assert_eq!(model.element(&group).unwrap().kind, Kind::Group);
 }
 
-/// The view patched after each change equals a fresh read of the replica (E11).
+/// The view patched after each change equals a fresh read of the replica (E11), on the replica
+/// that writes and on one that follows it.
 #[test]
 fn the_patched_view_equals_a_fresh_read() {
     let mut a = board();
@@ -133,7 +124,7 @@ fn the_patched_view_equals_a_fresh_read() {
     let mut b = fork(&a);
     let mut ids = Vec::new();
     for step in 0..30 {
-        let session = if step % 3 == 0 { &mut b } else { &mut a };
+        let session = &mut a;
         let x = f64::from(step) * 10.0;
         let id = write(session, |tx| Ok(add(tx, &page, shape(x, 0.0, 20.0, 20.0))));
         ids.push(id.clone());
@@ -148,13 +139,13 @@ fn the_patched_view_equals_a_fresh_read() {
             session.undo().unwrap();
         }
         if step % 7 == 6 {
-            sync(&mut a, &mut b);
+            follow(&mut b, &a);
         }
         for session in [&a, &b] {
             assert_eq!(session.model(), &BoardModel::read(session.replica()).unwrap(), "step {step}");
         }
     }
-    sync(&mut a, &mut b);
+    follow(&mut b, &a);
     assert_eq!(a.model(), b.model());
 }
 

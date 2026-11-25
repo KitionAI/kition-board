@@ -1,0 +1,6 @@
+{"kdm":1,"kit":"kit.board","docId":"01a16848-e64d-76be-b587-68385c4cadfc","schemaVersion":1,"objects":{
+"01a16848-e64d-76be-b587-68397bf463f1":{"$type":"Page","elements":["01a16848-e64d-76be-b587-683a09883139","01a16848-e64d-76be-b587-683bf38d46c7"],"name":"Page 1"},
+"01a16848-e64d-76be-b587-683a09883139":{"$type":"Element","kind":"text","position":{"x":0,"y":0},"text":[{"insert":"Notes"}]},
+"01a16848-e64d-76be-b587-683bf38d46c7":{"$type":"Element","kind":"text","position":{"x":10,"y":6},"text":[{"insert":"More notes"}]},
+"board":{"$type":"Board","pages":["01a16848-e64d-76be-b587-68397bf463f1"],"title":"Labels"}
+}}

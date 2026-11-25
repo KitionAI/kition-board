@@ -1,21 +1,19 @@
-//! A `.kboard` file holds the document's content, not its history (kition-sdk data model 7.3, rule
-//! M16b; feature `board.file.content-only`): the replica entry, read through the engine, holds one
-//! change (the seal) and none of the deleted or overwritten content; an unchanged board saves to
-//! the same bytes; a file opened without a store is the same document and edits; a replica from
-//! the file and one with the whole history converge; undo after a save takes back the last edit;
-//! and a file opens on top of a stored replica, by its changes or by its state. Hosts seal before
-//! saving (`prepare_save`); a save nobody sealed for is refused.
+//! A `.kboard` file holds the document's content, not its history (kition-sdk data model 7.3, 7.4,
+//! rule M16b; feature `board.file.content-only`): the content entry holds the state and none of the
+//! deleted or overwritten content, and no version or origin; an unchanged board saves to the same
+//! bytes; a file opened without a store is the same document and edits; undo after a save takes
+//! back the last edit; and a file opens on top of a stored replica, as it is when both hold the
+//! same state, else by the file's state written by object id.
 //!
 //! The needles below are written once each and share no run of four characters with anything else
-//! in the board, so the engine's compression keeps each one literal in the bytes that hold it:
-//! every test checks the session's full snapshot holds them (the control) before it checks the
-//! file does not (the method of kition-sdk's `crates/kition-kdm/tests/content_snapshot.rs`).
+//! in the board: every test checks the session's change log holds them (the control) before it
+//! checks the file does not, in its bytes and in its content entry unzipped.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use kition_board_kboard as kboard;
 use kition_board_kit::BoardDocument;
 use kition_kit::KitDocument;
-use kition_kit::kdm::{ObjectId, Origin, OriginKind, Replica};
+use kition_kit::kdm::{ObjectId, Origin, Version};
 use kition_kit::session::{__export_changes, __snapshot, KitSessionDocument};
 use serde_json::{Value, json};
 
@@ -30,25 +28,31 @@ fn contains(bytes: &[u8], needle: &str) -> bool {
     bytes.windows(needle.len()).any(|window| window == needle.as_bytes()) || bytes.windows(utf16.len()).any(|window| window == utf16.as_slice())
 }
 
-/// The file as a host saves it: sealed first (`prepare_save`), then the bytes.
+/// The file as a host saves it.
 fn host_save(doc: &mut BoardDocument) -> Vec<u8> {
-    doc.prepare_save().unwrap();
     doc.save(Some(FILE)).unwrap()
 }
 
-/// The version a file's content holds.
-fn file_version(bytes: &[u8]) -> kition_kit::kdm::Version {
-    Replica::load(kition_board_kdm::schema(), &kboard::read(bytes).unwrap().content, kition_kit::kdm::ActorId::random()).unwrap().version()
+/// Whether a file holds `needle`, in its bytes or in its content entry unzipped.
+fn file_holds(bytes: &[u8], needle: &str) -> bool {
+    contains(bytes, needle) || contains(&kboard::read(bytes).unwrap().content, needle)
+}
+
+/// The session's changes since it was made: its change log, which holds what it deleted and
+/// overwrote (the control for the needles).
+fn change_log(doc: &BoardDocument, since: &Version) -> Vec<u8> {
+    __export_changes(doc, &since.encode()).unwrap()
 }
 
 fn created(answer: &Value) -> Vec<String> {
     answer["created"].as_array().unwrap().iter().map(|id| id.as_str().unwrap().to_owned()).collect()
 }
 
-/// A board whose history holds typed-then-deleted text, a deleted element and an overwritten
-/// value; answers it and the id of the shape that stays.
-fn board_with_history() -> (BoardDocument, String) {
+/// A board whose change log holds typed-then-deleted text, a deleted element and an overwritten
+/// value; answers it, the id of the shape that stays and the version it was made at.
+fn board_with_history() -> (BoardDocument, String, Version) {
     let mut doc = BoardDocument::create(FILE, 1920, 1080).unwrap();
+    let made_at = doc.version();
     let made = created(
         &doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "text": "Kept" }, { "kind": "shape", "position": [300, 0], "text": DELETED_ELEMENT }] }))
             .unwrap(),
@@ -68,7 +72,7 @@ fn board_with_history() -> (BoardDocument, String) {
         })
         .unwrap();
     doc.execute("element.delete", json!({ "ids": [gone] })).unwrap();
-    (doc, kept)
+    (doc, kept, made_at)
 }
 
 fn element_ids(doc: &BoardDocument) -> Vec<Vec<ObjectId>> {
@@ -80,53 +84,43 @@ fn state(doc: &BoardDocument) -> Value {
 }
 
 #[test]
-fn the_file_holds_the_content_and_of_the_history_only_the_seal() {
-    let (mut doc, kept) = board_with_history();
-    let full = __snapshot(&doc).unwrap();
+fn an_unchanged_board_saves_to_the_same_bytes_and_its_content_holds_no_history() {
+    let (mut doc, kept, made_at) = board_with_history();
+    let log = change_log(&doc, &made_at);
     for needle in NEEDLES {
-        assert!(contains(&full, needle), "the control: the session's history holds {needle}");
+        assert!(contains(&log, needle), "the control: the session's change log holds {needle}");
     }
-    let bytes = host_save(&mut doc);
-    for needle in NEEDLES {
-        assert!(!contains(&bytes, needle), "the file holds {needle}");
-    }
-    let parts = kboard::read(&bytes).unwrap();
-    let held = Replica::snapshot_origins(&parts.content).unwrap();
-    assert_eq!(held.len(), 1, "of the history, the file holds one change: {held:?}");
-    let origin = held[0].clone().unwrap();
-    assert_eq!(origin, Origin::system("content-seal"));
-    assert_eq!(origin.kind, OriginKind::System);
-    assert!(Replica::snapshot_origins(&full).unwrap().len() > 1, "the control: the history holds every change");
-    // The direct path: the seal is the session's own, before the host marks the file saved.
-    assert_eq!(doc.version(), file_version(&bytes));
-    // The state is all there.
-    let back = BoardDocument::open(FILE, &bytes).unwrap();
-    assert_eq!(state(&back), state(&doc));
-    assert_eq!(back.model().element(&ObjectId::from_string(&kept)).unwrap().text, "Kept");
-}
-
-#[test]
-fn an_unchanged_board_saves_to_the_same_bytes() {
-    let (mut doc, _) = board_with_history();
-    let first = host_save(&mut doc);
     let version = doc.version();
+    let first = host_save(&mut doc);
+    for needle in NEEDLES {
+        assert!(!file_holds(&first, needle), "the file holds {needle}");
+    }
+    // The content is the state, with no version, lineage, actor or origin (data model 7.4, C10).
+    let content = String::from_utf8(kboard::read(&first).unwrap().content).unwrap();
+    assert!(
+        content.starts_with(&format!("{{\"kdm\":1,\"kit\":\"kit.board\",\"docId\":\"{}\",\"schemaVersion\":1,\"objects\":{{\n", doc.doc_id())),
+        "{content}"
+    );
+    assert!(!content.contains("\"version\"") && !content.contains("person:test") && !content.contains("lineage"), "{content}");
     assert_eq!(host_save(&mut doc), first, "two saves with nothing between");
-    assert_eq!(doc.version(), version, "a sealed board seals nothing more");
+    assert_eq!(doc.version(), version, "a save writes nothing into the replica");
     doc.mark_saved();
     assert_eq!(host_save(&mut doc), first, "and after the host stored the first");
     let mut opened = BoardDocument::open(FILE, &first).unwrap();
+    assert_eq!(state(&opened), state(&doc), "the state is all there, under the same ids");
+    assert_eq!(opened.model().element(&ObjectId::from_string(&kept)).unwrap().text, "Kept");
     assert_eq!(host_save(&mut opened), first, "and from the file opened again");
 }
 
 #[test]
 fn a_file_opened_without_a_store_is_the_same_document_and_edits() {
-    let (mut doc, kept) = board_with_history();
+    let (mut doc, kept, _) = board_with_history();
     let bytes = host_save(&mut doc);
     doc.mark_saved();
     let mut back = BoardDocument::open(FILE, &bytes).unwrap();
     assert_eq!(back.doc_id(), doc.doc_id());
     assert_eq!(element_ids(&back), element_ids(&doc), "the same object ids");
-    assert_eq!(back.version(), doc.version(), "the same version: the seal is the session's");
+    assert_eq!(state(&back), state(&doc), "the same state");
     back.execute("element.setText", json!({ "id": kept, "text": "Edited" })).unwrap();
     let made = created(&back.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 300], "text": "New" }] })).unwrap());
     let saved = host_save(&mut back);
@@ -137,40 +131,13 @@ fn a_file_opened_without_a_store_is_the_same_document_and_edits() {
 }
 
 #[test]
-fn a_replica_from_the_file_and_one_with_the_whole_history_converge() {
-    let (mut full, kept) = board_with_history();
-    let bytes = host_save(&mut full);
-    full.mark_saved();
-    let mut file = BoardDocument::open(FILE, &bytes).unwrap();
-    // Edits on both after the save.
-    full.execute("element.move", json!({ "ids": [kept], "delta": [40, 0] })).unwrap();
-    full.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [600, 600], "text": "Full" }] })).unwrap();
-    file.execute("element.setText", json!({ "id": kept, "text": "From the file" })).unwrap();
-    file.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 600], "text": "File" }] })).unwrap();
-    for _ in 0..4 {
-        let (to_file, to_full) =
-            (__export_changes(&full, &file.version().encode()).unwrap(), __export_changes(&file, &full.version().encode()).unwrap());
-        KitSessionDocument::import_changes(&mut full, &to_full).unwrap();
-        KitSessionDocument::import_changes(&mut file, &to_file).unwrap();
-        if full.version() == file.version() {
-            break;
-        }
-    }
-    assert_eq!(full.version(), file.version());
-    assert_eq!(state(&full), state(&file), "both replicas hold the same document");
-    let shape = full.model().element(&ObjectId::from_string(&kept)).unwrap();
-    assert_eq!((shape.text.as_str(), shape.position.unwrap().x), ("From the file", 40.0), "both edits survive");
-    assert_eq!(full.model().element_count(), 3);
-}
-
-#[test]
 fn undo_after_a_save_takes_back_the_last_edit() {
     let mut doc = BoardDocument::create(FILE, 1920, 1080).unwrap();
     let made = created(&doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "text": "A" }] })).unwrap());
     doc.execute("element.move", json!({ "ids": [made[0]], "delta": [25, 0] })).unwrap();
     host_save(&mut doc);
     doc.mark_saved();
-    assert!(doc.inspect().unwrap()["canUndo"].as_bool().unwrap(), "the seal is no undo step and clears none");
+    assert!(doc.inspect().unwrap()["canUndo"].as_bool().unwrap(), "a save is no undo step and clears none");
     assert_eq!(doc.execute("edit.undo", json!({})).unwrap()["done"], true);
     let id = ObjectId::from_string(&made[0]);
     assert_eq!(doc.model().element(&id).unwrap().position.unwrap().x, 0.0, "the undo took back the move");
@@ -181,24 +148,22 @@ fn undo_after_a_save_takes_back_the_last_edit() {
 }
 
 #[test]
-fn a_file_opens_on_the_stored_replica_that_holds_its_version() {
-    let (mut doc, _) = board_with_history();
+fn a_file_opens_on_the_stored_replica_that_holds_its_state() {
+    let (mut doc, _, _) = board_with_history();
     let bytes = host_save(&mut doc);
     doc.mark_saved();
     let stored = __snapshot(&doc).unwrap();
     let mut opened = BoardDocument::open_with_replica(FILE, &bytes, &stored, &doc.blobs_bundle()).unwrap();
     assert_eq!(opened.version(), doc.version(), "the stored replica, as it was");
-    assert!(!opened.session().replica().is_shallow(), "with its whole history");
-    for needle in NEEDLES {
-        assert!(contains(&__snapshot(&opened).unwrap(), needle), "the history keeps {needle}");
-    }
-    assert_eq!(file_version(&host_save(&mut opened)), file_version(&bytes), "and saves the document it opened, sealing nothing new");
+    assert_eq!(state(&opened), state(&doc));
+    assert_eq!(host_save(&mut opened), bytes, "and saves the document it opened to the same bytes");
 }
 
 #[test]
 fn a_file_saved_elsewhere_opens_on_the_stored_replica_by_its_state() {
-    let (mut doc, kept) = board_with_history();
+    let (mut doc, kept, _) = board_with_history();
     let stored = __snapshot(&doc).unwrap();
+    let stored_version = doc.version();
     let bytes = host_save(&mut doc);
     doc.mark_saved();
     // Elsewhere, from the file alone: an edit, a new shape, a save.
@@ -210,21 +175,6 @@ fn a_file_saved_elsewhere_opens_on_the_stored_replica_by_its_state() {
     assert_eq!(opened.doc_id(), doc.doc_id());
     assert_eq!(state(&opened), state(&elsewhere), "the file's state, by object id");
     assert_eq!(element_ids(&opened), element_ids(&elsewhere));
-    assert!(!opened.session().replica().is_shallow(), "on top of the stored history");
-    assert!(contains(&__snapshot(&opened).unwrap(), DELETED_ELEMENT), "which it keeps");
-}
-
-/// A save writes the content of a sealed session only: one nobody sealed for (`prepare_save`) is
-/// refused and changes nothing, and the same session saves once it is sealed.
-#[test]
-fn a_save_nobody_sealed_for_is_refused() {
-    let (mut doc, _) = board_with_history();
-    let version = doc.version();
-    let error = doc.save(Some(FILE)).unwrap_err();
-    assert!(error.contains("not-sealed"), "{error}");
-    assert_eq!(doc.version(), version, "a refused save changes nothing");
-    let bytes = host_save(&mut doc);
-    for needle in NEEDLES {
-        assert!(!contains(&bytes, needle), "the file holds {needle}");
-    }
+    assert!(opened.version().includes(&stored_version), "on top of the stored replica, on its line of changes");
+    assert_ne!(opened.version(), stored_version, "with the file's state as a change");
 }

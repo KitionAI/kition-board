@@ -87,7 +87,6 @@ fn marks_and_markdown_are_drawn() {
     assert!(markdown_ink > 200, "the Markdown draws ({markdown_ink})");
 
     // Saved and opened again, it draws the same.
-    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     let reopened = BoardDocument::open("Styles.kboard", &bytes).unwrap();
     assert_eq!(fragment(&reopened, &ids[1]), bold);

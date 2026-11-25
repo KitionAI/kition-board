@@ -42,7 +42,6 @@ fn stored_end(doc: &BoardDocument, id: &str, terminal: &str) -> End {
 /// What the board shows after saving and opening the file again: the open-time repair changes
 /// nothing on a healthy board.
 fn reopened(doc: &mut BoardDocument) -> BoardModel {
-    doc.prepare_save().unwrap();
     BoardDocument::open("Paste.kboard", &doc.save(None).unwrap()).unwrap().model().clone()
 }
 

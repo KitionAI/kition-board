@@ -89,7 +89,6 @@ fn an_end_at_a_diamonds_box_corner_meets_the_diamond() {
 fn the_end_is_the_same_after_save_and_reopen() {
     let (mut doc, _, connector) = board();
     let before = fragment(&doc, &connector);
-    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     let reopened = BoardDocument::open("Ends.kboard", &bytes).unwrap();
     assert_eq!(fragment(&reopened, &connector), before);
@@ -102,15 +101,13 @@ fn a_stored_point_on_the_box_is_drawn_on_the_outline_and_never_repaired() {
     let older = json!({ "point": [500, 100], "binding": { "target": diamond, "anchor": [1, 0] } });
     let id = ObjectId::from_string(&connector);
     doc.session_mut().record(&Origin::system("fixture"), |tx| Ok(tx.set(&id, "end", older)?)).unwrap();
-    doc.prepare_save().unwrap();
     let first = doc.save(None).unwrap();
-    let mut opened = BoardDocument::open("Ends.kboard", &first).unwrap();
+    let opened = BoardDocument::open("Ends.kboard", &first).unwrap();
     assert_eq!(stored_end(&opened, &connector).point, Point::new(500.0, 100.0), "the file keeps its point");
     let end = route_end(&fragment(&opened, &connector));
     assert!(off_diamond(end) < 1e-3, "the end {end:?} is drawn on the diamond");
     assert!(!dark(&opened, 500.0, 100.0));
     // Derived, not repaired (design note 1.4): a save without edits writes the same bytes.
-    opened.prepare_save().unwrap();
     let again = opened.save(None).unwrap();
     assert_eq!(again, first, "the save wrote a change");
     assert_eq!(stored_end(&opened, &connector).point, Point::new(500.0, 100.0));

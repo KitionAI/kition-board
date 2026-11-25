@@ -108,7 +108,6 @@ fn an_unknown_shape_is_refused_and_a_known_one_survives_reopening() {
     let refused = doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "shapeType": "blob" }] }));
     assert!(format!("{refused:?}").contains("invalid-params"), "{refused:?}");
     let id = shape(&mut doc, "cylinder");
-    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     let reopened = BoardDocument::open("Shapes.kboard", &bytes).unwrap();
     assert!(fragment(&reopened, &id).contains("A "), "the reopened cylinder still has its arcs");

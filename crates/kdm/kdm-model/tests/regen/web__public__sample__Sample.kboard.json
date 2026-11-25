@@ -1,0 +1,8 @@
+{"kdm":1,"kit":"kit.board","docId":"01a167b8-27ad-75e7-a9a4-ec8bf563085d","schemaVersion":1,"objects":{
+"01a167b8-27af-735e-8da1-24e3e8382811":{"$type":"Page","elements":["01a167b8-27b1-73ba-ab85-02a842abfabe","01a167b8-27b0-713c-90df-3fad3fdad2e8","01a167b8-27b0-713c-90df-3fae464b2f91","01a167b8-27b1-73ba-ab85-02a9a32f5880"],"name":"Page 1"},
+"01a167b8-27b0-713c-90df-3fad3fdad2e8":{"$type":"Element","fillColor":"yellow","kind":"shape","parent":"01a167b8-27b1-73ba-ab85-02a842abfabe","position":{"x":140,"y":180},"shapeStyle":"sticky","shapeType":"rectangle","size":{"h":110,"w":200},"text":[{"insert":"Idea"}]},
+"01a167b8-27b0-713c-90df-3fae464b2f91":{"$type":"Element","fillColor":"purple","kind":"shape","parent":"01a167b8-27b1-73ba-ab85-02a842abfabe","position":{"x":520,"y":180},"shapeType":"pill","size":{"h":110,"w":200},"text":[{"insert":"Ship"}]},
+"01a167b8-27b1-73ba-ab85-02a842abfabe":{"$type":"Element","kind":"frame","position":{"x":80,"y":80},"size":{"h":320,"w":760},"text":[{"insert":"Plan"}]},
+"01a167b8-27b1-73ba-ab85-02a9a32f5880":{"$type":"Element","end":{"binding":{"anchor":[0,0.5],"target":"01a167b8-27b0-713c-90df-3fae464b2f91"},"point":[520,235]},"endArrowhead":"arrow","kind":"connector","start":{"binding":{"anchor":[1,0.5],"target":"01a167b8-27b0-713c-90df-3fad3fdad2e8"},"point":[340,235]},"text":[{"insert":"build"}]},
+"board":{"$type":"Board","pages":["01a167b8-27af-735e-8da1-24e3e8382811"],"title":"Sample"}
+}}

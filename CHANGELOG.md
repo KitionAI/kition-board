@@ -5,8 +5,9 @@ each package is published with a `package-v<version>` tag.
 
 ## Unreleased
 
-- A `.kboard` file holds the board's content, not its history (kition-sdk rule M16b): `content.bin`, a sealed content snapshot (the state, the same document id and element ids, of the history only a `system` seal), and the pictures the board shows. No change log, no deleted text or elements, no overwritten values, no names of the people or agents who edited; `meta.json` holds only the format, kit, KDM and schema versions and the document id. The history stays in the host's history store. Files of the earlier layout (`snapshot.bin` and `changes/`) are not read.
-- A board opens on the host's stored replica with its file taken in: as it is when the store has the file's version, with the file's changes when the store missed only them, and otherwise with the file's state written by element id as one import step.
+- A `.kboard` file holds the board's content, not its history (kition-sdk rule M16b, data model 7.4): `content.json` (deflated), the board's state in the KDM content encoding under the same document id and element ids, with no version and no origins, and the pictures the board shows. No change log, no deleted text or elements, no overwritten values, no names of the people or agents who edited; `meta.json` holds only the format, kit, KDM and schema versions and the document id. An unchanged board saves to the same bytes. Files of earlier layouts (`content.bin`, or `snapshot.bin` and `changes/`) are not read.
+- A board opens on the host's stored replica with its file taken in: as it is when both hold the same state, and otherwise with the file's state written by element id as one import step.
+- The engine runs on kition-sdk's plain document model (no CRDT): Kition Desktop is for one person, so boards are no longer merged from concurrent edits; the page's replica follows the engine's changes in order. Loro is no longer bundled or linked.
 
 ## 0.1.5
 

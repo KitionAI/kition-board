@@ -2,13 +2,13 @@
  * The page's replica of the board and the engine's fragments (design note 4.1–4.2, R2c).
  *
  * The page holds a KDM replica of the engine worker's board, loaded from the engine's snapshot and
- * kept in step by pulling the worker's changes after every change (a command, an agent, undo, a
- * collaborator). It never writes the replica. Each pull reads the changed elements into the page
+ * kept in step by pulling the worker's changes, in order, after every change (a command, an agent,
+ * undo). It never writes the replica. Each pull reads the changed elements into the page
  * view and asks the engine for the fragments whose appearance changed (`elementSvg` with the
  * revisions the page already has); everything is fetched once at open, in batches of 500, so
  * panning and zooming fetch nothing (spike S2, 5.2).
  */
-import { parseSchema, randomActor, Replica, type TextRun } from '@kition/sdk/kdm'
+import { parseSchema, Replica, type TextRun } from '@kition/sdk/kdm'
 import schemaJson from '../../../crates/kdm/kdm-model/model/schema.json'
 import type { Rect } from './geometry'
 import { BoardView } from './model'
@@ -117,7 +117,7 @@ export class BoardSync {
 
   /** Loads the engine's board into a page replica, its view, and every element's fragment. */
   static async open(engine: BoardEngine): Promise<BoardSync> {
-    const replica = Replica.load(boardSchema, await engine.snapshot(), randomActor())
+    const replica = Replica.load(boardSchema, await engine.snapshot())
     const sync = new BoardSync(replica, engine)
     sync.view.refresh(replica, null)
     await Promise.all([sync.fragments.fetch([...sync.view.elements.keys()], 'full'), sync.loadOutlines()])
@@ -176,7 +176,7 @@ export class BoardSync {
         early.size ? this.fetchLods([...early]) : Promise.resolve(new Set<string>()),
       ])
       if (this.closed) return
-      const changedObjects = this.replica.importChanges(new Uint8Array(changes))
+      const changedObjects = new Set(this.replica.importChanges(new Uint8Array(changes)))
       if (!changedObjects.size && !fetchedEarly.size) return
       const touched = changedObjects.size ? this.view.refresh(this.replica, changedObjects) : new Set<string>()
       // A connector's look follows its targets: ask for it again when they changed.

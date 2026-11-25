@@ -1,6 +1,6 @@
 [package]
 name = "kition-board-kboard"
-description = "The .kboard file of Kition Board: a ZIP container holding a KDM snapshot, its change log and the blobs, as bytes."
+description = "The .kboard file of Kition Board: a ZIP container holding the KDM content (content.json) and the blobs, as bytes."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

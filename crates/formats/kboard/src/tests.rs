@@ -26,6 +26,23 @@ fn round_trips_every_part_with_mimetype_first_and_stored() {
     assert_eq!(write(&sample()).unwrap(), bytes, "the same parts give the same bytes: no entry carries a time");
 }
 
+/// `content.json` is deflated, at a fixed level, between `meta.json` and the blobs; the old entry
+/// `content.bin` is not read (no reader for the old format).
+#[test]
+fn the_content_is_content_json_deflated_and_content_bin_is_not_read() {
+    let bytes = write(&sample()).unwrap();
+    let mut zip = zip::ZipArchive::new(Cursor::new(&bytes)).unwrap();
+    let names: Vec<String> = (0..zip.len()).map(|i| zip.by_index(i).unwrap().name().to_owned()).collect();
+    assert_eq!(names[..3], ["mimetype", "meta.json", "content.json"]);
+    assert_eq!(zip.by_name("content.json").unwrap().compression(), zip::CompressionMethod::Deflated);
+    let meta = serde_json::to_vec(
+        &serde_json::json!({ "format": FORMAT, "formatVersion": 1, "kit": "kit.board", "kdm": 1, "schemaVersion": 1, "docId": "d" }),
+    )
+    .unwrap();
+    let old = zip_of(&[("mimetype", MIME.as_bytes(), false), ("meta.json", &meta, true), ("content.bin", b"s", false)]);
+    assert!(matches!(read(&old), Err(ContainerError::Damaged(_))), "a file with content.bin and no content.json is damaged");
+}
+
 /// `meta.json` holds what identifies and describes the content, and nothing a save changes.
 #[test]
 fn meta_json_names_the_document_and_nothing_a_save_changes() {
@@ -68,7 +85,7 @@ fn refuses_foreign_files_as_not_a_board() {
     assert!(not(&zip_of(&[("mimetype", mime, true), ("meta.json", &meta, true)])), "mimetype compressed");
     assert!(not(&zip_of(&[("mimetype", b"application/vnd.kition.layout+zip", false)])), "another kit's MIME");
     let other = serde_json::to_vec(&serde_json::json!({ "format": "kition.design", "formatVersion": 1 })).unwrap();
-    assert!(not(&zip_of(&[("mimetype", mime, false), ("meta.json", &other, true), ("content.bin", b"s", false)])), "another format");
+    assert!(not(&zip_of(&[("mimetype", mime, false), ("meta.json", &other, true), ("content.json", b"s", false)])), "another format");
 }
 
 #[test]
@@ -76,26 +93,26 @@ fn refuses_damaged_files() {
     let meta = meta_json();
     let mime = MIME.as_bytes();
     let bad = |bytes: &[u8]| matches!(read(bytes), Err(ContainerError::Damaged(_)));
-    assert!(bad(&zip_of(&[("mimetype", mime, false), ("content.bin", b"s", false)])), "no meta.json");
+    assert!(bad(&zip_of(&[("mimetype", mime, false), ("content.json", b"s", false)])), "no meta.json");
     assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &meta, true)])), "no content");
     assert!(
         bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &meta, true), ("snapshot.bin", b"s", false), ("changes/000001.bin", b"c", false)])),
         "a file with a snapshot and a change log, and no content, is not read"
     );
-    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", b"{ not json", true), ("content.bin", b"s", false)])), "meta.json is not JSON");
+    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", b"{ not json", true), ("content.json", b"s", false)])), "meta.json is not JSON");
     for name in ["../evil", "/abs", "a\\b", "C:/x", "a/../b", "./x"] {
-        assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &meta, true), ("content.bin", b"s", false), (name, b"x", false)])), "{name}");
+        assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &meta, true), ("content.json", b"s", false), (name, b"x", false)])), "{name}");
     }
     let wrong_hash = format!("blobs/{}", sha256_hex(b"other"));
-    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &meta, true), ("content.bin", b"s", false), (&wrong_hash, b"x", false)])));
+    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &meta, true), ("content.json", b"s", false), (&wrong_hash, b"x", false)])));
     let bomb = serde_json::to_vec(&serde_json::json!({
         "format": FORMAT, "formatVersion": 1, "kit": "kit.board", "kdm": 1, "schemaVersion": 2, "docId": "d", "pad": " ".repeat(200_000)
     }))
     .unwrap();
-    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &bomb, true), ("content.bin", b"s", false)])), "deflate bomb");
+    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &bomb, true), ("content.json", b"s", false)])), "deflate bomb");
     let no_doc =
         serde_json::to_vec(&serde_json::json!({ "format": FORMAT, "formatVersion": 1, "kit": "kit.board", "kdm": 1, "schemaVersion": 2 })).unwrap();
-    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &no_doc, true), ("content.bin", b"s", false)])), "meta.json without a docId");
+    assert!(bad(&zip_of(&[("mimetype", mime, false), ("meta.json", &no_doc, true), ("content.json", b"s", false)])), "meta.json without a docId");
     // Truncated archives never panic.
     let whole = write(&sample()).unwrap();
     for cut in [40, 80, whole.len() / 2, whole.len() - 1] {
@@ -108,7 +125,7 @@ fn refuses_a_newer_format_with_its_version() {
     let mime = MIME.as_bytes();
     let newer = serde_json::to_vec(&serde_json::json!({ "format": FORMAT, "formatVersion": 9 })).unwrap();
     assert_eq!(
-        read(&zip_of(&[("mimetype", mime, false), ("meta.json", &newer, true), ("content.bin", b"s", false)])),
+        read(&zip_of(&[("mimetype", mime, false), ("meta.json", &newer, true), ("content.json", b"s", false)])),
         Err(ContainerError::TooNew(9))
     );
 }

@@ -1,6 +1,6 @@
 //! The `.kboard` file as a replica (design note 2.3): the file holds the document's **content**, not
 //! its history (kition-sdk data model 7.3, rule M16b). [`save_file`] writes the replica's content
-//! snapshot (its state, and of its history only a `system` seal) and the blobs the state
+//! (`content.json`, the state and nothing else, data model 7.4) and the blobs the state
 //! references; [`open_file`] loads it as the same document (same docId, same object ids) and
 //! repairs once; it never writes. The history lives in the host's history store (`snapshot()` of
 //! the live replica), never in the file.
@@ -21,7 +21,7 @@ use crate::{BoardModel, DanglingEnd, KIT, schema};
 /// What a document's file holds besides its content.
 #[derive(Clone, Debug)]
 pub struct FileBase {
-    /// The replica version the file's content holds (its seal included).
+    /// The replica's version when the file was read or written in this session.
     version: Version,
     doc_id: String,
     /// Entries this build does not know, written back as they were.
@@ -81,7 +81,7 @@ fn read(bytes: &[u8], actor: ActorId) -> Result<(Container, Replica)> {
 }
 
 /// Opens a `.kboard` file as a replica of `actor`: the document the file holds, with its docId and
-/// object ids, and of its history only the seal. Answers `not-a-board: …`, `damaged: …` or
+/// object ids, on a new line of changes. Answers `not-a-board: …`, `damaged: …` or
 /// `newer-version: …` for files it does not open.
 pub fn open_file(bytes: &[u8], actor: ActorId) -> Result<OpenedFile> {
     let (parts, mut replica) = read(bytes, actor)?;
@@ -94,7 +94,7 @@ pub fn open_file(bytes: &[u8], actor: ActorId) -> Result<OpenedFile> {
     Ok(OpenedFile { replica, base, blobs: parts.blobs, detached })
 }
 
-/// The replica a `.kboard` file embeds (`document.identity`, KitModel M7a): its content snapshot,
+/// The replica a `.kboard` file embeds (`document.identity`, KitModel M7a): its content,
 /// or `None` for an empty file (one made for the kit before it saved a board there). Answers
 /// `not-a-board: …`, `damaged: …` or `newer-version: …` for other bytes, as [`open_file`] does;
 /// never repairs, never writes.
@@ -107,12 +107,11 @@ pub fn embedded_replica(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
 }
 
 /// `bytes` (a `.kboard` file) holding the document `snapshot` instead of its own (`document.fork`,
-/// KitModel M7a): `content.bin` is the snapshot's content (a copy's birth is its seal, so a copy
-/// adds no change), `meta.json`'s docId the snapshot's, and the blobs the ones its state
+/// KitModel M7a): `content.json` is the snapshot's content, `meta.json`'s docId the snapshot's, and the blobs the ones its state
 /// references, so no earlier identity stays in the file. Entries this build does not know are kept.
 pub fn replace_replica(bytes: &[u8], snapshot: &[u8]) -> Result<Vec<u8>> {
     let mut parts = kboard::read(bytes).map_err(|error| KitError::new(error.to_string()))?;
-    let mut replica = load(snapshot, ActorId::random())?;
+    let replica = load(snapshot, ActorId::random())?;
     let referenced = BoardModel::read(&replica)?.image_hashes();
     parts.blobs.retain(|hash, _| referenced.contains(hash));
     parts.meta.doc_id = replica.doc_id().to_string();
@@ -154,17 +153,13 @@ pub fn repair_once(replica: &mut Replica) -> Result<bool> {
 
 /// The file `replica` saves to, with `blobs` (what the state references), and `base` (what its file
 /// holds, when it is the same document, for the entries this build does not know): the bytes and
-/// what the file then holds. The replica must be sealed first (`KitDocument::prepare_save`,
-/// `KitSession::seal`, which every host calls before a save): its own content snapshot is written,
-/// the same bytes for the same version. An unsealed replica answers `not-sealed: …`.
+/// what the file then holds. The content depends on the state alone, so an unchanged document
+/// saves to the same bytes.
 pub fn save_file(replica: &Replica, blobs: BTreeMap<String, Vec<u8>>, base: Option<&FileBase>) -> Result<SavedFile> {
     let doc_id = replica.doc_id().to_string();
     let base = base.filter(|base| base.doc_id == doc_id);
-    if !replica.is_sealed() {
-        return Err(KitError::new("not-sealed: the replica is saved after its seal (prepareSave)"));
-    }
     let version = replica.version();
-    let content = replica.sealed_content_snapshot()?;
+    let content = replica.content_snapshot()?;
     let extra = base.map(|base| base.extra.clone()).unwrap_or_default();
     let parts = Container {
         meta: Meta {

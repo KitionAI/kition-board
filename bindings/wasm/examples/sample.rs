@@ -22,6 +22,5 @@ fn main() -> Result<(), String> {
     let (Some(idea), Some(ship)) = (ids.first(), ids.get(1)) else { return Err("no shapes".into()) };
     doc.execute("frame.create", json!({ "box": [80, 80, 840, 400], "title": "Plan", "children": [idea, ship] }))?;
     doc.execute("connector.create", json!({ "from": { "element": idea }, "to": { "element": ship }, "label": "build" }))?;
-    doc.prepare_save()?;
     std::fs::write(&path, doc.save(None)?).map_err(|error| format!("{path}: {error}"))
 }

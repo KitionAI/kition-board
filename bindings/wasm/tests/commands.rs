@@ -537,11 +537,9 @@ fn cards_and_pictures_read_workspace_files_through_the_host() {
     let root = std::env::temp_dir().join(format!("kition-board-cards-{}", std::process::id()));
     std::fs::create_dir_all(root.join("plans")).unwrap();
     let mut doc = board();
-    doc.prepare_save().unwrap();
     let own = doc.save(None).unwrap();
     std::fs::write(root.join("plans/Self.kboard"), &own).unwrap();
-    let mut other = board();
-    other.prepare_save().unwrap();
+    let other = board();
     let other = other.save(None).unwrap();
     std::fs::write(root.join("plans/Map.kboard"), &other).unwrap();
     let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
@@ -588,7 +586,6 @@ fn cards_and_pictures_read_workspace_files_through_the_host() {
     fails(&mut doc, "image.insert", json!({ "file": "plans/chart.png", "mime": "image/jpeg" }), "invalid-params");
     fails(&mut doc, "image.insert", json!({ "file": "plans/missing.png" }), "invalid-params: cannot read");
     fails(&mut doc, "image.insert", json!({ "file": "../outside.png" }), "invalid-params: cannot read");
-    doc.prepare_save().unwrap();
     let saved = doc.save(None).unwrap();
     assert_eq!(kition_board_kboard::read(&saved).unwrap().blobs.len(), 2);
 
@@ -715,30 +712,6 @@ fn each_command_is_one_undo_step() {
         run(&mut doc, "edit.redo", json!({}));
         run(&mut doc, "edit.undo", json!({}));
     }
-}
-
-/// Commands from two replicas merge, and the merge needs no repair.
-#[test]
-fn commands_on_two_replicas_converge() {
-    let mut a_doc = board();
-    let a = shape(&mut a_doc, 0.0, 0.0, 100.0, 50.0);
-    let b = shape(&mut a_doc, 300.0, 0.0, 100.0, 50.0);
-    // As a host saves: sealed first (`prepare_save`), so the file's seal is the session's own.
-    a_doc.prepare_save().unwrap();
-    let file = a_doc.save(None).unwrap();
-    let mut other = BoardDocument::open("Plan.kboard", &file).unwrap();
-    let since_a = a_doc.version().encode();
-    let since_other = other.version().encode();
-    run(&mut a_doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }));
-    run(&mut other, "element.move", json!({ "ids": [b], "delta": [0, 300] }));
-    let from_a = kition_kit::session::__export_changes(&a_doc, &since_a).unwrap();
-    let from_other = kition_kit::session::__export_changes(&other, &since_other).unwrap();
-    KitSessionDocument::import_changes(&mut a_doc, &from_other).unwrap();
-    KitSessionDocument::import_changes(&mut other, &from_a).unwrap();
-    assert_eq!(state(&a_doc), state(&other));
-    let connector = a_doc.model().pages()[0].elements.iter().find(|id| a_doc.model().element(id).unwrap().kind == Kind::Connector).cloned().unwrap();
-    let end = a_doc.model().element(&connector).unwrap().end.clone().unwrap();
-    assert!(close(a_doc.model().end_point(&connector, &end), Point::new(300.0, 325.0)), "the end follows the moved target without a repair");
 }
 
 #[test]

@@ -38,7 +38,6 @@ impl Fixture {
         let (a, b, child) = (made["created"][0].clone(), made["created"][1].clone(), made["created"][2].clone());
         let frame = doc.execute("frame.create", json!({"box":[0,400,500,700],"children":[child],"title":"Frame"})).unwrap()["frame"].clone();
         let other_page = doc.execute("page.create", json!({"name":"Other"})).unwrap()["page"].clone();
-        doc.prepare_save().unwrap();
         std::fs::write(dir.path().join("Test.kboard"), doc.save(None).unwrap()).unwrap();
         let definition = KitDefinition::from_manifest_text(include_str!("../../../../kit.json")).unwrap();
         let kits = KitManager::new(Some(dir.path().to_path_buf()), vec![(definition, Some(PathBuf::from(env!("CARGO_BIN_EXE_kition-board"))))]);
@@ -58,7 +57,6 @@ impl Fixture {
         for (command, params) in steps {
             doc.execute(command, params.clone()).unwrap();
         }
-        doc.prepare_save().unwrap();
         std::fs::write(self.dir.path().join("Test.kboard"), doc.save(None).unwrap()).unwrap();
     }
 

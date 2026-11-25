@@ -5,10 +5,10 @@ intent: >-
   Through the real kition-board process: document.identity answers the docId a .kboard carries
   (the one meta.json's copy names), and a byte copy answers the same one; document.fork writes a
   new document to a new file: a new docId in the replica and in meta.json, the same objects, ids
-  and values, sealed content with no history, the kit, blobs and unknown entries as they were; the
-  text of a shape deleted before the save is in neither file; an edited fork's file holds its
-  content, not its whole history, and becomes a birth only through rebirth; a fork of the fork is a
-  third document; a fork never replaces an existing file.
+  and values, content with no history whose docId is the fork's, the kit, blobs and unknown
+  entries as they were; the text of a shape deleted before the save is in neither file (it is in
+  the session's change log); an edited fork saves and reopens under its id with the same objects
+  and ids; a fork of the fork is a third document; a fork never replaces an existing file.
 layer: gate
 source:
   kind: synthetic

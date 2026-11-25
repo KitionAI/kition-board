@@ -7,7 +7,6 @@ headless `kition-board` executable.
 | Library | License | Through |
 |---|---|---|
 | Kition SDK (`kition-sdk`, `kition-kdm`, `kition-headless`, `kition-kit-server`) | Apache-2.0 | direct, pinned by commit in `Cargo.toml` |
-| Loro (`loro`) | MIT | `kition-kdm` (the KDM's replication engine) |
 | serde, serde_json | MIT OR Apache-2.0 | direct |
 | zip | MIT | direct (the `.kboard` container) |
 | sha2 | MIT OR Apache-2.0 | direct (blob hashes) |

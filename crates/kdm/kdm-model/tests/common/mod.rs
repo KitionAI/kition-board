@@ -1,5 +1,5 @@
 //! Helpers for the model's tests: boards built through transactions, replicas of one board, and
-//! the change exchange between them.
+//! one following the other's changes.
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use kition_board_kdm::blobs::SharedBlobs;
@@ -26,19 +26,12 @@ pub fn fork(session: &Session) -> Session {
     KitSession::from_replica(replica, Box::new(SharedBlobs::default())).unwrap()
 }
 
-/// Exchanges changes until both replicas have everything (repairs included).
-pub fn sync(a: &mut Session, b: &mut Session) {
-    for _ in 0..4 {
-        let (va, vb) = (a.version(), b.version());
-        let from_b = b.export_changes(&va).unwrap();
-        let from_a = a.export_changes(&vb).unwrap();
-        a.import_changes(&from_b).unwrap();
-        b.import_changes(&from_a).unwrap();
-        if a.version() == b.version() {
-            return;
-        }
-    }
-    panic!("the replicas did not settle");
+/// Takes `from`'s changes since `to`'s version into `to` (repairs included): `to` follows `from`
+/// on one line of changes (it made none of its own since they parted).
+pub fn follow(to: &mut Session, from: &Session) {
+    let changes = from.export_changes(&to.version()).unwrap();
+    to.import_changes(&changes).unwrap();
+    assert_eq!(to.version(), from.version(), "the follower has every change");
 }
 
 /// Runs `f` as one person transaction.

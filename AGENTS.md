@@ -38,8 +38,8 @@ This repository is Kition's `kit.board` kit. The engine is Kition's own, in Rust
   Kit Harness Protocol (KHP) and the kit platform contracts live in kition-sdk and khp;
   change them there, never here.
 - **The replica is the document; the file holds its content, not its history.** A `.kboard` file
-  is a ZIP of the replica's content snapshot (sealed: its state, no deleted content, no origins)
-  and the blobs the state references (`docs/design.md` section 2, kition-sdk rule M16b). Never
+  is a ZIP of the replica's content (`content.json`: its state, no deleted content, no version, no
+  origins) and the blobs the state references (`docs/design.md` section 2, kition-sdk rule M16b). Never
   write `snapshot()`, a change log or anything a save changes (times, counters) into the file;
   the history is the host's.
 - **Bound connector ends are derived** from the target's box and the stored anchor; the stored

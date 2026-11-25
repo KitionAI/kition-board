@@ -33,7 +33,6 @@ fn created(value: &Value) -> String {
 fn board(name: &str, build: impl FnOnce(&mut BoardDocument) -> Result<(), String>) -> Result<Vec<u8>, String> {
     let mut doc = BoardDocument::create(name, 1920, 1080)?;
     build(&mut doc)?;
-    doc.prepare_save()?;
     doc.save(None)
 }
 

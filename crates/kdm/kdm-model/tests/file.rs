@@ -1,7 +1,7 @@
 //! The `.kboard` file as the document's content (design note 2.3, 2.6; kition-sdk rule M16b):
-//! round trip (M15), the same bytes for a save of the same version, unknown entries, the repair on
-//! open, a file taken into a replica that holds its history (by its changes, or by its state keyed
-//! by object id), and refusals.
+//! round trip (M15), the same bytes for an unchanged document, unknown entries, the repair on
+//! open, a file taken into the replica a host stored (nothing when both hold the same state, else
+//! the file's state keyed by object id), and refusals.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
 mod common;
@@ -15,9 +15,8 @@ use kition_kit::kdm::{ActorId, Replica};
 use kition_kit::session::take_file;
 use serde_json::json;
 
-/// A save as a host makes it: the session sealed first (`KitDocument::prepare_save`), then the file.
+/// A save as a host makes it.
 fn save(session: &mut Session, base: Option<&FileBase>) -> SavedFile {
-    session.seal().unwrap();
     save_file(session.replica(), BTreeMap::new(), base).unwrap()
 }
 
@@ -47,38 +46,18 @@ fn a_board_round_trips_through_its_file() {
     assert_eq!(parts.meta.doc_id, a.replica().doc_id().to_string());
     assert_eq!(parts.meta.schema_version, 1);
     assert_eq!(parts.meta.kit, "kit.board");
+    assert_eq!(parts.content, a.content_snapshot().unwrap(), "the file holds the replica's content");
+    // The content holds the state and no version, lineage, actor or origin (data model 7.4, C2, C10).
+    let text = std::str::from_utf8(&parts.content).unwrap();
+    let header = format!("{{\"kdm\":1,\"kit\":\"kit.board\",\"docId\":\"{}\",\"schemaVersion\":1,\"objects\":{{\n", a.replica().doc_id());
+    assert!(text.starts_with(&header), "{text}");
+    assert!(!text.contains("\"version\"") && !text.contains("person:test"), "{text}");
     let content = Replica::load(kition_board_kdm::schema(), &parts.content, ActorId::random()).unwrap();
-    assert!(content.is_sealed(), "the content is sealed");
-    assert!(content.is_shallow(), "and holds no history before its seal");
+    assert_eq!(content.state_json().unwrap(), a.replica().state_json().unwrap());
 }
 
 #[test]
-fn a_save_of_the_version_the_file_holds_writes_the_same_bytes() {
-    let mut a = board();
-    let page = first_page(&a);
-    write(&mut a, |tx| {
-        add(tx, &page, shape(0.0, 0.0, 20.0, 20.0));
-        Ok(())
-    });
-    let first = save(&mut a, None);
-    // The replica that saved is at the file's version and sealed, and a second save seals nothing
-    // new and writes the same bytes.
-    assert_eq!(a.version(), *first.base.version());
-    assert!(a.replica().is_sealed());
-    let second = save(&mut a, Some(&first.base));
-    assert_eq!(second.base.version(), first.base.version(), "a sealed replica seals nothing more");
-    assert_eq!(second.bytes, first.bytes, "saving the same version twice gives the same bytes");
-    // Opened again, and saved with nothing new: the same bytes.
-    let opened = open_file(&first.bytes, ActorId::random()).unwrap();
-    assert_eq!(opened.replica.version(), *opened.base.version(), "the file needed no repair");
-    let mut b = kition_kit::session::KitSession::from_replica(opened.replica, Box::new(kition_board_kdm::blobs::SharedBlobs::default())).unwrap();
-    let again = save(&mut b, Some(&opened.base));
-    assert_eq!(again.bytes, first.bytes);
-}
-
-/// A save writes the content of a sealed replica only: one nobody sealed (`prepareSave`) is refused.
-#[test]
-fn a_replica_nobody_sealed_is_not_saved() {
+fn an_unchanged_board_saves_to_the_same_bytes_and_keeps_its_ids() {
     let mut a = board();
     let page = first_page(&a);
     write(&mut a, |tx| {
@@ -86,9 +65,20 @@ fn a_replica_nobody_sealed_is_not_saved() {
         Ok(())
     });
     let version = a.version();
-    let error = save_file(a.replica(), BTreeMap::new(), None).err().map(|error| error.to_string()).unwrap_or_default();
-    assert!(error.starts_with("not-sealed"), "{error}");
-    assert_eq!(a.version(), version, "a refused save changes nothing");
+    let first = save(&mut a, None);
+    // A save writes nothing into the replica, and a second save writes the same bytes.
+    assert_eq!(a.version(), version, "a save changes nothing");
+    assert_eq!(a.version(), *first.base.version());
+    let second = save(&mut a, Some(&first.base));
+    assert_eq!(second.base.version(), first.base.version(), "nor does a second one");
+    assert_eq!(second.bytes, first.bytes, "saving the same version twice gives the same bytes");
+    // Opened again, and saved with nothing new: the same bytes.
+    let opened = open_file(&first.bytes, ActorId::random()).unwrap();
+    assert_eq!(opened.replica.version(), *opened.base.version(), "the file needed no repair");
+    let mut b = kition_kit::session::KitSession::from_replica(opened.replica, Box::new(kition_board_kdm::blobs::SharedBlobs::default())).unwrap();
+    assert_eq!(state(&b), state(&a), "reopened: the same objects under the same ids");
+    let again = save(&mut b, Some(&opened.base));
+    assert_eq!(again.bytes, first.bytes);
 }
 
 #[test]
@@ -110,7 +100,7 @@ fn unknown_entries_survive_a_save() {
     assert_eq!(kboard::read(&saved).unwrap().extra, vec![("later/notes.json".to_owned(), b"{\"kept\":true}".to_vec())]);
 }
 
-/// Opening repairs once (a merge can leave a file inconsistent) and never writes the file; the
+/// Opening repairs once (a file written elsewhere can be inconsistent) and never writes the file; the
 /// repair is in the next save.
 #[test]
 fn opening_repairs_and_the_next_save_holds_the_repair() {
@@ -133,24 +123,21 @@ fn opening_repairs_and_the_next_save_holds_the_repair() {
     assert_eq!(end.binding.unwrap().anchor, [1.0, 0.5], "the file holds the repaired anchor");
 }
 
-/// A file saved from the stored replica's own history: the store has its version (nothing to
-/// take), or lacks only the seal (taken as a change).
+/// A file of the state the stored replica holds: nothing to take, the store stays as it was.
 #[test]
-fn a_file_saved_from_the_stored_history_is_taken_as_its_changes() {
+fn a_file_of_the_stored_state_is_taken_as_nothing() {
     let mut a = board();
     let page = first_page(&a);
     write(&mut a, |tx| {
         add(tx, &page, shape(0.0, 0.0, 20.0, 20.0));
         Ok(())
     });
-    // The store saved before the seal reached it.
     let mut stored = Replica::load(kition_board_kdm::schema(), &a.snapshot().unwrap(), ActorId::random()).unwrap();
+    let before = stored.version();
     let saved = save(&mut a, None);
     let file = open_file(&saved.bytes, ActorId::random()).unwrap().replica;
-    assert!(take_file(&mut stored, &file).unwrap());
-    assert_eq!(stored.version(), file.version(), "the seal came as a change");
-    assert!(!stored.is_shallow(), "the store keeps its whole history");
-    assert!(!take_file(&mut stored, &file).unwrap(), "a store that has the file's version takes nothing");
+    assert!(!take_file(&mut stored, &file).unwrap(), "a store that holds the file's state takes nothing");
+    assert_eq!(stored.version(), before);
 }
 
 /// A file saved elsewhere, from changes the store never saw: its state is written over the
@@ -180,8 +167,7 @@ fn a_file_saved_elsewhere_is_taken_as_its_state_by_object_id() {
     let saved = reopen(&save(&mut a, None).bytes);
     let before = stored.version();
     assert!(take_file(&mut stored, saved.replica()).unwrap());
-    assert!(!stored.is_shallow(), "the store keeps its whole history");
-    assert!(stored.version().includes(&before));
+    assert!(stored.version().includes(&before), "the file's state is a change on the store's line");
     assert!(!stored.can_undo(), "the import is no undo step");
     let back = kition_kit::session::KitSession::<kition_board_kdm::BoardModel>::from_replica(
         stored,

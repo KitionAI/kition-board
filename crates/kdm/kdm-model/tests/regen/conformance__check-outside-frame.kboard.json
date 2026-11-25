@@ -1,0 +1,6 @@
+{"kdm":1,"kit":"kit.board","docId":"01a16848-e64e-745b-b4c7-e7b556a35c9f","schemaVersion":1,"objects":{
+"01a16848-e64e-745b-b4c7-e7b6eec6fb5b":{"$type":"Page","elements":["01a16848-e64e-745b-b4c7-e7b7fab47290","01a16848-e64e-745b-b4c7-e7b8a9e4dced"],"name":"Page 1"},
+"01a16848-e64e-745b-b4c7-e7b7fab47290":{"$type":"Element","kind":"frame","position":{"x":0,"y":0},"size":{"h":200,"w":300},"text":[{"insert":"Sprint"}]},
+"01a16848-e64e-745b-b4c7-e7b8a9e4dced":{"$type":"Element","kind":"shape","parent":"01a16848-e64e-745b-b4c7-e7b7fab47290","position":{"x":250,"y":150},"shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"Late"}]},
+"board":{"$type":"Board","pages":["01a16848-e64e-745b-b4c7-e7b6eec6fb5b"],"title":"Frame"}
+}}

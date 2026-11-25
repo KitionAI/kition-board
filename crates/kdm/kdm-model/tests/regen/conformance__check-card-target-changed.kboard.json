@@ -1,0 +1,5 @@
+{"kdm":1,"kit":"kit.board","docId":"01a168df-fc57-769e-af84-0106510a2fca","schemaVersion":1,"objects":{
+"01a168df-fc57-769e-af84-010758a2e10e":{"$type":"Page","elements":["01a168df-fc57-769e-af84-0108453d4d85"],"name":"Page 1"},
+"01a168df-fc57-769e-af84-0108453d4d85":{"$type":"Element","card":{"kind":"board","target":{"docId":"0192f0a0-0000-7000-8000-00000000c0de","path":"check-card-target-changed.kboard"}},"kind":"card","position":{"x":0,"y":0},"size":{"h":200,"w":320}},
+"board":{"$type":"Board","pages":["01a168df-fc57-769e-af84-010758a2e10e"],"title":"Changed"}
+}}

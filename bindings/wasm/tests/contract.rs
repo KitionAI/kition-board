@@ -10,7 +10,6 @@ fn fixture() -> Vec<u8> {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 40, "y": 40 }, "size": { "w": 160, "h": 100 } }] }))
         .unwrap();
-    doc.prepare_save().unwrap();
     doc.save(None).unwrap()
 }
 

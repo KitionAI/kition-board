@@ -38,7 +38,6 @@ fn add_picture(doc: &mut BoardDocument, bytes: &[u8]) -> String {
 fn pictures_travel_in_the_file() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let hash = add_picture(&mut doc, PICTURE);
-    doc.prepare_save().unwrap();
     let bytes = doc.save(None).unwrap();
     let parts = kboard::read(&bytes).unwrap();
     assert_eq!(parts.blobs.get(&hash).map(Vec::as_slice), Some(PICTURE));
@@ -51,9 +50,8 @@ fn pictures_travel_in_the_file() {
 #[test]
 fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
     let mut a = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
-    // As a host saves: sealed first (`prepare_save`), so the file's seal is the session's own.
-    a.prepare_save().unwrap();
-    let mut b = BoardDocument::open("Plan.kboard", &a.save(None).unwrap()).unwrap();
+    // A replica that follows `a` (the page's or a draft's): from its snapshot, on its line of changes.
+    let mut b = BoardDocument::open_with_replica("Plan.kboard", &[], &kition_kit::session::__snapshot(&a).unwrap(), &[]).unwrap();
     let since = b.version().encode();
     let hash = add_picture(&mut a, PICTURE);
     // The changes arrive first.
@@ -61,7 +59,6 @@ fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
     KitSessionDocument::import_changes(&mut b, &changes).unwrap();
     assert_eq!(b.missing_blobs(), vec![hash.clone()]);
     assert_eq!(b.inspect().unwrap()["missingBlobs"], json!([hash.clone()]));
-    b.prepare_save().unwrap();
     let without = kboard::read(&b.save(None).unwrap()).unwrap();
     assert!(without.blobs.is_empty(), "a save never invents bytes it lacks");
     // Then the blobs: only what b lacks.
@@ -72,7 +69,6 @@ fn a_picture_whose_bytes_come_late_shows_when_they_arrive() {
     assert!(b.revision() > revision);
     assert!(b.missing_blobs().is_empty());
     assert!(!b.add_blobs(&bundle).unwrap(), "adding them again changes nothing");
-    b.prepare_save().unwrap();
     assert_eq!(kboard::read(&b.save(None).unwrap()).unwrap().blobs.get(&hash).map(Vec::as_slice), Some(PICTURE));
     // A peer at the current version needs nothing; one with nothing needs every referenced blob.
     assert!(b.blobs_since(&b.version().encode()).unwrap().is_empty());
@@ -88,13 +84,11 @@ fn a_board_opens_from_a_stored_replica_and_its_blobs() {
     assert_eq!(alone.doc_id(), a.doc_id());
     assert!(alone.has_blob(&hash));
     // With the file too, edits only the file has are kept.
-    a.prepare_save().unwrap();
     let file = a.save(None).unwrap();
     let mut later = BoardDocument::open("Plan.kboard", &file).unwrap();
     later
         .execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 300 }, "size": { "w": 50, "h": 50 } }] }))
         .unwrap();
-    later.prepare_save().unwrap();
     let newer_file = later.save(None).unwrap();
     let both = BoardDocument::open_with_replica("Plan.kboard", &newer_file, &snapshot, &[]).unwrap();
     assert_eq!(both.doc_id(), a.doc_id());
@@ -109,23 +103,19 @@ fn saves_write_the_content_the_document_holds_now() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let shapes: Vec<_> = (0..40).map(|x| json!({ "kind": "shape", "position": { "x": x * 30, "y": 400 }, "size": { "w": 20, "h": 20 } })).collect();
     doc.execute("element.create", json!({ "elements": shapes })).unwrap();
-    doc.prepare_save().unwrap();
     let first = doc.save(None).unwrap();
     doc.mark_saved();
-    doc.prepare_save().unwrap();
     assert_eq!(doc.save(None).unwrap(), first, "a save of the version the file holds writes the same bytes");
     let mut doc = BoardDocument::open("Plan.kboard", &first).unwrap();
     doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 0, "y": 0 }, "size": { "w": 50, "h": 50 } }] }))
         .unwrap();
-    doc.prepare_save().unwrap();
     let second = doc.save(None).unwrap();
     assert!(doc.dirty(), "save leaves the document dirty until mark_saved");
     doc.mark_saved();
     assert!(!doc.dirty());
     let parts = kboard::read(&second).unwrap();
     assert_ne!(parts.content, kboard::read(&first).unwrap().content);
-    doc.prepare_save().unwrap();
-    assert_eq!(doc.save(None).unwrap(), second, "a sealed session saves the same bytes");
+    assert_eq!(doc.save(None).unwrap(), second, "an unchanged session saves the same bytes");
     assert_eq!(BoardDocument::open("Plan.kboard", &second).unwrap().model().element_count(), 41);
 }
 
@@ -145,7 +135,6 @@ fn a_deleted_picture_leaves_its_bytes_out_of_the_file() {
         .unwrap()
         .clone();
     doc.execute("element.delete", json!({ "ids": [id.as_str()] })).unwrap();
-    doc.prepare_save().unwrap();
     let parts = kboard::read(&doc.save(None).unwrap()).unwrap();
     assert!(parts.blobs.contains_key(&kept));
     assert!(!parts.blobs.contains_key(&gone), "the deleted picture's bytes are not in the file");

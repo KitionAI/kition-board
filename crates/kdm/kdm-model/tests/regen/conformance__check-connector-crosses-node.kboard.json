@@ -1,0 +1,8 @@
+{"kdm":1,"kit":"kit.board","docId":"01a16848-e64e-745b-b4c7-e7b989ff55f2","schemaVersion":1,"objects":{
+"01a16848-e64e-745b-b4c7-e7ba50c18ec2":{"$type":"Page","elements":["01a16848-e64e-745b-b4c7-e7bba0b2f9d8","01a16848-e64e-745b-b4c7-e7bc76763b84","01a16848-e64f-70b4-bee6-7d892ec6192c","01a16848-e64f-70b4-bee6-7d8a7180eec4"],"name":"Page 1"},
+"01a16848-e64e-745b-b4c7-e7bba0b2f9d8":{"$type":"Element","kind":"shape","position":{"x":0,"y":0},"shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"From"}]},
+"01a16848-e64e-745b-b4c7-e7bc76763b84":{"$type":"Element","kind":"shape","position":{"x":300,"y":0},"shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"In the way"}]},
+"01a16848-e64f-70b4-bee6-7d892ec6192c":{"$type":"Element","kind":"shape","position":{"x":600,"y":0},"shapeType":"rectangle","size":{"h":80,"w":160},"text":[{"insert":"To"}]},
+"01a16848-e64f-70b4-bee6-7d8a7180eec4":{"$type":"Element","end":{"binding":{"anchor":[0,0.5],"target":"01a16848-e64f-70b4-bee6-7d892ec6192c"},"point":[600,40]},"endArrowhead":"arrow","kind":"connector","start":{"binding":{"anchor":[1,0.5],"target":"01a16848-e64e-745b-b4c7-e7bba0b2f9d8"},"point":[160,40]}},
+"board":{"$type":"Board","pages":["01a16848-e64e-745b-b4c7-e7ba50c18ec2"],"title":"Route"}
+}}

@@ -1,0 +1,5 @@
+{"kdm":1,"kit":"kit.board","docId":"01a16848-e64f-70b4-bee6-7d8b74f7c647","schemaVersion":1,"objects":{
+"01a16848-e64f-70b4-bee6-7d8c40945867":{"$type":"Page","elements":["01a16848-e64f-70b4-bee6-7d8d7d5bdd75"],"name":"Page 1"},
+"01a16848-e64f-70b4-bee6-7d8d7d5bdd75":{"$type":"Element","kind":"frame","position":{"x":0,"y":0},"size":{"h":200,"w":300},"text":[{"insert":"Later"}]},
+"board":{"$type":"Board","pages":["01a16848-e64f-70b4-bee6-7d8c40945867"],"title":"Empty"}
+}}
