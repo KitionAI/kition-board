@@ -50,7 +50,7 @@ const until = async (check, tries = 100) => {
 const ai = (steps) => page.evaluate(async (steps) => window.devHost.connection().ai.run(steps, false), steps)
 const inspect = () => page.evaluate(async () => (await window.devHost.connection().ai.inspect()).details ?? (await window.devHost.connection().ai.inspect()))
 const elementCount = async () => (await inspect()).elements
-const copy = async (ids) => (await ai([{ command: 'clipboard.copy', params: { ids } }])).completed[0].result
+const copy = async (ids) => (await ai([{ command: 'edit.copy', params: { ids } }])).completed[0].result
 
 /** The library's shapes, with the English names the search matches (strings.ts, en-US). */
 const PICKED = ['document', 'cylinder', 'callout', 'pentagon', 'brace-left']
@@ -80,7 +80,7 @@ try {
   /** The person's New page, from the View tab. */
   const newPage = async () => {
     await kit.getByTestId('ribbon-tab-View').click()
-    await kit.getByTestId('board-cmd-page.create').click()
+    await kit.getByTestId('board-cmd-page.add').click()
     await kit.getByTestId('ribbon-tab-Edit').click()
   }
   /** Copies `ids` and answers their stored elements. */
@@ -144,7 +144,7 @@ try {
     `${JSON.stringify(found)} in ${foundGroups} group(s); ${cleared} after clearing`,
   )
 
-  // 3 and 4. Each picked shape becomes the shape tool's; a drag draws it, one element.create.
+  // 3 and 4. Each picked shape becomes the shape tool's; a drag draws it, one element.add.
   const made = {}
   for (const [at, shape] of PICKED.entries()) {
     const button = kit.getByTestId(`board-library-${shape}`)

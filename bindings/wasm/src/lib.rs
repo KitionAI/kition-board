@@ -32,7 +32,7 @@ pub const EXTENSION: &str = "kboard";
 
 /// Commands whose file parameters the engine reads through lent files (`kition-board`'s
 /// SANDBOXED list), until typed `file` parameters land in `kition-headless`.
-pub const SANDBOXED: &[&str] = &["card.create", "card.setTarget", "image.insert"];
+pub const SANDBOXED: &[&str] = &["card.add", "card.setTarget", "image.insert"];
 
 /// The formats a board exports to (`kit.json` `exports`, KHP A41), as `file.export` writes them.
 pub const EXPORTS: &[&str] = &["png", "svg", "pdf"];
@@ -68,7 +68,7 @@ pub struct BoardDocument {
     /// that took its place when it was first). Kept by id, so a later move of pages does not
     /// change what the person sees.
     fallback: Option<ObjectId>,
-    /// The page the person showed when their `page.create { activate }` made the page they show
+    /// The page the person showed when their `page.add { activate }` made the page they show
     /// now: an undo of that creation takes them back there. Cleared when they show another page.
     came_from: Option<ObjectId>,
     revision: u64,
@@ -487,7 +487,7 @@ impl KitSessionDocument for BoardDocument {
     }
 
     /// Runs `command`. An agent's command leaves the page the editor shows as it was, also when it
-    /// fails; only the commands whose work is moving the editor (`page.activate`, `page.create`
+    /// fails; only the commands whose work is moving the editor (`page.activate`, `page.add`
     /// with `activate`) keep their effect. A person's commands run as they always did.
     fn execute_as(&mut self, command: &str, params: Value, origin: &Origin) -> Result<Value, String> {
         let agent = kition_kit::dispatch::role() == Some(kition_kit::dispatch::Role::Agent);
@@ -590,7 +590,7 @@ impl BoardDocument {
                     kition_board_model::run(model, tx, &mut ctx, command, &params)
                 })?;
                 self.changed(&damage);
-                if command == "page.create" && params.get("activate").and_then(Value::as_bool) == Some(true) {
+                if command == "page.add" && params.get("activate").and_then(Value::as_bool) == Some(true) {
                     let shown = self.active_page().map(|page| page.id.clone());
                     self.active_page = value.get("page").and_then(Value::as_str).map(ObjectId::from_string);
                     // An agent's run keeps its own editor state; only the person goes back.

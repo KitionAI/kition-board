@@ -48,7 +48,7 @@ fn outside(bytes: &[u8], steps: &[(&str, Value)]) -> BoardDocument {
 fn an_outside_save_keeps_the_agents_undo_and_the_colleagues_edit() {
     let mut live = BoardDocument::create(FILE, 1920, 1080).unwrap();
     let made = live
-        .execute("element.create", json!({"elements":[{"kind":"shape","position":[0,0],"text":"A"},{"kind":"shape","position":[300,0],"text":"B"}]}))
+        .execute("element.add", json!({"elements":[{"kind":"shape","position":[0,0],"text":"A"},{"kind":"shape","position":[300,0],"text":"B"}]}))
         .unwrap();
     let (a, b) = (made["created"][0].clone(), made["created"][1].clone());
     live.execute_as("element.move", json!({"ids":[a],"delta":[10,0]}), &agent()).unwrap();
@@ -76,7 +76,7 @@ fn an_outside_save_keeps_the_agents_undo_and_the_colleagues_edit() {
 #[test]
 fn a_reread_keeps_the_shown_page_and_refuses_when_the_file_deleted_it() {
     let mut live = BoardDocument::create(FILE, 1920, 1080).unwrap();
-    let page = live.execute("page.create", json!({"name":"Ideas","activate":true})).unwrap()["page"].clone();
+    let page = live.execute("page.add", json!({"name":"Ideas","activate":true})).unwrap()["page"].clone();
     let bytes = store(&mut live);
 
     let renamed = outside(&bytes, &[("page.rename", json!({"page":page,"name":"Plans"}))]);
@@ -95,7 +95,7 @@ fn a_reread_keeps_the_shown_page_and_refuses_when_the_file_deleted_it() {
 #[test]
 fn a_file_of_another_board_is_not_reconciled() {
     let mut live = BoardDocument::create(FILE, 1920, 1080).unwrap();
-    live.execute("element.create", json!({"elements":[{"kind":"shape","position":[0,0],"text":"A"}]})).unwrap();
+    live.execute("element.add", json!({"elements":[{"kind":"shape","position":[0,0],"text":"A"}]})).unwrap();
     store(&mut live);
     let other = BoardDocument::create(FILE, 1920, 1080).unwrap();
     let other = BoardDocument::open(FILE, &other.save(Some(FILE)).unwrap()).unwrap();
@@ -113,7 +113,7 @@ fn a_broken_file_written_outside_is_taken_in_repaired() {
     let mut live = BoardDocument::create(FILE, 1920, 1080).unwrap();
     let made = live
         .execute(
-            "element.create",
+            "element.add",
             json!({"elements":[{"kind":"shape","position":[0,0],"size":[100,100]},{"kind":"shape","position":[300,0],"size":[100,100]},{"kind":"shape","position":[600,0],"size":[100,100]}]}),
         )
         .unwrap();

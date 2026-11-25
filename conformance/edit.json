@@ -1,7 +1,7 @@
 {
   "steps": [
     {
-      "command": "element.create",
+      "command": "element.add",
       "params": {
         "elements": [
           {

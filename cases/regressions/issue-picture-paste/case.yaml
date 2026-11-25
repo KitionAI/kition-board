@@ -4,7 +4,7 @@ feature: board.images
 intent: >-
   A picture copied on one board and pasted on another: the clipboard payload names a picture by its
   blob's hash, not its bytes, and the editor pastes a payload into another document (the system
-  clipboard's `kition-board:` text). element.paste leaves out a picture whose bytes the destination
+  clipboard's `kition-board:` text). edit.paste leaves out a picture whose bytes the destination
   does not store, names it in its answer (`skipped`, reason `board.image-missing-blob`) and pastes
   the rest where it would have landed; a payload of nothing but such pictures is refused, and a
   board that stores the bytes pastes the picture. The editor tells the person either way. Before,

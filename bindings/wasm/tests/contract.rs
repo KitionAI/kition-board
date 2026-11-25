@@ -8,7 +8,7 @@ use serde_json::json;
 /// A board titled `Plan` with one shape on its first page, as a `.kboard` file.
 fn fixture() -> Vec<u8> {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
-    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 40, "y": 40 }, "size": { "w": 160, "h": 100 } }] }))
+    doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": { "x": 40, "y": 40 }, "size": { "w": 160, "h": 100 } }] }))
         .unwrap();
     doc.save(None).unwrap()
 }
@@ -16,10 +16,7 @@ fn fixture() -> Vec<u8> {
 #[test]
 fn keeps_the_kit_sdk_contract() {
     kition_kit::testing::check_contract::<BoardDocument>(&fixture(), "Plan.kboard", |doc| {
-        doc.execute(
-            "element.create",
-            json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 200 }, "size": { "w": 240, "h": 120 } }] }),
-        )?;
+        doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 200 }, "size": { "w": 240, "h": 120 } }] }))?;
         Ok(())
     })
     .unwrap();

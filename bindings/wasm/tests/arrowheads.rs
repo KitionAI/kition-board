@@ -15,7 +15,7 @@ fn fragment(doc: &BoardDocument, id: &str) -> String {
 fn line(doc: &mut BoardDocument, start: &str, end: &str) -> String {
     let made = doc
         .execute(
-            "connector.create",
+            "connector.add",
             json!({ "from": { "point": [100, 100] }, "to": { "point": [400, 100] }, "startArrowhead": start, "endArrowhead": end }),
         )
         .unwrap();
@@ -47,7 +47,7 @@ fn there_are_nine_arrowheads_and_each_is_drawn_differently() {
 fn a_head_is_at_the_end_it_is_set_on() {
     let mut doc = BoardDocument::create("Heads.kboard", 800, 600).unwrap();
     assert_ne!(line(&mut doc, "diamond", "none"), line(&mut doc, "none", "diamond"));
-    let refused = doc.execute("connector.create", json!({ "from": { "point": [0, 0] }, "to": { "point": [10, 0] }, "endArrowhead": "claw" }));
+    let refused = doc.execute("connector.add", json!({ "from": { "point": [0, 0] }, "to": { "point": [10, 0] }, "endArrowhead": "claw" }));
     assert!(format!("{refused:?}").contains("invalid-params"), "{refused:?}");
 }
 
@@ -57,7 +57,7 @@ fn a_zero_length_connector_with_any_head_is_drawn_without_nan() {
     for head in ARROWHEADS {
         let made = doc
             .execute(
-                "connector.create",
+                "connector.add",
                 json!({ "from": { "point": [50, 50] }, "to": { "point": [50, 50] }, "startArrowhead": head, "endArrowhead": head }),
             )
             .unwrap();
@@ -78,7 +78,7 @@ fn open_heads_are_hollow_and_closed_heads_are_filled() {
     ] {
         let mut doc = BoardDocument::create("Heads.kboard", 800, 600).unwrap();
         doc.execute(
-            "connector.create",
+            "connector.add",
             json!({ "from": { "point": [100, 300] }, "to": { "point": [400, 300] }, "endArrowhead": head, "style": { "strokeColor": "#000000" } }),
         )
         .unwrap();
@@ -94,7 +94,7 @@ fn an_open_head_is_the_paper_of_either_scheme() {
     // restyles; the dark raster fills it with the dark paper, under the light default ink.
     let mut doc = BoardDocument::create("Heads.kboard", 800, 600).unwrap();
     let made = doc
-        .execute("connector.create", json!({ "from": { "point": [100, 300] }, "to": { "point": [400, 300] }, "endArrowhead": "triangle-open" }))
+        .execute("connector.add", json!({ "from": { "point": [100, 300] }, "to": { "point": [400, 300] }, "endArrowhead": "triangle-open" }))
         .unwrap();
     assert!(fragment(&doc, made["created"][0].as_str().unwrap()).contains(r#"fill="var(--kb-paper, #ffffff)""#));
     let inside = doc.render_scheme("dark", 391.0, 300.0, 1.0, 1, 1).unwrap();

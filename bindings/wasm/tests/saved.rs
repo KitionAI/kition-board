@@ -54,7 +54,7 @@ fn every_fixture_and_representative_command_reopens_as_the_exact_in_memory_state
         check(&mut doc, "open");
         let made = run(
             &mut doc,
-            "element.create",
+            "element.add",
             json!({"elements":[
                 {"kind":"shape","position":[0.1,1.0/3.0],"size":[120.123456789,60.987654321],"text":"Alpha"},
                 {"kind":"text","position":[400.1,30.2],"text":"Beta"}
@@ -62,7 +62,7 @@ fn every_fixture_and_representative_command_reopens_as_the_exact_in_memory_state
             &mut commands,
         );
         let (a, b) = (made["created"][0].clone(), made["created"][1].clone());
-        let frame = run(&mut doc, "frame.create", json!({"box":[-10.1,-10.2,300.3,300.4],"children":[a]}), &mut commands)["frame"].clone();
+        let frame = run(&mut doc, "frame.add", json!({"box":[-10.1,-10.2,300.3,300.4],"children":[a]}), &mut commands)["frame"].clone();
         for (command, params) in [
             ("element.style", json!({"ids":[a,b],"style":{"opacity":0.123456789123,"fontSize":27.123456789}})),
             ("element.move", json!({"ids":[frame],"delta":[1.0/7.0,1.0/3.0]})),
@@ -77,7 +77,7 @@ fn every_fixture_and_representative_command_reopens_as_the_exact_in_memory_state
             run(&mut doc, command, params, &mut commands);
         }
         let connector =
-            run(&mut doc, "connector.create", json!({"from":{"element":a},"to":{"element":b},"label":"Edge"}), &mut commands)["created"][0].clone();
+            run(&mut doc, "connector.add", json!({"from":{"element":a},"to":{"element":b},"label":"Edge"}), &mut commands)["created"][0].clone();
         for (command, params) in [
             ("connector.setLabel", json!({"id":connector,"text":"Next","position":1.0/3.0})),
             ("connector.setWaypoints", json!({"id":connector,"waypoints":[[222.222,111.111]]})),
@@ -85,13 +85,13 @@ fn every_fixture_and_representative_command_reopens_as_the_exact_in_memory_state
         ] {
             run(&mut doc, command, params, &mut commands);
         }
-        let group = run(&mut doc, "element.group", json!({"ids":[a,b]}), &mut commands)["group"].clone();
-        run(&mut doc, "element.ungroup", json!({"groupIds":[group]}), &mut commands);
+        let group = run(&mut doc, "arrange.group", json!({"ids":[a,b]}), &mut commands)["group"].clone();
+        run(&mut doc, "arrange.ungroup", json!({"groupIds":[group]}), &mut commands);
         let duplicate = run(&mut doc, "element.duplicate", json!({"ids":[a],"offset":[0.1,0.2]}), &mut commands)["created"].clone();
         run(&mut doc, "element.delete", json!({"ids":duplicate}), &mut commands);
-        run(&mut doc, "stroke.create", json!({"points":[[1.123456789,2.987654321],[100.1,200.2]]}), &mut commands);
-        run(&mut doc, "card.create", json!({"url":"https://example.com","position":[123.123456789,321.987654321]}), &mut commands);
-        run(&mut doc, "page.create", json!({"name":"Invariant","at":0}), &mut commands);
+        run(&mut doc, "stroke.add", json!({"points":[[1.123456789,2.987654321],[100.1,200.2]]}), &mut commands);
+        run(&mut doc, "card.add", json!({"url":"https://example.com","position":[123.123456789,321.987654321]}), &mut commands);
+        run(&mut doc, "page.add", json!({"name":"Invariant","at":0}), &mut commands);
     }
     println!("in-memory == saved: {} fixture files, {commands} commands, 0 replica/view/derived/receipt mismatches", paths.len());
 }

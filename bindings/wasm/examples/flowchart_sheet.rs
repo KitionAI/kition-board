@@ -20,7 +20,7 @@ const FONTS: &[&str] = &["fonts/inter/Inter-Variable.ttf", "fonts/droid-sans-fal
 /// One shape: its type, label, top-left and size.
 fn shape(doc: &mut BoardDocument, shape_type: &str, text: &str, at: [f64; 2], size: [f64; 2]) -> Value {
     let element = json!({ "kind": "shape", "shapeType": shape_type, "shapeStyle": "flow-node", "position": at, "size": size, "text": text });
-    doc.execute("element.create", json!({ "elements": [element] })).unwrap()["created"][0].clone()
+    doc.execute("element.add", json!({ "elements": [element] })).unwrap()["created"][0].clone()
 }
 
 /// A connector from `from` at `from_anchor` to `to` at `to_anchor` (`None`: the edge facing the
@@ -32,7 +32,7 @@ fn connect(doc: &mut BoardDocument, from: &Value, from_anchor: Option<[f64; 2]>,
     };
     let mut params = json!({ "from": end(from, from_anchor), "to": end(to, to_anchor) });
     params.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
-    doc.execute("connector.create", params).unwrap()["created"][0].clone()
+    doc.execute("connector.add", params).unwrap()["created"][0].clone()
 }
 
 fn main() {

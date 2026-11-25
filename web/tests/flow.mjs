@@ -60,7 +60,7 @@ const until = async (check, tries = 100) => {
 const ai = (steps) => page.evaluate(async (steps) => window.devHost.connection().ai.run(steps, false), steps)
 const inspect = () => page.evaluate(async () => (await window.devHost.connection().ai.inspect()).details ?? (await window.devHost.connection().ai.inspect()))
 const elementCount = async () => (await inspect()).elements
-const copy = async (ids) => (await ai([{ command: 'clipboard.copy', params: { ids } }])).completed[0].result
+const copy = async (ids) => (await ai([{ command: 'edit.copy', params: { ids } }])).completed[0].result
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]
 const p95 = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length * 0.95)]
 
@@ -157,7 +157,7 @@ try {
   const b = await screen(ox + 160, oy + 100)
   await drag(a, b)
   await until(async () => (await elementCount()) === 5 && (await board(() => window.kitBoard.selection())).length === 1)
-  step('draws a shape: one element.create', (await elementCount()) === 5)
+  step('draws a shape: one element.add', (await elementCount()) === 5)
   const drawn = (await board(() => window.kitBoard.selection()))[0]
   const drawnBox = await board((id) => window.kitBoard.worldBox(id), drawn)
   step('the new shape has the dragged box', drawnBox && Math.abs(drawnBox.x0 - ox) < 3 && Math.abs(drawnBox.x1 - ox - 160) < 3, JSON.stringify(drawnBox))
@@ -209,7 +209,7 @@ try {
   const connector = (await board(() => window.kitBoard.selection()))[0]
   const payload = await copy([connector])
   const stored = payload.payload?.elements?.find((e) => e.kind === 'connector') ?? payload.elements?.find((e) => e.kind === 'connector')
-  step('connects two shapes: one connector.create, bound at both ends', stored?.start?.binding?.target === drawn && stored?.end?.binding?.target === ship, `${connector} ${JSON.stringify(payload).slice(0, 400)} ${warnings.slice(-3).join(' | ')}`)
+  step('connects two shapes: one connector.add, bound at both ends', stored?.start?.binding?.target === drawn && stored?.end?.binding?.target === ship, `${connector} ${JSON.stringify(payload).slice(0, 400)} ${warnings.slice(-3).join(' | ')}`)
   const derived = await board((id) => window.kitBoard.endPoints(id), connector)
   const engineEnds = [stored?.start?.point, stored?.end?.point]
   const off = Math.max(Math.hypot(derived[0].x - engineEnds[0][0], derived[0].y - engineEnds[0][1]), Math.hypot(derived.at(-1).x - engineEnds[1][0], derived.at(-1).y - engineEnds[1][1]))
@@ -277,19 +277,19 @@ try {
   step('the saved board reopens with every element', (await elementCount()) === 6 && (await board(() => window.kitBoard.shown().length)) === 6)
 
   // An agent's step runs in an editor state of its own and never moves the person's page (Kit UI
-  // protocol 2.9): `page.create { activate }` makes the page and puts the run's next steps there.
+  // protocol 2.9): `page.add { activate }` makes the page and puts the run's next steps there.
   const personPage = async () => (await inspect()).page
   const pageBefore = await personPage()
   const agentRun = await ai([
-    { command: 'page.create', params: { name: 'Agent', activate: true } },
-    { command: 'element.create', params: { elements: [{ kind: 'shape', position: { x: 0, y: 0 }, size: { w: 40, h: 40 } }] } },
+    { command: 'page.add', params: { name: 'Agent', activate: true } },
+    { command: 'element.add', params: { elements: [{ kind: 'shape', position: { x: 0, y: 0 }, size: { w: 40, h: 40 } }] } },
   ])
   const agentPage = agentRun.completed[0].result.page
   const agentMade = agentRun.completed[1].result.created[0]
   const agentPageElements = async () => (await inspect()).pages.find((listed) => listed.id === agentPage)?.elements
   await page.waitForTimeout(300)
   step(
-    "an agent's page.create { activate } leaves the person's page, and its next step goes to the new page",
+    "an agent's page.add { activate } leaves the person's page, and its next step goes to the new page",
     (await personPage()) === pageBefore && (await board(() => window.kitBoard.shown().length)) === 6 && !(await board(() => window.kitBoard.shown())).includes(agentMade) && (await agentPageElements()) === 1,
     `${await personPage()} vs ${pageBefore}, ${await board(() => window.kitBoard.shown().length)} shown, ${await agentPageElements()} on the agent's page`,
   )
@@ -298,7 +298,7 @@ try {
   /** The person's New page, from the View tab. */
   const newPage = async () => {
     await kit.getByTestId('ribbon-tab-View').click()
-    await kit.getByTestId('board-cmd-page.create').click()
+    await kit.getByTestId('board-cmd-page.add').click()
     await kit.getByTestId('ribbon-tab-Edit').click()
   }
   await newPage()
@@ -719,7 +719,7 @@ try {
   await newPage()
   await until(async () => (await personPage()) !== toolsPage && (await board(() => window.kitBoard.shown().length)) === 0)
   const t0 = Date.now()
-  await ai([{ command: 'element.paste', params: { payload: bigPayload() } }])
+  await ai([{ command: 'edit.paste', params: { payload: bigPayload() } }])
   const pasteMs = Date.now() - t0
   await until(async () => (await board(() => window.kitBoard.shown().length)) > 10, 600)
   const showMs = Date.now() - t0 - pasteMs

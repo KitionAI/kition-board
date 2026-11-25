@@ -3,7 +3,7 @@ id: board.history/editor
 feature: board.history
 intent: >-
   Undo and redo end to end in the editor, through the development host (web/tests/proof.mjs, its
-  history steps): the person draws a rectangle (element.create), moves it (element.move), fills it
+  history steps): the person draws a rectangle (element.add), moves it (element.move), fills it
   green from the style panel (element.style) and deletes it (element.delete); four undos, by
   Cmd/Ctrl+Z and the frame's Undo button in turn, bring back each earlier state (filled, moved,
   drawn, nothing), and four redos, by Cmd/Ctrl+Shift+Z and the Redo button, go forward through them

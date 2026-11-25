@@ -55,7 +55,7 @@ fn board_with_history() -> (BoardDocument, String, Version) {
     let mut doc = BoardDocument::create(FILE, 1920, 1080).unwrap();
     let made_at = doc.version();
     let made = created(
-        &doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "text": "Kept" }, { "kind": "shape", "position": [300, 0], "text": DELETED_ELEMENT }] }))
+        &doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "text": "Kept" }, { "kind": "shape", "position": [300, 0], "text": DELETED_ELEMENT }] }))
             .unwrap(),
     );
     let (kept, gone) = (made[0].clone(), made[1].clone());
@@ -123,7 +123,7 @@ fn a_file_opened_without_a_store_is_the_same_document_and_edits() {
     assert_eq!(element_ids(&back), element_ids(&doc), "the same object ids");
     assert_eq!(state(&back), state(&doc), "the same state");
     back.execute("element.setText", json!({ "id": kept, "text": "Edited" })).unwrap();
-    let made = created(&back.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 300], "text": "New" }] })).unwrap());
+    let made = created(&back.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 300], "text": "New" }] })).unwrap());
     let saved = host_save(&mut back);
     let again = BoardDocument::open(FILE, &saved).unwrap();
     assert_eq!(again.doc_id(), doc.doc_id());
@@ -134,7 +134,7 @@ fn a_file_opened_without_a_store_is_the_same_document_and_edits() {
 #[test]
 fn undo_after_a_save_takes_back_the_last_edit() {
     let mut doc = BoardDocument::create(FILE, 1920, 1080).unwrap();
-    let made = created(&doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "text": "A" }] })).unwrap());
+    let made = created(&doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "text": "A" }] })).unwrap());
     doc.execute("element.move", json!({ "ids": [made[0]], "delta": [25, 0] })).unwrap();
     host_save(&mut doc);
     doc.mark_saved();
@@ -193,7 +193,7 @@ fn a_file_saved_elsewhere_opens_on_the_stored_replica_by_its_state() {
     // Elsewhere, from the file alone: an edit, a new shape, a save.
     let mut elsewhere = BoardDocument::open(FILE, &bytes).unwrap();
     elsewhere.execute("element.setText", json!({ "id": kept, "text": "Elsewhere" })).unwrap();
-    elsewhere.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 600], "text": "New" }] })).unwrap();
+    elsewhere.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 600], "text": "New" }] })).unwrap();
     let edited = host_save(&mut elsewhere);
     let opened = BoardDocument::open_with_replica(FILE, &edited, &stored, &[]).unwrap();
     assert_eq!(opened.doc_id(), doc.doc_id());

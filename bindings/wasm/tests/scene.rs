@@ -22,7 +22,7 @@ fn element_svg_answers_fragments_by_revision() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let ids = created(
         &doc.execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
         { "kind": "shape", "position": [100, 100], "size": [160, 100], "text": "Idea" },
         { "kind": "text", "position": [400, 100], "text": "Notes" },
@@ -70,7 +70,7 @@ fn text_metrics_and_blobs_for_the_editor() {
 fn render_draws_the_scene_in_the_document_frame() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     assert_eq!((doc.width(), doc.height()), (1920, 1080));
-    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [-300, -200], "size": [200, 100], "fillColor": "#ff0000" }] }))
+    doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [-300, -200], "size": [200, 100], "fillColor": "#ff0000" }] }))
         .unwrap();
     let area = doc.inspect().unwrap()["area"].clone();
     assert_eq!((area["x"].as_f64(), area["y"].as_f64(), area["unit"].as_f64()), (Some(-340.0), Some(-240.0), Some(1.0)));
@@ -106,7 +106,7 @@ fn big_payload() -> Value {
 #[test]
 fn five_thousand_elements_draw_within_budget() {
     let mut doc = BoardDocument::create("Big.kboard", 1920, 1080).unwrap();
-    doc.execute("element.paste", json!({ "payload": big_payload() })).unwrap();
+    doc.execute("edit.paste", json!({ "payload": big_payload() })).unwrap();
     assert_eq!(doc.inspect().unwrap()["elements"], 5000);
     let all: Vec<String> = doc.model().pages()[0].elements.iter().map(|id| id.as_str().to_owned()).collect();
     let started = Instant::now();
@@ -130,7 +130,7 @@ fn five_thousand_elements_draw_within_budget() {
 fn a_five_thousand_element_paste_is_linear() {
     let mut doc = BoardDocument::create("Big.kboard", 1920, 1080).unwrap();
     let started = Instant::now();
-    doc.execute("element.paste", json!({ "payload": big_payload() })).unwrap();
+    doc.execute("edit.paste", json!({ "payload": big_payload() })).unwrap();
     let pasted = started.elapsed();
     assert_eq!(doc.inspect().unwrap()["elements"], 5000);
     let started = Instant::now();
@@ -150,7 +150,7 @@ fn issue_1_create_sets_the_document_size_at_the_origin() {
     let mut doc = BoardDocument::create("Poster.kboard", 1200, 800).unwrap();
     assert_eq!((doc.width(), doc.height()), (1200, 800), "an empty board is its document size");
     doc.execute(
-        "element.create",
+        "element.add",
         json!({ "elements": [
             { "kind": "shape", "position": [0, 0], "size": [100, 100], "fillColor": "#ff0000" },
             { "kind": "shape", "position": [1100, 700], "size": [100, 100], "fillColor": "#0000ff" },
@@ -171,7 +171,7 @@ fn issue_1_create_sets_the_document_size_at_the_origin() {
     assert_eq!(reopened.inspect().unwrap()["area"], area);
 
     // Past the right edge: the frame grows to the right (with the margin), the origin stays.
-    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [1300, 100], "size": [100, 100] }] })).unwrap();
+    doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [1300, 100], "size": [100, 100] }] })).unwrap();
     let area = doc.inspect().unwrap()["area"].clone();
     assert_eq!((area["x"].as_f64(), area["y"].as_f64()), (Some(0.0), Some(0.0)));
     assert_eq!((doc.width(), doc.height()), (1440, 800));

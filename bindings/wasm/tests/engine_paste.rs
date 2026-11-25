@@ -31,7 +31,7 @@ fn paste(doc: &mut BoardDocument, elements: Value, at: Option<[f64; 2]>) -> Vec<
     if let Some(at) = at {
         params["at"] = json!(at);
     }
-    let answer = run(doc, "element.paste", params);
+    let answer = run(doc, "edit.paste", params);
     answer["created"].as_array().unwrap().iter().map(|id| id.as_str().unwrap().to_owned()).collect()
 }
 
@@ -55,10 +55,10 @@ fn healthy(doc: &mut BoardDocument, what: &str) {
 fn a_pasted_binding_to_what_takes_none_is_freed() {
     let mut doc = board();
     let (a, b) = {
-        let made = run(&mut doc, "element.create", json!({"elements":[{"kind":"shape","position":[0,0]},{"kind":"shape","position":[300,0]}]}));
+        let made = run(&mut doc, "element.add", json!({"elements":[{"kind":"shape","position":[0,0]},{"kind":"shape","position":[300,0]}]}));
         (made["created"][0].as_str().unwrap().to_owned(), made["created"][1].as_str().unwrap().to_owned())
     };
-    let group = run(&mut doc, "element.group", json!({"ids":[a, b]}))["group"].as_str().unwrap().to_owned();
+    let group = run(&mut doc, "arrange.group", json!({"ids":[a, b]}))["group"].as_str().unwrap().to_owned();
     let made = paste(
         &mut doc,
         json!([
@@ -73,7 +73,7 @@ fn a_pasted_binding_to_what_takes_none_is_freed() {
     healthy(&mut doc, "bindings");
 }
 
-/// A pasted anchor is clamped to [0, 1] (rule V7) as connector.create clamps one.
+/// A pasted anchor is clamped to [0, 1] (rule V7) as connector.add clamps one.
 #[test]
 fn a_pasted_anchor_is_clamped() {
     let mut doc = board();

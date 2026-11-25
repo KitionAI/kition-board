@@ -42,7 +42,7 @@ fn board() -> Vec<u8> {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [0, 0], "text": "Kept" },
                 { "kind": "shape", "position": [300, 0], "text": "Also kept" },
@@ -134,7 +134,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     // The fork edits, saves and opens again as any board, under its own id.
     let mut opened = BoardDocument::open("Fork.kboard", &fork_bytes).unwrap();
     assert_eq!(opened.doc_id(), fork_id);
-    opened.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 300], "text": "New" }] })).unwrap();
+    opened.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 300], "text": "New" }] })).unwrap();
     let edited = opened.save(None).unwrap();
     let reopened = BoardDocument::open("Fork.kboard", &edited).unwrap();
     assert_eq!((reopened.doc_id(), reopened.model().element_count()), (fork_id.clone(), opened.model().element_count()));
@@ -154,7 +154,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     assert_eq!(objects(&kit, "Again.kboard").await, objects(&kit, "Plan.kboard").await);
     let again_bytes = std::fs::read(dir.join("Again.kboard")).unwrap();
     let mut again_doc = BoardDocument::open("Again.kboard", &again_bytes).unwrap();
-    again_doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [300, 300], "text": "Again" }] })).unwrap();
+    again_doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [300, 300], "text": "Again" }] })).unwrap();
     let again_edited = again_doc.save(None).unwrap();
     let again_reopened = BoardDocument::open("Again.kboard", &again_edited).unwrap();
     assert_eq!(again_reopened.doc_id(), again, "and keeps its id after an edit, a save and a reopen");

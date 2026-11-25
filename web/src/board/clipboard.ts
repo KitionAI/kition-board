@@ -1,6 +1,6 @@
 /**
- * The board's clipboard (design note 4.3): copy, cut and paste on the engine's `clipboard.copy`
- * and `element.paste`, and pictures pasted or dropped on the canvas (`image.insert` with `data` and
+ * The board's clipboard (design note 4.3): copy, cut and paste on the engine's `edit.copy`
+ * and `edit.paste`, and pictures pasted or dropped on the canvas (`image.insert` with `data` and
  * `mime`, the picture tool's path).
  *
  * The payload is the engine's (`application/x-kition-board+json`); the editor never builds one. A
@@ -65,7 +65,7 @@ export type Query = (command: string, params: Record<string, unknown>) => Promis
 /** Copies `ids` and everything inside them; answers whether the engine gave a payload. */
 export function copy(query: Query, ids: readonly string[]): Promise<boolean> {
   const run = (async () => {
-    const payload = await query('clipboard.copy', { ids: [...ids] })
+    const payload = await query('edit.copy', { ids: [...ids] })
     if (!isPayload(payload)) return false
     held = payload
     repeat = null

@@ -4,7 +4,7 @@ feature: board.editing
 intent: >-
   Copy, cut, paste, Alt-drag duplicate and the canvas menu in the editor, through the development
   host (web/tests/editing.mjs steps 1 to 9): Cmd/Ctrl+C then V pastes one copy, selected, as one
-  element.paste and one undo step; a second paste at the same place is 16 units on; cut removes the
+  edit.paste and one undo step; a second paste at the same place is 16 units on; cut removes the
   selection and paste brings it back; a connector copied with the two shapes it joins is pasted bound
   to the copies; Alt pressed during a drag leaves the original and makes one copy at the drop (one
   element.duplicate, one undo step); the canvas menu selects the element it opens on and its Send to

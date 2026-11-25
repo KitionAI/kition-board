@@ -17,7 +17,7 @@ fn board() -> BoardDocument {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [100, 100], "size": [400, 240], "text": "Plan the launch" },
                 { "kind": "shape", "position": [900, 100], "size": [300, 300], "shapeStyle": "sticky", "text": "Ask Ana" },
@@ -27,7 +27,7 @@ fn board() -> BoardDocument {
         )
         .unwrap();
     let ids: Vec<String> = made["created"].as_array().unwrap().iter().map(|id| id.as_str().unwrap().to_owned()).collect();
-    doc.execute("connector.create", json!({ "from": { "element": ids[0] }, "to": { "element": ids[1] } })).unwrap();
+    doc.execute("connector.add", json!({ "from": { "element": ids[0] }, "to": { "element": ids[1] } })).unwrap();
     doc
 }
 
@@ -106,9 +106,9 @@ fn previews_and_exports_are_drawn_light_after_the_dark_minimap() {
 fn cards() -> BoardDocument {
     let mut doc = BoardDocument::create("Cards.kboard", 1920, 1080).unwrap();
     for (index, file) in ["plans/Roadmap.md", "data/Budget.ktable", "Other.kboard", "docs/Spec.pdf"].into_iter().enumerate() {
-        doc.execute("card.create", json!({ "file": file, "position": [index as f64 * 400.0, 0.0] })).unwrap();
+        doc.execute("card.add", json!({ "file": file, "position": [index as f64 * 400.0, 0.0] })).unwrap();
     }
-    doc.execute("card.create", json!({ "url": "https://kition.ai", "title": "Kition", "position": [0, 400] })).unwrap();
+    doc.execute("card.add", json!({ "url": "https://kition.ai", "title": "Kition", "position": [0, 400] })).unwrap();
     doc
 }
 

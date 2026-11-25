@@ -54,9 +54,9 @@ fn colleague(f: &Fixture, change: usize, round: usize) {
         3 => ("element.delete", json!({"ids":[f.a]})),
         4 => ("element.move", json!({"ids":[f.frame],"delta":[800,0]})),
         5 => ("element.setText", json!({"id":f.frame,"text":"Renamed destination"})),
-        6 => ("page.create", json!({"at":0,"name":"Before"})),
-        7 => ("page.create", json!({"at":2,"name":"After"})),
-        8 => ("element.update", json!({"id":f.a,"set":{"parent":f.frame}})),
+        6 => ("page.add", json!({"at":0,"name":"Before"})),
+        7 => ("page.add", json!({"at":2,"name":"After"})),
+        8 => ("element.set", json!({"id":f.a,"set":{"parent":f.frame}})),
         9 => ("element.move", json!({"ids":[f.b],"delta":[40,0]})),
         _ => panic!("unknown change"),
     };
@@ -66,9 +66,9 @@ fn colleague(f: &Fixture, change: usize, round: usize) {
 fn write(f: &Fixture, form: usize) -> (&'static str, Value) {
     match form {
         0 => ("element.style", json!({"ids":[f.a],"style":{"fillColor":"blue"}})),
-        1 => ("page.create", json!({"name":"Agent","at":1})),
+        1 => ("page.add", json!({"name":"Agent","at":1})),
         2 => ("element.move", json!({"ids":[f.a],"delta":[50,400],"reparent":true})),
-        3 => ("element.group", json!({"ids":[f.a,f.b]})),
+        3 => ("arrange.group", json!({"ids":[f.a,f.b]})),
         _ => panic!("unknown form"),
     }
 }

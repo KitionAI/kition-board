@@ -2,7 +2,7 @@ format: 1
 id: board.elements/save-reopen-append
 feature: board.elements
 intent: >-
-  Elements made with element.create survive a save and a reopen: the reopened board keeps the
+  Elements made with element.add survive a save and a reopen: the reopened board keeps the
   saved snapshot, and each later save appends only the new edits to the file it opened.
 layer: unit
 source:

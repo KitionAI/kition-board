@@ -3,7 +3,7 @@
 //! the same transaction (design note 1.4, gap 14).
 //!
 //! Ported from Kition's `packages/board-editor/src/lib/boardBindingEngine.ts`
-//! (`getBoardConnectorAnchor`, `getBoardConnectorAnchorAt`) and the `connector.create` and
+//! (`getBoardConnectorAnchor`, `getBoardConnectorAnchorAt`) and the `connector.add` and
 //! `connector.update-terminal` commands of `boardCommands.ts`.
 
 use kition_board_kdm::geometry::{clamp_anchor, nearest_edge_anchor};
@@ -89,7 +89,7 @@ fn resolve(model: &BoardModel, page: &PageView, spec: &EndSpec, toward: Point) -
     }
 }
 
-/// `connector.create { page?, from, to, label?, type?, startArrowhead?, endArrowhead?, waypoints?, style? }`.
+/// `connector.add { page?, from, to, label?, type?, startArrowhead?, endArrowhead?, waypoints?, style? }`.
 pub fn create(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value) -> Result<Value> {
     let page = params::page(model, params, ctx.active_page)?;
     let from = end_spec(params.get("from"), "from")?;

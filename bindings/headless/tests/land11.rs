@@ -11,7 +11,7 @@ async fn uuid_page_context_reaches_the_page_the_agent_named() {
         .ok(
             "run",
             json!({"target":{"page":f.other_page},"steps":[
-                {"command":"element.create","params":{"elements":[{"kind":"shape","position":[50,50],"text":"Explicit page"}]}}
+                {"command":"element.add","params":{"elements":[{"kind":"shape","position":[50,50],"text":"Explicit page"}]}}
             ]}),
         )
         .await;

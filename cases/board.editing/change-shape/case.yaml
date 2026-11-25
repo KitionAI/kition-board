@@ -5,7 +5,7 @@ intent: >-
   Changing a shape's type from the style panel, through the development host (web/tests/editing.mjs
   steps 10 and 11): with a rectangle selected, the panel's Shape section offers the library's 44
   shapes in its four groups (basic, flowchart, arrows, marks, from the engine's shape.previews);
-  choosing the document is one element.update that keeps the shape's box and label and the connector
+  choosing the document is one element.set that keeps the shape's box and label and the connector
   bound to it; one undo brings the rectangle back and the panel shows it again.
 layer: gate
 dimension: function

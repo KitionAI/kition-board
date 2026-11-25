@@ -62,7 +62,7 @@ const until = async (check, tries = 100) => {
 const ai = (steps) => page.evaluate(async (steps) => window.devHost.connection().ai.run(steps, false), steps)
 const inspect = () => page.evaluate(async () => (await window.devHost.connection().ai.inspect()).details ?? (await window.devHost.connection().ai.inspect()))
 const elementCount = async () => (await inspect()).elements
-const copy = async (ids) => (await ai([{ command: 'clipboard.copy', params: { ids } }])).completed[0].result
+const copy = async (ids) => (await ai([{ command: 'edit.copy', params: { ids } }])).completed[0].result
 
 /** A 2 × 2 PNG (as in flow.mjs's picture step). */
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGMIc73yH4QZYAwAUnYJuZK5ts8AAAAASUVORK5CYII='
@@ -104,7 +104,7 @@ try {
   /** The person's New page, from the View tab. */
   const newPage = async () => {
     await kit.getByTestId('ribbon-tab-View').click()
-    await kit.getByTestId('board-cmd-page.create').click()
+    await kit.getByTestId('board-cmd-page.add').click()
     await kit.getByTestId('ribbon-tab-Edit').click()
   }
   /** Copies `ids` and answers their stored elements, in the page's order. */
@@ -144,7 +144,7 @@ try {
   const shownPage = await personPage()
   const setup = await ai([
     {
-      command: 'element.create',
+      command: 'element.add',
       params: {
         page: shownPage,
         elements: [
@@ -157,7 +157,7 @@ try {
     },
   ])
   const [a, b, c, d] = setup.completed[0].result.created
-  const joined = await ai([{ command: 'connector.create', params: { page: shownPage, from: { element: b }, to: { element: c } } }])
+  const joined = await ai([{ command: 'connector.add', params: { page: shownPage, from: { element: b }, to: { element: c } } }])
   const connector = joined.completed[0].result.created[0]
   await until(async () => (await shown()).length === 5)
 
@@ -458,7 +458,7 @@ try {
   const marksPage = await personPage()
   const madeForMarks = await ai([
     {
-      command: 'element.create',
+      command: 'element.add',
       params: {
         page: marksPage,
         elements: [
@@ -471,7 +471,7 @@ try {
     },
   ])
   const [rectangle, archive, labelled, markdown] = madeForMarks.completed[0].result.created
-  const joinedForShape = await ai([{ command: 'connector.create', params: { page: marksPage, from: { element: rectangle }, to: { element: archive } } }])
+  const joinedForShape = await ai([{ command: 'connector.add', params: { page: marksPage, from: { element: rectangle }, to: { element: archive } } }])
   const shapeConnector = joinedForShape.completed[0].result.created[0]
   await until(async () => (await shown()).length === 5)
   const shapeType = kit.getByTestId('board-style-shapeType')
@@ -608,7 +608,7 @@ try {
   const fixesPage = await personPage()
   const madeForFixes = await ai([
     {
-      command: 'element.create',
+      command: 'element.add',
       params: {
         page: fixesPage,
         elements: [
@@ -687,7 +687,7 @@ try {
   // 16. A link address with its scheme in capitals (regressions/issue-link-scheme): "docs" in "Read
   // the docs" linked to HTTPS://Example.com/Docs, then "Read" made bold, one commit: the link is
   // stored with https in lower case and the bold made after it is stored too, with no notice.
-  const madeForScheme = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 60, y: 260 }, size: { w: 300, h: 100 }, text: 'Read the docs' }] } }])
+  const madeForScheme = await ai([{ command: 'element.add', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 60, y: 260 }, size: { w: 300, h: 100 }, text: 'Read the docs' }] } }])
   const [schemed] = madeForScheme.completed[0].result.created
   await until(async () => (await shown()).includes(schemed))
   const schemeOpened = await openLabel(210, 280)
@@ -729,7 +729,7 @@ try {
   // focus to the field; a click on the empty canvas then commits and closes the box (nothing linked,
   // the text kept), and the canvas takes presses again (the empty canvas clears the selection, the
   // shape is selected).
-  const madeForField = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 420, y: 260 }, size: { w: 300, h: 100 }, text: 'Close the box' }] } }])
+  const madeForField = await ai([{ command: 'element.add', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 420, y: 260 }, size: { w: 300, h: 100 }, text: 'Close the box' }] } }])
   const [closing] = madeForField.completed[0].result.created
   await until(async () => (await shown()).includes(closing))
   const fieldOpened = await openLabel(570, 280)
@@ -760,7 +760,7 @@ try {
   // 18. Cmd/Ctrl+X and Delete on a locked shape (regressions/issue-locked-cut-key): as the canvas
   // menu has Cut and Delete off, the keys do nothing: the shape stays and stays selected.
   await page.keyboard.press('Escape')
-  const madeLocked = await ai([{ command: 'element.create', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 60, y: 420 }, size: { w: 160, h: 80 }, text: 'Kept' }] } }])
+  const madeLocked = await ai([{ command: 'element.add', params: { page: fixesPage, elements: [{ kind: 'shape', position: { x: 60, y: 420 }, size: { w: 160, h: 80 }, text: 'Kept' }] } }])
   const [kept] = madeLocked.completed[0].result.created
   await until(async () => (await shown()).includes(kept))
   await ai([{ command: 'element.lock', params: { ids: [kept], locked: true } }])

@@ -6,7 +6,7 @@
  * elements differ). A change to the selection is one `element.style` (one undo step); opacity and
  * text size are sent when the slider or field is let go. When every selected element is a plain or
  * flow-chart shape, a Shape section changes their `shapeType` to any of the library's shapes, in
- * its groups (`shape.previews`, the answer the board asked for once): one `element.update` per
+ * its groups (`shape.previews`, the answer the board asked for once): one `element.set` per
  * shape, so box, label, style and bound connectors stay, and the connectors' ends move to the new
  * outline in the same command (design note 1.4).
  *

@@ -46,7 +46,7 @@ fn board() -> (BoardDocument, String, String) {
     let [x, y, w, h] = DIAMOND;
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [100, 300], "size": [100, 100], "strokeColor": "#000000", "fillStyle": "none" },
                 { "kind": "shape", "shapeType": "diamond", "position": [x, y], "size": [w, h], "strokeColor": "#000000", "fillStyle": "none" },
@@ -56,7 +56,7 @@ fn board() -> (BoardDocument, String, String) {
     let (rectangle, diamond) = (made["created"][0].as_str().unwrap().to_owned(), made["created"][1].as_str().unwrap().to_owned());
     let made = doc
         .execute(
-            "connector.create",
+            "connector.add",
             json!({
                 "from": { "element": rectangle, "anchor": [1, 0.5] },
                 "to": { "element": diamond, "anchor": [1, 0] },
@@ -118,7 +118,7 @@ fn a_new_shape_type_moves_the_cached_end_onto_the_new_outline_and_rectangles_sta
     let mut doc = BoardDocument::create("Ends.kboard", 800, 600).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [100, 300], "size": [100, 100] },
                 { "kind": "shape", "position": [400, 100], "size": [100, 100] },
@@ -127,10 +127,10 @@ fn a_new_shape_type_moves_the_cached_end_onto_the_new_outline_and_rectangles_sta
         .unwrap();
     let (a, b) = (made["created"][0].as_str().unwrap().to_owned(), made["created"][1].as_str().unwrap().to_owned());
     let made =
-        doc.execute("connector.create", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [1, 0] } })).unwrap();
+        doc.execute("connector.add", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [1, 0] } })).unwrap();
     let connector = made["created"][0].as_str().unwrap().to_owned();
     assert_eq!(stored_end(&doc, &connector).point, Point::new(500.0, 100.0), "a rectangle's end is its box point, exactly");
-    doc.execute("element.update", json!({ "id": b, "set": { "shapeType": "diamond" } })).unwrap();
+    doc.execute("element.set", json!({ "id": b, "set": { "shapeType": "diamond" } })).unwrap();
     let cached = stored_end(&doc, &connector).point;
     assert!(off_diamond(cached) < 1e-9, "{cached:?}");
     let derived = doc.model().end_point(&ObjectId::from_string(&connector), &stored_end(&doc, &connector));
@@ -144,7 +144,7 @@ fn joined(shape: &str, [x, y, w, h]: [f64; 4], ends: &[([f64; 2], [f64; 2], [f64
     let mut doc = BoardDocument::create("Ends.kboard", 1000, 700).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [{ "kind": "shape", "shapeType": shape, "position": [x, y], "size": [w, h], "strokeColor": "#000000", "fillStyle": "none" }] }),
         )
         .unwrap();
@@ -153,14 +153,14 @@ fn joined(shape: &str, [x, y, w, h]: [f64; 4], ends: &[([f64; 2], [f64; 2], [f64
     for (from, from_anchor, anchor) in ends {
         let made = doc
             .execute(
-                "element.create",
+                "element.add",
                 json!({ "elements": [{ "kind": "shape", "position": from, "size": [40, 40], "strokeColor": "#000000", "fillStyle": "none" }] }),
             )
             .unwrap();
         let start = made["created"][0].as_str().unwrap().to_owned();
         let made = doc
             .execute(
-                "connector.create",
+                "connector.add",
                 json!({
                     "from": { "element": start, "anchor": from_anchor },
                     "to": { "element": target, "anchor": anchor },

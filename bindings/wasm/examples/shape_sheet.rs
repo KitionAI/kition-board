@@ -48,7 +48,7 @@ fn main() {
         elements.push(json!({ "kind": "shape", "shapeType": name, "position": [sx, sy], "size": [SHAPE.0, SHAPE.1], "text": name }));
         elements.push(json!({ "kind": "text", "position": [x, sy + SHAPE.1 + 16.0], "size": [CELL.0, 24.0], "text": name, "textAlign": "center", "fontSize": 13 }));
     }
-    doc.execute("element.create", json!({ "elements": elements })).unwrap();
+    doc.execute("element.add", json!({ "elements": elements })).unwrap();
 
     let rgba = doc.render(0.0, 0.0, 1.0, BOARD.0, BOARD.1).unwrap();
     let picture = image::RgbaImage::from_raw(BOARD.0, BOARD.1, rgba).unwrap();

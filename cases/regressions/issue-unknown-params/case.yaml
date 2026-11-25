@@ -4,7 +4,7 @@ feature: board.agent.recover
 intent: >-
   A command refuses a key its schema does not name and says which, with the parameter it resembles
   and the ones the command takes (platform rule E7a), instead of running without it; every key a
-  command reads is in its schema (page.create's activate, connector.create's style), so a valid
+  command reads is in its schema (page.add's activate, connector.add's style), so a valid
   call still runs. Before, undo and redo ran with an unknown key without a word.
 layer: gate
 source:

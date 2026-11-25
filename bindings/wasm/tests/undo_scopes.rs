@@ -21,8 +21,8 @@ fn agent() -> Origin {
 fn shape(doc: &mut BoardDocument, x: f64, origin: Option<&Origin>) -> String {
     let params = json!({ "elements": [{ "kind": "shape", "position": [x, 10.0], "size": [40.0, 30.0] }] });
     let created = match origin {
-        Some(origin) => doc.execute_as("element.create", params, origin).unwrap(),
-        None => doc.execute("element.create", params).unwrap(),
+        Some(origin) => doc.execute_as("element.add", params, origin).unwrap(),
+        None => doc.execute("element.add", params).unwrap(),
     };
     created["created"][0].as_str().unwrap().to_owned()
 }

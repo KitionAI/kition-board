@@ -30,14 +30,14 @@
 //! Where the declarations before this card differed, the row says so (`was`). Of the 43
 //! commands, 21 differed (49%): 3 held less than the handler reads (a write that can land on what
 //! the agent did not observe), 20 held more (a refusal no change needs), 2 both. By class:
-//! - held less, a read that is not held: an end element's `rotation` (`connector.create`,
+//! - held less, a read that is not held: an end element's `rotation` (`connector.add`,
 //!   `connector.bind`: the edge an end faces turns with it, and a turn from 45 to 135 degrees
 //!   keeps `~bounds`): 2;
 //! - held less, a value naming another object: a pasted payload's refs and its connectors'
-//!   bindings name live elements (`element.paste`): 1;
+//!   bindings name live elements (`edit.paste`): 1;
 //! - held more, a container held though not read (a lone element's `parent` and its ancestors'
 //!   kind and parent; an end element's or a new container's own container; every mind-map node's
-//!   container): 13 (`element.create`, `element.update`, `connector.create`, `connector.bind`,
+//!   container): 13 (`element.add`, `element.set`, `connector.add`, `connector.bind`,
 //!   `element.move`, `element.resize`, `element.rotate`, `element.reorder`, the five map commands);
 //! - held more, geometry beyond what is read (`size` and `rotation` beside `~bounds`, a box's
 //!   bounds for a turn about its own centre, `fontSize` where nothing scales it): 5
@@ -85,7 +85,7 @@ pub fn fixture() -> (BoardDocument, Vec<(String, String)>) {
     role("$P", page.clone());
     let made = created(
         &doc.execute(
-            "element.create",
+            "element.add",
             json!({"page":page,"elements":[
                 {"kind":"shape","position":[0,0],"text":"A"},
                 {"kind":"shape","position":[300,0],"text":"B"},
@@ -103,19 +103,19 @@ pub fn fixture() -> (BoardDocument, Vec<(String, String)>) {
         role(name, id.clone());
     }
     let (a, b, c, g1, g2, l, m) = (&made[0], &made[1], &made[3], &made[4], &made[5], &made[6], &made[7]);
-    let k = created(&doc.execute("connector.create", json!({"page":page,"from":{"element":a},"to":{"element":b}})).unwrap())[0].clone();
+    let k = created(&doc.execute("connector.add", json!({"page":page,"from":{"element":a},"to":{"element":b}})).unwrap())[0].clone();
     role("$K", k);
-    let f = text_of(&doc.execute("frame.create", json!({"page":page,"box":[0,400,500,700],"children":[c],"title":"Frame"})).unwrap()["frame"]);
+    let f = text_of(&doc.execute("frame.add", json!({"page":page,"box":[0,400,500,700],"children":[c],"title":"Frame"})).unwrap()["frame"]);
     role("$F", f);
-    let g = doc.execute("element.group", json!({"ids":[g1,g2]})).unwrap();
+    let g = doc.execute("arrange.group", json!({"ids":[g1,g2]})).unwrap();
     role("$G", text_of(&g["group"]));
-    let s = doc.execute("stroke.create", json!({"page":page,"points":[[0,900],[100,950]]})).unwrap();
+    let s = doc.execute("stroke.add", json!({"page":page,"points":[[0,900],[100,950]]})).unwrap();
     role("$S", text_of(&s["created"][0]));
     let i = doc.execute("image.insert", json!({"page":page,"data":PNG,"position":[1200,0],"size":[100,100]})).unwrap();
     role("$I", text_of(&i["created"][0]));
-    let card = doc.execute("card.create", json!({"page":page,"url":"https://example.com","position":[1200,400]})).unwrap();
+    let card = doc.execute("card.add", json!({"page":page,"url":"https://example.com","position":[1200,400]})).unwrap();
     role("$CARD", text_of(&card["created"][0]));
-    let note = doc.execute("card.create", json!({"page":page,"file":"notes.md","position":[1200,700]})).unwrap();
+    let note = doc.execute("card.add", json!({"page":page,"file":"notes.md","position":[1200,700]})).unwrap();
     role("$NOTE", text_of(&note["created"][0]));
     doc.execute("element.lock", json!({"ids":[l],"locked":true})).unwrap();
     let mut m1 = String::new();
@@ -130,9 +130,9 @@ pub fn fixture() -> (BoardDocument, Vec<(String, String)>) {
     let added = doc.execute("mindmap.addChild", json!({"node":m1,"text":"M11"})).unwrap();
     role("$M11", text_of(&added["node"]));
     role("$E11", text_of(&added["created"][0]));
-    let other = text_of(&doc.execute("page.create", json!({"name":"Other"})).unwrap()["page"]);
+    let other = text_of(&doc.execute("page.add", json!({"name":"Other"})).unwrap()["page"]);
     role("$Q", other.clone());
-    let q1 = created(&doc.execute("element.create", json!({"page":other,"elements":[{"kind":"shape","position":[0,0],"text":"Q1"}]})).unwrap());
+    let q1 = created(&doc.execute("element.add", json!({"page":other,"elements":[{"kind":"shape","position":[0,0],"text":"Q1"}]})).unwrap());
     role("$Q1", q1[0].clone());
     let bytes = doc.save(None).unwrap();
     (BoardDocument::open("Read.kboard", &bytes).unwrap(), roles)
@@ -405,13 +405,13 @@ fn every_write_rests_on_what_its_handler_reads() {
 fn nested_fixture() -> (BoardDocument, Vec<(String, String)>) {
     let (mut doc, mut roles) = fixture();
     let ids: BTreeMap<_, _> = roles.iter().cloned().collect();
-    let fg = doc.execute("element.group", json!({"ids":[ids["$F"]]})).unwrap()["group"].clone();
-    let gf = doc.execute("frame.create", json!({"page":ids["$P"],"box":[650,250,1150,650],"children":[ids["$G"]]})).unwrap()["frame"].clone();
+    let fg = doc.execute("arrange.group", json!({"ids":[ids["$F"]]})).unwrap()["group"].clone();
+    let gf = doc.execute("frame.add", json!({"page":ids["$P"],"box":[650,250,1150,650],"children":[ids["$G"]]})).unwrap()["frame"].clone();
     for (child, parent) in [("$T", "$F"), ("$A", "$F"), ("$B", "$G")] {
-        doc.execute("element.update", json!({"id":ids[child],"set":{"parent":ids[parent]}})).unwrap();
+        doc.execute("element.set", json!({"id":ids[child],"set":{"parent":ids[parent]}})).unwrap();
     }
     doc.execute("element.lock", json!({"ids":[ids["$L"]],"locked":false})).unwrap();
-    doc.execute("element.update", json!({"id":ids["$L"],"set":{"parent":ids["$G"]}})).unwrap();
+    doc.execute("element.set", json!({"id":ids["$L"],"set":{"parent":ids["$G"]}})).unwrap();
     doc.execute("element.lock", json!({"ids":[ids["$L"]],"locked":true})).unwrap();
     roles.extend([("$FG".into(), text_of(&fg)), ("$GF".into(), text_of(&gf))]);
     (BoardDocument::open("Nested.kboard", &doc.save(None).unwrap()).unwrap(), roles)
@@ -476,7 +476,7 @@ fn nested_reading(row: &Row) -> BTreeMap<String, (String, String)> {
                     add(id, "*", "parent,position");
                 }
             }
-            "element.ungroup" => {
+            "arrange.ungroup" => {
                 for id in ["$B", "$L"] {
                     add(id, "locked", "parent");
                 }
@@ -522,67 +522,67 @@ const NODE: &str = "locked,mindMapBranchSide,mindMapCollapsed,mindMapDirection,r
 const EDGE: &str = "connectorRole,connectorType,end,endArrowhead,locked,mindMapBranchAxis,start";
 
 const ROWS: &[Row] = &[
-    // ---- Making content. element.create (elements.rs create): `page` by id, else the editor's
+    // ---- Making content. element.add (elements.rs create): `page` by id, else the editor's
     // page (`ctx.active_page`, else the first). New elements go at the end of the page's list (the
     // front): no sibling is read. A spec's `parent` (an id in a member of `elements`) is checked
     // for kind (frame or group) and page; a spec's `key` against every key on the page.
-    r("element.create", r#"{"page":"$P","elements":[{"kind":"shape","position":[50,50]}]}"#, "part", &[("$P", "-", "-")]),
+    r("element.add", r#"{"page":"$P","elements":[{"kind":"shape","position":[50,50]}]}"#, "part", &[("$P", "-", "-")]),
     // pinned from the declaration after review: the editor's page held as a premise of existence
     // is the same fact as the part it reads.
-    r("element.create", r#"{"elements":[{"kind":"shape","position":[50,50]}]}"#, "part", &[("$P", "-", "-")]),
+    r("element.add", r#"{"elements":[{"kind":"shape","position":[50,50]}]}"#, "part", &[("$P", "-", "-")]),
     // was: $F ("-", "parent"): the container's own container, which `check_parent` does not read.
     r(
-        "element.create",
+        "element.add",
         r#"{"page":"$P","elements":[{"kind":"shape","position":[50,450],"parent":"$F"}]}"#,
         "part",
         &[("$P", "-", "-"), ("$F", "-", "-")],
     ),
     r(
-        "element.create",
+        "element.add",
         r#"{"page":"$P","elements":[{"kind":"shape","position":[50,50],"key":"k1"}]}"#,
         "part",
         &[("$P", "-", "-"), ("board", "~keys", "-")],
     ),
-    // frame.create: as create; with `children`, each one's lock, its place (the frame goes in at
+    // frame.add: as create; with `children`, each one's lock, its place (the frame goes in at
     // the first member's index) and its `parent`, replaced.
-    r("frame.create", r#"{"page":"$P","box":[0,0,100,100],"title":"New"}"#, "part", &[("$P", "-", "-")]),
+    r("frame.add", r#"{"page":"$P","box":[0,0,100,100],"title":"New"}"#, "part", &[("$P", "-", "-")]),
     // pinned from the declaration after review: the frame goes in at its first member's index
     // wherever that is, so the member's index is no premise (the reading held `elements`).
-    r("frame.create", r#"{"page":"$P","box":[0,0,400,400],"children":["$A"]}"#, "part", &[("$P", "-", "-"), ("$A", "locked", "parent")]),
-    // stroke.create: the page, the points given.
-    r("stroke.create", r#"{"page":"$P","points":[[0,0],[10,10]]}"#, "part", &[("$P", "-", "-")]),
-    // connector.create: an `element` end by id, on the page, bindable; its box (position, size,
+    r("frame.add", r#"{"page":"$P","box":[0,0,400,400],"children":["$A"]}"#, "part", &[("$P", "-", "-"), ("$A", "locked", "parent")]),
+    // stroke.add: the page, the points given.
+    r("stroke.add", r#"{"page":"$P","points":[[0,0],[10,10]]}"#, "part", &[("$P", "-", "-")]),
+    // connector.add: an `element` end by id, on the page, bindable; its box (position, size,
     // rotation) gives the end point and, without an anchor, the nearest edge toward the other end.
     // pinned from the declaration after review: the box as `~bounds` (it holds a text's measured
     // size too) beside `rotation`.
     // was: ("~bounds", "parent,position"): no rotation (a turn from 45 to 135 degrees keeps the
     // bounds and changes the edge an end faces), the end element's container (not read).
     r(
-        "connector.create",
+        "connector.add",
         r#"{"page":"$P","from":{"element":"$A"},"to":{"element":"$B"}}"#,
         "part",
         &[("$P", "-", "-"), ("$A", "rotation,~bounds", "position"), ("$B", "rotation,~bounds", "position")],
     ),
-    r("connector.create", r#"{"page":"$P","from":{"point":[0,0]},"to":{"point":[100,0]}}"#, "part", &[("$P", "-", "-")]),
+    r("connector.add", r#"{"page":"$P","from":{"point":[0,0]},"to":{"point":[100,0]}}"#, "part", &[("$P", "-", "-")]),
     // A text without a stored size is measured from its text and font: its `~bounds`.
     // pinned from the declaration after review (the reading listed the fields it is measured from).
     // was: ("~bounds", "parent,position").
     r(
-        "connector.create",
+        "connector.add",
         r#"{"page":"$P","from":{"element":"$T"},"to":{"point":[0,0]}}"#,
         "part",
         &[("$P", "-", "-"), ("$T", "rotation,~bounds", "position")],
     ),
     r(
-        "connector.create",
+        "connector.add",
         r#"{"page":"$P","from":{"point":[0,0]},"to":{"point":[100,0]},"key":"k2"}"#,
         "part",
         &[("$P", "-", "-"), ("board", "~keys", "-")],
     ),
-    // card.create / image.insert: without `position`, right of the page's content
+    // card.add / image.insert: without `position`, right of the page's content
     // (content_bounds: every element's bounds).
-    r("card.create", r#"{"page":"$P","url":"https://example.org","position":[0,0]}"#, "part", &[("$P", "-", "-")]),
-    r("card.create", r#"{"page":"$P","url":"https://example.org"}"#, "part", &[("$P", "~geometry", "-")]),
+    r("card.add", r#"{"page":"$P","url":"https://example.org","position":[0,0]}"#, "part", &[("$P", "-", "-")]),
+    r("card.add", r#"{"page":"$P","url":"https://example.org"}"#, "part", &[("$P", "~geometry", "-")]),
     r(
         "image.insert",
         r#"{"page":"$P","data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","position":[0,0],"size":[10,10]}"#,
@@ -598,26 +598,26 @@ const ROWS: &[Row] = &[
     // template.insert: `at` is the centre; without it right of the content.
     r("template.insert", r#"{"page":"$P","template":"kanban","at":[0,0]}"#, "part", &[("$P", "-", "-")]),
     r("template.insert", r#"{"page":"$P","template":"kanban"}"#, "part", &[("$P", "~geometry", "-")]),
-    // element.paste (clipboard.rs paste): the payload is a parameter. With `at`, only the
+    // edit.paste (clipboard.rs paste): the payload is a parameter. With `at`, only the
     // payload's own positions; without it, whether any payload ref is an element shown on the
     // page (24, 24 then). A binding to an element outside the payload on the page is kept, its
     // point from that element's box.
     r(
-        "element.paste",
+        "edit.paste",
         r#"{"page":"$P","payload":{"type":"application/x-kition-board+json","version":1,"elements":[{"ref":"x","kind":"shape","position":{"x":0,"y":0}}]},"at":[10,10]}"#,
         "part",
         &[("$P", "-", "-")],
     ),
     // was: $A not held (the payload's refs were read as source identities only).
     r(
-        "element.paste",
+        "edit.paste",
         r#"{"page":"$P","payload":{"type":"application/x-kition-board+json","version":1,"elements":[{"ref":"$A","kind":"shape","position":{"x":0,"y":0},"size":{"w":10,"h":10}}]}}"#,
         "part",
         &[("$P", "-", "-"), ("$A", "-", "-")],
     ),
     // was: $B not held.
     r(
-        "element.paste",
+        "edit.paste",
         r#"{"page":"$P","payload":{"type":"application/x-kition-board+json","version":1,"elements":[{"ref":"x","kind":"connector","start":{"point":[0,0]},"end":{"point":[5,5],"binding":{"target":"$B","anchor":[0,0.5]}}}]},"at":[10,10]}"#,
         "part",
         &[("$P", "-", "-"), ("$B", "rotation,~bounds", "position")],
@@ -627,16 +627,16 @@ const ROWS: &[Row] = &[
     // pinned from the declaration after review: `parent` is read (the reading had position only).
     r("element.duplicate", r#"{"ids":["$A"]}"#, "", &[("$A", "*", "parent,position")]),
     r("element.duplicate", r#"{"ids":["$F"]}"#, "", &[("$F", "*", "parent,position"), ("$C", "*", "parent,position"), ("board", "~structure", "-")]),
-    // ---- Fields of one element. element.update (elements.rs update): the target's kind and lock,
+    // ---- Fields of one element. element.set (elements.rs update): the target's kind and lock,
     // the fields set; `position`/`size`/`rotation` refresh bound connector ends (a consequence);
     // `parent` checks the new container's kind and page; `key` every key on the page.
-    r("element.update", r#"{"id":"$A","set":{"fillColor":"red"}}"#, "", &[("$A", "fillColor,locked", "-")]),
-    r("element.update", r#"{"id":"$A","set":{"position":[10,10]}}"#, "", &[("$A", "locked", "position")]),
+    r("element.set", r#"{"id":"$A","set":{"fillColor":"red"}}"#, "", &[("$A", "fillColor,locked", "-")]),
+    r("element.set", r#"{"id":"$A","set":{"position":[10,10]}}"#, "", &[("$A", "locked", "position")]),
     // was: $F ("-", "parent") and the board's ~structure: a shape holds nothing the new container
     // could be inside.
-    r("element.update", r#"{"id":"$A","set":{"parent":"$F"}}"#, "", &[("$A", "locked", "parent"), ("$F", "-", "-")]),
-    r("element.update", r#"{"id":"$A","set":{"key":"k3"}}"#, "", &[("$A", "key,locked", "-"), ("board", "~keys", "-")]),
-    r("element.update", r#"{"id":"$T","set":{"fontSize":30}}"#, "", &[("$T", "fontSize,locked", "-")]),
+    r("element.set", r#"{"id":"$A","set":{"parent":"$F"}}"#, "", &[("$A", "locked", "parent"), ("$F", "-", "-")]),
+    r("element.set", r#"{"id":"$A","set":{"key":"k3"}}"#, "", &[("$A", "key,locked", "-"), ("board", "~keys", "-")]),
+    r("element.set", r#"{"id":"$T","set":{"fontSize":30}}"#, "", &[("$T", "fontSize,locked", "-")]),
     // element.style: per element its kind (which fields it takes) and lock; the fields written.
     r("element.style", r#"{"ids":["$A"],"style":{"fillColor":"red"}}"#, "", &[("$A", "fillColor,locked", "-")]),
     // element.setText: kind, lock, the text (diffed).
@@ -656,7 +656,7 @@ const ROWS: &[Row] = &[
     // from its target's box when bound: no two ends on one target, the edge faced); an `element`
     // end's box on the connector's page.
     // pinned from the declaration after review: `start.binding` is a path inside `start`, and the
-    // boxes as for connector.create.
+    // boxes as for connector.add.
     // was: $A and $T ("~bounds", "parent,position").
     r(
         "connector.bind",
@@ -677,11 +677,11 @@ const ROWS: &[Row] = &[
     // image.setAlt: the image's kind; `alt` written. The reading found no lock check (an engine
     // defect, fixed); was: ("alt", "-").
     r("image.setAlt", r#"{"id":"$I","alt":"A picture"}"#, "", &[("$I", "alt,locked", "-")]),
-    // links.retarget: every shown card's `card.target.path` on every page; the matching cards'
+    // link.retarget: every shown card's `card.target.path` on every page; the matching cards'
     // `card` rewritten.
     // pinned from the declaration after review: the cards a path names are a place (`from`), told
     // by asking (`covers ~link`), each holding the path it is rewritten from.
-    rw("links.retarget", r#"{"from":"notes.md","to":"new.md"}"#, "", &[("$NOTE", "card.target.path", "-")], &[], "~link"),
+    rw("link.retarget", r#"{"from":"notes.md","to":"new.md"}"#, "", &[("$NOTE", "card.target.path", "-")], &[], "~link"),
     // ---- Geometry. element.move (elements.rs move_elements): the subtree of the roots (a
     // frame's or group's members), each one's kind and lock and the fields shifted.
     // was: ("locked", "parent,position"): a lone element's container is not read.
@@ -831,16 +831,16 @@ const ROWS: &[Row] = &[
         "",
         &[("$F", "-", "elements"), ("$C", "-", "elements,parent"), ("$P", "~hierarchy", "-")],
     ),
-    // element.group: the roots' locks and parents (a common parent is the group's), the first
+    // arrange.group: the roots' locks and parents (a common parent is the group's), the first
     // member's index (where the group goes).
     // pinned from the declaration after review: the group goes in at the first member's index
     // wherever that is (no `elements`).
-    r("element.group", r#"{"ids":["$A","$B"]}"#, "", &[("$A", "locked", "parent"), ("$B", "locked", "parent")]),
-    // element.ungroup: the group's kind, lock and parent (its members' new parent), its members.
+    r("arrange.group", r#"{"ids":["$A","$B"]}"#, "", &[("$A", "locked", "parent"), ("$B", "locked", "parent")]),
+    // arrange.ungroup: the group's kind, lock and parent (its members' new parent), its members.
     // pinned from the declaration after review: the group goes, every field of it.
     // was: every field of $G1 and $G2, of which only `parent` is written.
     r(
-        "element.ungroup",
+        "arrange.ungroup",
         r#"{"groupIds":["$G"]}"#,
         "",
         &[("$G", "*", "parent,position"), ("$G1", "locked", "parent"), ("$G2", "locked", "parent"), ("$P", "~hierarchy", "-")],
@@ -950,10 +950,10 @@ const ROWS: &[Row] = &[
             ("board", "~mapStructure", "-"),
         ],
     ),
-    // ---- Pages (pages.rs). page.create: `at` a place in the raw list; without a name "Page N"
+    // ---- Pages (pages.rs). page.add: `at` a place in the raw list; without a name "Page N"
     // from the count.
-    rw("page.create", r#"{"name":"N","at":1}"#, "", &[], &["board.pages[1..1]"], "none"),
-    r("page.create", r#"{}"#, "", &[("board", "~pageCount", "-")]),
+    rw("page.add", r#"{"name":"N","at":1}"#, "", &[], &["board.pages[1..1]"], "none"),
+    r("page.add", r#"{}"#, "", &[("board", "~pageCount", "-")]),
     // page.rename: the name written.
     r("page.rename", r#"{"page":"$Q","name":"Renamed"}"#, "", &[("$Q", "name", "-")]),
     // page.duplicate: the source's name (the copy's default) and index (the copy goes after it),

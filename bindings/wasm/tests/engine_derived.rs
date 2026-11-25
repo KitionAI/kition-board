@@ -38,9 +38,8 @@ fn start_points(doc: &BoardDocument, connector: &str) -> (Point, Point) {
 #[test]
 fn an_end_on_a_sizeless_text_follows_its_text() {
     let mut doc = board();
-    let text = created(&run(&mut doc, "element.create", json!({"elements":[{"kind":"text","position":[0,0],"text":"Short"}]})))[0].clone();
-    let connector =
-        created(&run(&mut doc, "connector.create", json!({"from":{"element":text,"anchor":[1,0.5]},"to":{"point":[800,800]}})))[0].clone();
+    let text = created(&run(&mut doc, "element.add", json!({"elements":[{"kind":"text","position":[0,0],"text":"Short"}]})))[0].clone();
+    let connector = created(&run(&mut doc, "connector.add", json!({"from":{"element":text,"anchor":[1,0.5]},"to":{"point":[800,800]}})))[0].clone();
     let mut last = start_points(&doc, &connector).1;
     for (command, params) in [
         ("element.style", json!({"ids":[text],"style":{"fontSize":48}})),
@@ -64,11 +63,11 @@ fn alignment_answers_only_what_it_moves() {
     let mut doc = board();
     let made = created(&run(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({"elements":[{"kind":"shape","position":[0,0],"size":[100,100]},{"kind":"shape","position":[300,200],"size":[100,100]}]}),
     ));
     let (a, b) = (made[0].clone(), made[1].clone());
-    let connector = created(&run(&mut doc, "connector.create", json!({"from":{"element":a},"to":{"element":b}})))[0].clone();
+    let connector = created(&run(&mut doc, "connector.add", json!({"from":{"element":a},"to":{"element":b}})))[0].clone();
     let before = doc.session().replica().get(&ObjectId::from_string(&connector), "waypoints").unwrap();
     let answer = run(&mut doc, "layout.align", json!({"ids":[a, b, connector],"edge":"top"}));
     let moved: Vec<&str> = answer["moved"].as_array().unwrap().iter().map(|id| id.as_str().unwrap()).collect();
@@ -83,7 +82,7 @@ fn distribution_keeps_the_selections_extent() {
     let mut doc = board();
     let made = created(&run(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({"elements":[
             {"kind":"shape","position":[0,0],"size":[100,50]},
             {"kind":"shape","position":[50,100],"size":[950,50]},
@@ -103,15 +102,15 @@ fn distribution_keeps_the_selections_extent() {
 fn an_agents_command_does_not_land_on_another_page() {
     let mut doc = board();
     let first = doc.model().pages()[0].id.as_str().to_owned();
-    let other = run(&mut doc, "page.create", json!({"name":"Other"}))["page"].as_str().unwrap().to_owned();
+    let other = run(&mut doc, "page.add", json!({"name":"Other"}))["page"].as_str().unwrap().to_owned();
     run(&mut doc, "page.activate", json!({"page":other}));
     run(&mut doc, "page.delete", json!({"page":other}));
     let agent = Origin::agent("agent:test");
     let shape = json!({"elements":[{"kind":"shape","position":[0,0]}]});
     let before = doc.session().replica().state_json().unwrap();
-    let refused = doc.execute_as("element.create", shape.clone(), &agent);
+    let refused = doc.execute_as("element.add", shape.clone(), &agent);
     assert!(refused.as_ref().is_err_and(|error| error.starts_with("not-found")), "{refused:?}");
     assert_eq!(doc.session().replica().state_json().unwrap(), before);
-    let made = created(&run(&mut doc, "element.create", shape));
+    let made = created(&run(&mut doc, "element.add", shape));
     assert_eq!(doc.model().page_of(&ObjectId::from_string(&made[0])).unwrap().id.as_str(), first);
 }

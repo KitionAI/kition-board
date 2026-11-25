@@ -15,8 +15,8 @@ const PART: &[EditorState] = &[EditorState::Part];
 /// The editor state command `id` reads besides its parameters.
 pub fn reads(id: &str) -> &'static [EditorState] {
     match id {
-        "element.create" | "element.paste" | "frame.create" | "stroke.create" | "connector.create" | "card.create" | "image.insert"
-        | "template.insert" | "file.export" => PART,
+        "element.add" | "edit.paste" | "frame.add" | "stroke.add" | "connector.add" | "card.add" | "image.insert" | "template.insert"
+        | "file.export" => PART,
         _ => &[],
     }
 }
@@ -26,9 +26,9 @@ pub fn reads(id: &str) -> &'static [EditorState] {
 pub fn targets(id: &str) -> Option<&'static str> {
     Some(match id {
         "element.delete" | "element.move" | "element.rotate" | "element.style" | "element.getStyle" | "element.duplicate" | "element.reorder"
-        | "element.lock" | "element.group" | "clipboard.copy" | "layout.align" | "layout.distribute" | "layout.stack" => "ids",
-        "element.ungroup" => "groupIds",
-        "element.update"
+        | "element.lock" | "arrange.group" | "edit.copy" | "layout.align" | "layout.distribute" | "layout.stack" => "ids",
+        "arrange.ungroup" => "groupIds",
+        "element.set"
         | "element.resize"
         | "element.setText"
         | "text.mark"
@@ -53,14 +53,14 @@ const PASTE_TYPES: &[(&str, &[&str])] =
 
 pub fn objects(id: &str) -> &'static [&'static str] {
     match id {
-        "element.paste" => PASTE,
-        "element.create" => &["page", "elements[].parent"],
-        "element.update" => &["set.parent"],
+        "edit.paste" => PASTE,
+        "element.add" => &["page", "elements[].parent"],
+        "element.set" => &["set.parent"],
         "element.resize" => &["ids"],
-        "frame.create" => &["page", "children"],
-        "connector.create" => &["page", "from.element", "to.element"],
+        "frame.add" => &["page", "children"],
+        "connector.add" => &["page", "from.element", "to.element"],
         "connector.bind" => &["to.element"],
-        "stroke.create" | "template.insert" | "card.create" | "image.insert" | "page.rename" | "page.duplicate" | "page.delete" | "page.move"
+        "stroke.add" | "template.insert" | "card.add" | "image.insert" | "page.rename" | "page.duplicate" | "page.delete" | "page.move"
         | "page.activate" => &["page"],
         "file.export" => &["page", "frame"],
         "file.render" => &["target.frame", "target.objectId"],
@@ -73,16 +73,16 @@ pub fn objects(id: &str) -> &'static [&'static str] {
 /// an integer object reference.
 pub fn object_types(id: &str) -> &'static [(&'static str, &'static [&'static str])] {
     match id {
-        "element.create" => &[("page", &["Page"]), ("elements[].parent", &["Element"])],
-        "element.update" => &[("id", &["Element"]), ("set.parent", &["Element"])],
+        "element.add" => &[("page", &["Page"]), ("elements[].parent", &["Element"])],
+        "element.set" => &[("id", &["Element"]), ("set.parent", &["Element"])],
         "element.resize" => &[("id", &["Element"]), ("ids", &["Element"])],
-        "frame.create" => &[("page", &["Page"]), ("children", &["Element"])],
-        "connector.create" => &[("page", &["Page"]), ("from.element", &["Element"]), ("to.element", &["Element"])],
+        "frame.add" => &[("page", &["Page"]), ("children", &["Element"])],
+        "connector.add" => &[("page", &["Page"]), ("from.element", &["Element"]), ("to.element", &["Element"])],
         "connector.bind" => &[("id", &["Element"]), ("to.element", &["Element"])],
         "file.export" => &[("page", &["Page"]), ("frame", &["Element"])],
         "file.render" => &[("target.page", &["Page"]), ("target.frame", &["Element"]), ("target.objectId", &["Element"])],
-        "element.paste" => PASTE_TYPES,
-        "stroke.create" | "template.insert" | "card.create" | "image.insert" | "page.rename" | "page.duplicate" | "page.delete" | "page.move"
+        "edit.paste" => PASTE_TYPES,
+        "stroke.add" | "template.insert" | "card.add" | "image.insert" | "page.rename" | "page.duplicate" | "page.delete" | "page.move"
         | "page.activate" => &[("page", &["Page"])],
         _ => match targets(id) {
             Some("ids") => &[("ids", &["Element"])],
@@ -98,7 +98,7 @@ pub fn object_types(id: &str) -> &'static [(&'static str, &'static [&'static str
 /// Element or page ids a command's code reads that are not what it acts on, with why: `on` never
 /// fills them.
 pub const NOT_TARGETS: &[(&str, &str, &str)] = &[
-    ("frame.create", "children", "the elements a new frame takes in are the new frame's data"),
+    ("frame.add", "children", "the elements a new frame takes in are the new frame's data"),
     ("page.rename", "page", "a page is a part: the run's `target` or a step's `at.part`, not `on`"),
     ("page.duplicate", "page", "a page is a part: the run's `target` or a step's `at.part`, not `on`"),
     ("page.delete", "page", "a page is a part: the run's `target` or a step's `at.part`, not `on`"),

@@ -34,17 +34,17 @@ fn source() -> (BoardDocument, String, String, String) {
     let inserted = run(&mut doc, "image.insert", json!({ "data": PNG, "mime": "image/png", "position": [0, 0], "size": [40, 40] }));
     let picture = inserted["created"][0].as_str().unwrap().to_owned();
     let hash = inserted["blob"].as_str().unwrap().to_owned();
-    let made = run(&mut doc, "element.create", json!({ "elements": [{ "kind": "shape", "position": [100, 0], "size": [80, 60], "text": "Note" }] }));
+    let made = run(&mut doc, "element.add", json!({ "elements": [{ "kind": "shape", "position": [100, 0], "size": [80, 60], "text": "Note" }] }));
     (doc, picture, made["created"][0].as_str().unwrap().to_owned(), hash)
 }
 
 #[test]
 fn a_picture_pasted_on_a_board_without_its_bytes_is_left_out_and_named() {
     let (mut a, picture, shape, hash) = source();
-    let payload = run(&mut a, "clipboard.copy", json!({ "ids": [picture, shape] }));
+    let payload = run(&mut a, "edit.copy", json!({ "ids": [picture, shape] }));
     let mut b = BoardDocument::create("B.kboard", 1920, 1080).unwrap();
     assert!(!b.has_blob(&hash));
-    let answer = run(&mut b, "element.paste", json!({ "payload": payload, "at": [300, 300] }));
+    let answer = run(&mut b, "edit.paste", json!({ "payload": payload, "at": [300, 300] }));
     assert_eq!(answer["created"].as_array().map(Vec::len), Some(1), "only the shape: {answer}");
     assert_eq!(kinds(&b), vec!["shape".to_owned()], "{answer}");
     assert_eq!(answer["skipped"], json!([{ "ref": picture, "reason": "board.image-missing-blob" }]), "{answer}");
@@ -58,9 +58,9 @@ fn a_picture_pasted_on_a_board_without_its_bytes_is_left_out_and_named() {
 #[test]
 fn a_payload_of_pictures_without_their_bytes_is_refused() {
     let (mut a, picture, _, _) = source();
-    let payload = run(&mut a, "clipboard.copy", json!({ "ids": [picture] }));
+    let payload = run(&mut a, "edit.copy", json!({ "ids": [picture] }));
     let mut b = BoardDocument::create("B.kboard", 1920, 1080).unwrap();
-    let refused = b.execute("element.paste", json!({ "payload": payload }));
+    let refused = b.execute("edit.paste", json!({ "payload": payload }));
     assert!(refused.as_ref().is_err_and(|error| error.starts_with("not-found: board.image-missing-blob")), "{refused:?}");
     assert!(kinds(&b).is_empty());
 }
@@ -68,15 +68,15 @@ fn a_payload_of_pictures_without_their_bytes_is_refused() {
 #[test]
 fn a_picture_pasted_where_its_bytes_are_stored_is_pasted() {
     let (mut a, picture, _, hash) = source();
-    let payload = run(&mut a, "clipboard.copy", json!({ "ids": [picture] }));
-    let answer = run(&mut a, "element.paste", json!({ "payload": payload.clone() }));
+    let payload = run(&mut a, "edit.copy", json!({ "ids": [picture] }));
+    let answer = run(&mut a, "edit.paste", json!({ "payload": payload.clone() }));
     assert_eq!(answer["created"].as_array().map(Vec::len), Some(1), "{answer}");
     assert!(answer.get("skipped").is_none(), "{answer}");
     // On another board that has the same bytes (the same picture inserted there), too.
     let mut b = BoardDocument::create("B.kboard", 1920, 1080).unwrap();
     run(&mut b, "image.insert", json!({ "data": PNG, "mime": "image/png", "position": [500, 500] }));
     assert!(b.has_blob(&hash));
-    let answer = run(&mut b, "element.paste", json!({ "payload": payload }));
+    let answer = run(&mut b, "edit.paste", json!({ "payload": payload }));
     assert_eq!(answer["created"].as_array().map(Vec::len), Some(1), "{answer}");
     assert_eq!(kinds(&b), vec!["image".to_owned(), "image".to_owned()]);
     assert!(codes(&b).iter().all(|code| code != "board.image-missing-blob"), "{:?}", codes(&b));

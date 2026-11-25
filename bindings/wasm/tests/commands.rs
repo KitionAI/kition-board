@@ -31,7 +31,7 @@ fn ids(value: &Value) -> Vec<String> {
 }
 
 fn shape(doc: &mut BoardDocument, x: f64, y: f64, w: f64, h: f64) -> String {
-    ids(&run(doc, "element.create", json!({ "elements": [{ "kind": "shape", "position": [x, y], "size": [w, h] }] }))).remove(0)
+    ids(&run(doc, "element.add", json!({ "elements": [{ "kind": "shape", "position": [x, y], "size": [w, h] }] }))).remove(0)
 }
 
 fn element(doc: &BoardDocument, id: &str) -> kition_board_kdm::Element {
@@ -76,8 +76,8 @@ fn every_command_survives_empty_params() {
             }
         }
     }
-    assert!(doc.execute("element.create", Value::Null).is_err());
-    assert!(doc.execute("element.create", json!([1])).is_err());
+    assert!(doc.execute("element.add", Value::Null).is_err());
+    assert!(doc.execute("element.add", json!([1])).is_err());
 }
 
 /// E5, E7: every agent command has a valid `ParameterSchemaSpec`; editor-only ones have none.
@@ -95,7 +95,7 @@ fn agent_commands_have_parameter_schemas() {
     for id in ["edit.undo", "edit.redo"] {
         assert!(commands.iter().any(|command| command.id == id));
     }
-    assert!(commands.iter().find(|command| command.id == "clipboard.copy").is_some_and(|command| !command.mutates));
+    assert!(commands.iter().find(|command| command.id == "edit.copy").is_some_and(|command| !command.mutates));
     let mut sandboxed = kition_board_kit::SANDBOXED.to_vec();
     let mut reading = kition_board_model::spec::reading_files();
     sandboxed.sort_unstable();
@@ -108,7 +108,7 @@ fn element_create_makes_shapes_text_frames_and_strokes() {
     let mut doc = board();
     let made = run(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({ "elements": [
             { "kind": "frame", "position": [0, 0], "text": "Q4" },
             { "kind": "shape", "position": { "x": 10, "y": 20 }, "text": "Ship", "fillColor": "#5645D4", "key": "ship" },
@@ -126,26 +126,26 @@ fn element_create_makes_shapes_text_frames_and_strokes() {
     assert_eq!(ship.key.as_deref(), Some("ship"));
     assert_eq!(element(&doc, &made[3]).points.len(), 3);
     assert_eq!(doc.model().pages()[0].elements.len(), 4, "appended in order");
-    fails(&mut doc, "element.create", json!({ "elements": [{ "kind": "connector" }] }), "invalid-params: make a connector with connector.create");
+    fails(&mut doc, "element.add", json!({ "elements": [{ "kind": "connector" }] }), "invalid-params: make a connector with connector.add");
     fails(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({ "elements": [{ "kind": "image", "position": [0, 0] }] }),
         "invalid-params: make a image with image.insert",
     );
-    fails(&mut doc, "element.create", json!({ "elements": [{ "kind": "shape" }] }), "invalid-params: a shape needs a `position`");
-    fails(&mut doc, "element.create", json!({ "elements": [{ "kind": "stroke", "points": [[0, 0]] }] }), "invalid-params");
-    fails(&mut doc, "element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "points": [[0, 0], [1, 1]] }] }), "invalid-params");
+    fails(&mut doc, "element.add", json!({ "elements": [{ "kind": "shape" }] }), "invalid-params: a shape needs a `position`");
+    fails(&mut doc, "element.add", json!({ "elements": [{ "kind": "stroke", "points": [[0, 0]] }] }), "invalid-params");
+    fails(&mut doc, "element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "points": [[0, 0], [1, 1]] }] }), "invalid-params");
     fails(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({ "elements": [{ "kind": "shape", "position": [0, 0], "key": "ship" }] }),
         "invalid-params: key `ship` is already used",
     );
-    fails(&mut doc, "element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "fillColor": "violet" }] }), "invalid-params");
+    fails(&mut doc, "element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "fillColor": "violet" }] }), "invalid-params");
     fails(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({ "elements": [{ "kind": "shape", "position": [0, 0], "parent": made[1] }] }),
         "invalid-params: a shape cannot contain",
     );
@@ -160,13 +160,13 @@ fn moving_and_updating_a_target_recomputes_bound_ends_in_the_command() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut doc, 400.0, 0.0, 100.0, 50.0);
-    let connector = ids(&run(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
+    let connector = ids(&run(&mut doc, "connector.add", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
     assert!(close(stored_end(&doc, &connector, "start").point, Point::new(100.0, 25.0)), "the start binds to a's right edge");
     assert!(close(stored_end(&doc, &connector, "end").point, Point::new(400.0, 25.0)), "the end binds to b's left edge");
     assert_eq!(stored_end(&doc, &connector, "start").binding.unwrap().anchor, [1.0, 0.5]);
     run(&mut doc, "element.move", json!({ "ids": [b], "delta": [0, 200] }));
     assert!(close(stored_end(&doc, &connector, "end").point, Point::new(400.0, 225.0)));
-    run(&mut doc, "element.update", json!({ "id": a, "set": { "position": [0, 100] } }));
+    run(&mut doc, "element.set", json!({ "id": a, "set": { "position": [0, 100] } }));
     assert!(close(stored_end(&doc, &connector, "start").point, Point::new(100.0, 125.0)));
     run(&mut doc, "element.resize", json!({ "id": a, "box": [0, 100, 200, 150] }));
     assert!(close(stored_end(&doc, &connector, "start").point, Point::new(200.0, 125.0)));
@@ -180,18 +180,18 @@ fn moving_and_updating_a_target_recomputes_bound_ends_in_the_command() {
 fn element_update_sets_fields_of_the_kind_and_points_elsewhere_for_the_rest() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
-    run(&mut doc, "element.update", json!({ "id": a, "set": { "shapeType": "diamond", "opacity": 0.5, "roundness": null } }));
+    run(&mut doc, "element.set", json!({ "id": a, "set": { "shapeType": "diamond", "opacity": 0.5, "roundness": null } }));
     assert_eq!(element(&doc, &a).register("shapeType"), Some(&json!("diamond")));
     fails(
         &mut doc,
-        "element.update",
+        "element.set",
         json!({ "id": a, "set": { "text": "x" } }),
-        "invalid-params: `text` cannot be set by element.update (use element.setText)",
+        "invalid-params: `text` cannot be set by element.set (use element.setText)",
     );
-    fails(&mut doc, "element.update", json!({ "id": a, "set": { "points": [[0, 0], [1, 1]] } }), "invalid-params: a shape element has no `points`");
-    fails(&mut doc, "element.update", json!({ "id": a, "set": {} }), "invalid-params");
-    fails(&mut doc, "element.update", json!({ "id": a, "set": { "parent": a } }), "invalid-params");
-    fails(&mut doc, "element.update", json!({ "id": "nope", "set": { "opacity": 1 } }), "not-found");
+    fails(&mut doc, "element.set", json!({ "id": a, "set": { "points": [[0, 0], [1, 1]] } }), "invalid-params: a shape element has no `points`");
+    fails(&mut doc, "element.set", json!({ "id": a, "set": {} }), "invalid-params");
+    fails(&mut doc, "element.set", json!({ "id": a, "set": { "parent": a } }), "invalid-params");
+    fails(&mut doc, "element.set", json!({ "id": "nope", "set": { "opacity": 1 } }), "not-found");
 }
 
 #[test]
@@ -200,9 +200,9 @@ fn deleting_a_frame_deletes_its_content_and_frees_connectors_bound_to_it() {
     let child = shape(&mut doc, 20.0, 20.0, 100.0, 50.0);
     let outside = shape(&mut doc, 800.0, 20.0, 100.0, 50.0);
     let frame =
-        run(&mut doc, "frame.create", json!({ "box": [0, 0, 400, 300], "title": "Q4", "children": [child] }))["frame"].as_str().unwrap().to_owned();
+        run(&mut doc, "frame.add", json!({ "box": [0, 0, 400, 300], "title": "Q4", "children": [child] }))["frame"].as_str().unwrap().to_owned();
     assert_eq!(doc.model().pages()[0].elements[0].as_str(), frame, "the frame goes behind its children");
-    let connector = ids(&run(&mut doc, "connector.create", json!({ "from": { "element": child }, "to": { "element": outside } }))).remove(0);
+    let connector = ids(&run(&mut doc, "connector.add", json!({ "from": { "element": child }, "to": { "element": outside } }))).remove(0);
     let before = stored_end(&doc, &connector, "start").point;
     let deleted = run(&mut doc, "element.delete", json!({ "ids": [frame] }));
     assert_eq!(deleted["deleted"].as_array().unwrap().len(), 2);
@@ -217,8 +217,8 @@ fn deleting_a_frame_deletes_its_content_and_frees_connectors_bound_to_it() {
 fn moving_a_frame_moves_its_content() {
     let mut doc = board();
     let child = shape(&mut doc, 20.0, 20.0, 100.0, 50.0);
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[30, 30], [60, 60]], "style": { "strokeColor": "blue" } }))).remove(0);
-    let frame = run(&mut doc, "frame.create", json!({ "box": [0, 0, 400, 300], "children": [child, stroke] }))["frame"].as_str().unwrap().to_owned();
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[30, 30], [60, 60]], "style": { "strokeColor": "blue" } }))).remove(0);
+    let frame = run(&mut doc, "frame.add", json!({ "box": [0, 0, 400, 300], "children": [child, stroke] }))["frame"].as_str().unwrap().to_owned();
     run(&mut doc, "element.move", json!({ "ids": [frame, child], "delta": [10, 5] }));
     assert_eq!(element(&doc, &child).position, Some(Point::new(30.0, 25.0)), "moved once, as part of the frame");
     assert_eq!(element(&doc, &stroke).points[0], Point::new(40.0, 35.0));
@@ -230,8 +230,8 @@ fn moving_a_frame_moves_its_content() {
 #[test]
 fn a_drop_into_a_frame_makes_a_child_and_a_drop_outside_frees_it() {
     let mut doc = board();
-    let frame = run(&mut doc, "frame.create", json!({ "box": [500, 0, 900, 300] }))["frame"].as_str().unwrap().to_owned();
-    let inner = run(&mut doc, "frame.create", json!({ "box": [520, 20, 640, 140] }))["frame"].as_str().unwrap().to_owned();
+    let frame = run(&mut doc, "frame.add", json!({ "box": [500, 0, 900, 300] }))["frame"].as_str().unwrap().to_owned();
+    let inner = run(&mut doc, "frame.add", json!({ "box": [520, 20, 640, 140] }))["frame"].as_str().unwrap().to_owned();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut doc, 0.0, 100.0, 100.0, 50.0);
     let order = |doc: &BoardDocument| doc.model().pages()[0].elements.clone();
@@ -254,7 +254,7 @@ fn a_drop_into_a_frame_makes_a_child_and_a_drop_outside_frees_it() {
     assert_eq!(element(&doc, &a).position, Some(Point::new(550.0, 50.0)));
     // A group's member keeps its group when it is moved out of every frame; a move without
     // `reparent` changes no parent.
-    let group = run(&mut doc, "element.group", json!({ "ids": [b] }))["group"].as_str().unwrap().to_owned();
+    let group = run(&mut doc, "arrange.group", json!({ "ids": [b] }))["group"].as_str().unwrap().to_owned();
     run(&mut doc, "element.move", json!({ "ids": [b], "delta": [0, 1000] }));
     assert_eq!(element(&doc, &b).parent.as_ref().map(ObjectId::as_str), Some(group.as_str()));
     // A frame is never dropped into itself or what moves with it.
@@ -265,12 +265,12 @@ fn a_drop_into_a_frame_makes_a_child_and_a_drop_outside_frees_it() {
 #[test]
 fn resize_scales_strokes_and_groups_into_the_box() {
     let mut doc = board();
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[0, 0], [100, 50]] }))).remove(0);
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[0, 0], [100, 50]] }))).remove(0);
     run(&mut doc, "element.resize", json!({ "id": stroke, "box": [0, 0, 200, 200] }));
     assert_eq!(element(&doc, &stroke).points, vec![Point::new(0.0, 0.0), Point::new(200.0, 200.0)]);
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 100.0);
     let b = shape(&mut doc, 100.0, 0.0, 100.0, 100.0);
-    let group = run(&mut doc, "element.group", json!({ "ids": [a, b] }))["group"].as_str().unwrap().to_owned();
+    let group = run(&mut doc, "arrange.group", json!({ "ids": [a, b] }))["group"].as_str().unwrap().to_owned();
     run(&mut doc, "element.resize", json!({ "id": group, "box": [0, 0, 400, 100] }));
     assert_eq!(element(&doc, &b).position, Some(Point::new(200.0, 0.0)));
     assert_eq!(element(&doc, &b).size.unwrap().w, 200.0);
@@ -282,10 +282,9 @@ fn resize_scales_a_selection_into_its_new_bounds() {
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 100.0);
     let b = shape(&mut doc, 200.0, 0.0, 100.0, 100.0);
     run(&mut doc, "element.rotate", json!({ "ids": [b], "degrees": 90 }));
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[0, 100], [300, 100]] }))).remove(0);
-    let text =
-        ids(&run(&mut doc, "element.create", json!({ "elements": [{ "kind": "text", "position": [0, 150], "text": "Note", "fontSize": 20 }] })))
-            .remove(0);
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[0, 100], [300, 100]] }))).remove(0);
+    let text = ids(&run(&mut doc, "element.add", json!({ "elements": [{ "kind": "text", "position": [0, 150], "text": "Note", "fontSize": 20 }] })))
+        .remove(0);
     let bounds = |doc: &BoardDocument| {
         [&a, &b, &stroke, &text].iter().filter_map(|id| doc.model().bounds(&element(doc, id))).reduce(kition_board_kdm::Rect::union).unwrap()
     };
@@ -330,7 +329,7 @@ fn rotation_about_each_centre_or_the_selection() {
 fn style_applies_the_fields_each_kind_uses() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 100.0);
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
     let updated = run(
         &mut doc,
         "element.style",
@@ -365,7 +364,7 @@ fn get_style_answers_values_defaults_and_mixed_fields() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 100.0);
     let b = shape(&mut doc, 200.0, 0.0, 100.0, 100.0);
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
     run(&mut doc, "element.style", json!({ "ids": [a], "style": { "fillColor": "yellow", "strokeSize": "l" } }));
     let revision = doc.revision();
     let both = run(&mut doc, "element.getStyle", json!({ "ids": [a, b] }));
@@ -414,7 +413,7 @@ fn text_is_written_as_a_difference_and_marked_in_ranges() {
     );
     fails(&mut doc, "text.mark", json!({ "id": a, "range": [0, 2], "mark": "link", "value": { "href": "javascript:x" } }), "invalid-params");
     fails(&mut doc, "text.mark", json!({ "id": a, "range": [0, 99], "mark": "bold" }), "invalid-params");
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
     fails(&mut doc, "element.setText", json!({ "id": stroke, "text": "x" }), "invalid-params: a stroke has no text");
 }
 
@@ -423,12 +422,12 @@ fn duplicate_copies_trees_with_their_references() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut doc, 300.0, 0.0, 100.0, 50.0);
-    run(&mut doc, "element.update", json!({ "id": a, "set": { "key": "a" } }));
+    run(&mut doc, "element.set", json!({ "id": a, "set": { "key": "a" } }));
     run(&mut doc, "element.setText", json!({ "id": a, "text": "Bold" }));
     run(&mut doc, "text.mark", json!({ "id": a, "range": [0, 4], "mark": "bold" }));
-    let connector = ids(&run(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
+    let connector = ids(&run(&mut doc, "connector.add", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
     let frame =
-        run(&mut doc, "frame.create", json!({ "box": [-20, -20, 500, 100], "children": [a, b, connector] }))["frame"].as_str().unwrap().to_owned();
+        run(&mut doc, "frame.add", json!({ "box": [-20, -20, 500, 100], "children": [a, b, connector] }))["frame"].as_str().unwrap().to_owned();
     let copy = run(&mut doc, "element.duplicate", json!({ "ids": [frame] }));
     assert_eq!(copy["created"].as_array().unwrap().len(), 4);
     let copies = &copy["copies"];
@@ -469,13 +468,13 @@ fn group_and_ungroup_keep_the_hierarchy() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 10.0, 10.0);
     let b = shape(&mut doc, 50.0, 0.0, 10.0, 10.0);
-    let frame = run(&mut doc, "frame.create", json!({ "box": [-10, -10, 100, 100], "children": [a, b] }))["frame"].as_str().unwrap().to_owned();
-    let group = run(&mut doc, "element.group", json!({ "ids": [a, b] }))["group"].as_str().unwrap().to_owned();
+    let frame = run(&mut doc, "frame.add", json!({ "box": [-10, -10, 100, 100], "children": [a, b] }))["frame"].as_str().unwrap().to_owned();
+    let group = run(&mut doc, "arrange.group", json!({ "ids": [a, b] }))["group"].as_str().unwrap().to_owned();
     assert_eq!(element(&doc, &group).parent.unwrap().as_str(), frame, "the group stays inside the common parent");
     assert_eq!(element(&doc, &a).parent.unwrap().as_str(), group);
     assert_eq!(doc.model().bounds(&element(&doc, &group)).unwrap().x1, 60.0);
-    fails(&mut doc, "element.ungroup", json!({ "groupIds": [frame] }), "invalid-params");
-    run(&mut doc, "element.ungroup", json!({ "groupIds": [group] }));
+    fails(&mut doc, "arrange.ungroup", json!({ "groupIds": [frame] }), "invalid-params");
+    run(&mut doc, "arrange.ungroup", json!({ "groupIds": [group] }));
     assert!(doc.model().element(&ObjectId::from_string(&group)).is_none());
     assert_eq!(element(&doc, &a).parent.unwrap().as_str(), frame);
 }
@@ -484,11 +483,11 @@ fn group_and_ungroup_keep_the_hierarchy() {
 fn frames_fit_their_content() {
     let mut doc = board();
     let a = shape(&mut doc, 100.0, 100.0, 50.0, 50.0);
-    let frame = run(&mut doc, "frame.create", json!({ "box": [0, 0, 10, 10], "children": [a] }))["frame"].as_str().unwrap().to_owned();
+    let frame = run(&mut doc, "frame.add", json!({ "box": [0, 0, 10, 10], "children": [a] }))["frame"].as_str().unwrap().to_owned();
     run(&mut doc, "frame.fit", json!({ "id": frame, "padding": 10 }));
     assert_eq!(element(&doc, &frame).position, Some(Point::new(90.0, 90.0)));
     assert_eq!(element(&doc, &frame).size.unwrap().w, 70.0);
-    let empty = run(&mut doc, "frame.create", json!({ "box": [0, 0, 10, 10] }))["frame"].as_str().unwrap().to_owned();
+    let empty = run(&mut doc, "frame.add", json!({ "box": [0, 0, 10, 10] }))["frame"].as_str().unwrap().to_owned();
     fails(&mut doc, "frame.fit", json!({ "id": empty }), "invalid-params: the frame has no children");
     fails(&mut doc, "frame.fit", json!({ "id": a }), "invalid-params");
 }
@@ -500,7 +499,7 @@ fn connectors_bind_label_and_bend() {
     let b = shape(&mut doc, 0.0, 300.0, 100.0, 50.0);
     let made = run(
         &mut doc,
-        "connector.create",
+        "connector.add",
         json!({ "from": { "element": a, "anchor": [0.5, 1] }, "to": { "point": [500, 500] }, "label": "yes", "type": "elbow" }),
     );
     let connector = ids(&made).remove(0);
@@ -518,15 +517,15 @@ fn connectors_bind_label_and_bend() {
     assert_eq!(doc.model().route(&element(&doc, &connector)).len(), 4);
     run(&mut doc, "connector.setWaypoints", json!({ "id": connector, "waypoints": [] }));
     assert!(element(&doc, &connector).waypoints.is_empty());
-    fails(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": a } }), "invalid-params");
-    let stroke = ids(&run(&mut doc, "stroke.create", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
+    fails(&mut doc, "connector.add", json!({ "from": { "element": a }, "to": { "element": a } }), "invalid-params");
+    let stroke = ids(&run(&mut doc, "stroke.add", json!({ "points": [[0, 0], [1, 1]] }))).remove(0);
     fails(
         &mut doc,
-        "connector.create",
+        "connector.add",
         json!({ "from": { "element": a }, "to": { "element": stroke } }),
         "invalid-params: a connector cannot bind to a stroke",
     );
-    fails(&mut doc, "connector.create", json!({ "from": { "element": a, "point": [0, 0] }, "to": { "point": [1, 1] } }), "invalid-params");
+    fails(&mut doc, "connector.add", json!({ "from": { "element": a, "point": [0, 0] }, "to": { "point": [1, 1] } }), "invalid-params");
     fails(&mut doc, "connector.setLabel", json!({ "id": a, "text": "x" }), "invalid-params");
 }
 
@@ -550,24 +549,24 @@ fn cards_and_pictures_read_workspace_files_through_the_host() {
     kition_kit::host::set_root(Some(root.clone()));
     kition_kit::host::set_folder("");
 
-    let note = run(&mut doc, "card.create", json!({ "file": "plans/Roadmap.md", "view": { "heading": ["Plan"] }, "caption": "The plan" }));
+    let note = run(&mut doc, "card.add", json!({ "file": "plans/Roadmap.md", "view": { "heading": ["Plan"] }, "caption": "The plan" }));
     assert_eq!(note["card"], json!({ "kind": "note", "target": { "path": "plans/Roadmap.md" }, "view": { "heading": ["Plan"] } }));
     let note_id = ids(&note).remove(0);
     assert_eq!(element(&doc, &note_id).text, "The plan");
-    let map = run(&mut doc, "card.create", json!({ "file": "plans/Map.kboard", "position": [0, 400] }));
+    let map = run(&mut doc, "card.add", json!({ "file": "plans/Map.kboard", "position": [0, 400] }));
     assert_eq!(map["card"]["target"]["docId"], json!(BoardDocument::open("Map.kboard", &other).unwrap().doc_id()));
-    fails(&mut doc, "card.create", json!({ "file": "plans/Self.kboard" }), "invalid-params: a board card cannot show the board it is on");
-    let link = run(&mut doc, "card.create", json!({ "url": "https://kition.ai", "title": "Kition" }));
+    fails(&mut doc, "card.add", json!({ "file": "plans/Self.kboard" }), "invalid-params: a board card cannot show the board it is on");
+    let link = run(&mut doc, "card.add", json!({ "url": "https://kition.ai", "title": "Kition" }));
     assert_eq!(link["card"], json!({ "kind": "link", "url": "https://kition.ai", "title": "Kition" }));
-    fails(&mut doc, "card.create", json!({ "url": "ftp://x.example" }), "invalid-params");
-    fails(&mut doc, "card.create", json!({ "file": "a.md", "url": "https://kition.ai" }), "invalid-params");
-    fails(&mut doc, "card.create", json!({ "file": "a.md", "kind": "table" }), "invalid-params");
+    fails(&mut doc, "card.add", json!({ "url": "ftp://x.example" }), "invalid-params");
+    fails(&mut doc, "card.add", json!({ "file": "a.md", "url": "https://kition.ai" }), "invalid-params");
+    fails(&mut doc, "card.add", json!({ "file": "a.md", "kind": "table" }), "invalid-params");
     run(&mut doc, "card.setTarget", json!({ "id": note_id, "file": "plans/Later.md" }));
     assert_eq!(element(&doc, &note_id).text, "The plan", "the caption stays");
-    let moved = run(&mut doc, "links.retarget", json!({ "from": "plans", "to": "archive/plans" }));
+    let moved = run(&mut doc, "link.retarget", json!({ "from": "plans", "to": "archive/plans" }));
     assert_eq!(moved["retargeted"].as_array().unwrap().len(), 2);
     assert_eq!(element(&doc, &note_id).card.unwrap()["target"]["path"], "archive/plans/Later.md");
-    let again = run(&mut doc, "links.retarget", json!({ "from": "plans", "to": "archive/plans" }));
+    let again = run(&mut doc, "link.retarget", json!({ "from": "plans", "to": "archive/plans" }));
     assert!(again["retargeted"].as_array().unwrap().is_empty(), "idempotent");
 
     let picture = run(&mut doc, "image.insert", json!({ "file": "plans/chart.png", "alt": "Sales" }));
@@ -591,7 +590,7 @@ fn cards_and_pictures_read_workspace_files_through_the_host() {
 
     kition_kit::host::set_root(None);
     // A host that lends nothing still gets its card, without a docId.
-    let unlent = run(&mut doc, "card.create", json!({ "file": "plans/Map.kboard" }));
+    let unlent = run(&mut doc, "card.add", json!({ "file": "plans/Map.kboard" }));
     assert!(unlent["card"]["target"].get("docId").is_none());
     let _ = std::fs::remove_dir_all(root);
 }
@@ -621,9 +620,9 @@ fn pages_are_created_renamed_duplicated_moved_activated_and_deleted() {
     let first = doc.model().pages()[0].id.as_str().to_owned();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut doc, 300.0, 0.0, 100.0, 50.0);
-    run(&mut doc, "element.update", json!({ "id": a, "set": { "key": "a" } }));
-    run(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }));
-    let second = run(&mut doc, "page.create", json!({ "name": "Ideas", "activate": true }))["page"].as_str().unwrap().to_owned();
+    run(&mut doc, "element.set", json!({ "id": a, "set": { "key": "a" } }));
+    run(&mut doc, "connector.add", json!({ "from": { "element": a }, "to": { "element": b } }));
+    let second = run(&mut doc, "page.add", json!({ "name": "Ideas", "activate": true }))["page"].as_str().unwrap().to_owned();
     assert_eq!(doc.inspect().unwrap()["page"], json!(second));
     let on_second = shape(&mut doc, 0.0, 0.0, 10.0, 10.0);
     assert_eq!(doc.model().page_of(&ObjectId::from_string(&on_second)).unwrap().id.as_str(), second, "commands without page use the shown page");
@@ -660,12 +659,12 @@ fn copy_and_paste_within_and_across_pages() {
     let mut doc = board();
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut doc, 300.0, 0.0, 100.0, 50.0);
-    let connector = ids(&run(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
-    let payload = run(&mut doc, "clipboard.copy", json!({ "ids": [a, connector] }));
+    let connector = ids(&run(&mut doc, "connector.add", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
+    let payload = run(&mut doc, "edit.copy", json!({ "ids": [a, connector] }));
     assert_eq!(payload["type"], "application/x-kition-board+json");
     assert_eq!(payload["version"], 1, "the clipboard format is version 1");
     assert_eq!(payload["elements"].as_array().unwrap().len(), 2);
-    let pasted = ids(&run(&mut doc, "element.paste", json!({ "payload": payload })));
+    let pasted = ids(&run(&mut doc, "edit.paste", json!({ "payload": payload })));
     assert_eq!(element(&doc, &pasted[0]).position, Some(Point::new(24.0, 24.0)), "offset on the same page");
     let pasted_connector = &pasted[1];
     assert_eq!(stored_end(&doc, pasted_connector, "start").binding.unwrap().target.as_str(), pasted[0]);
@@ -674,14 +673,14 @@ fn copy_and_paste_within_and_across_pages() {
         b,
         "a target outside the payload on this page stays bound"
     );
-    let other = run(&mut doc, "page.create", json!({}))["page"].as_str().unwrap().to_owned();
-    let across = ids(&run(&mut doc, "element.paste", json!({ "page": other, "payload": payload, "at": [1000, 1000] })));
+    let other = run(&mut doc, "page.add", json!({}))["page"].as_str().unwrap().to_owned();
+    let across = ids(&run(&mut doc, "edit.paste", json!({ "page": other, "payload": payload, "at": [1000, 1000] })));
     assert_eq!(element(&doc, &across[0]).position, Some(Point::new(1000.0, 1000.0)));
     assert!(stored_end(&doc, &across[1], "end").binding.is_none(), "a target on another page is not followed");
-    fails(&mut doc, "element.paste", json!({ "payload": { "type": "text/plain", "elements": [] } }), "invalid-params");
+    fails(&mut doc, "edit.paste", json!({ "payload": { "type": "text/plain", "elements": [] } }), "invalid-params");
     fails(
         &mut doc,
-        "element.paste",
+        "edit.paste",
         json!({ "payload": { "type": "application/x-kition-board+json", "version": 1, "elements": [{ "ref": "x", "kind": "shape", "position": "nowhere" }] } }),
         "invalid-params",
     );
@@ -694,13 +693,13 @@ fn each_command_is_one_undo_step() {
     let a = shape(&mut doc, 0.0, 0.0, 100.0, 50.0);
     let b = shape(&mut doc, 300.0, 0.0, 100.0, 50.0);
     let steps = [
-        ("connector.create", json!({ "from": { "element": a }, "to": { "element": b }, "label": "x" })),
+        ("connector.add", json!({ "from": { "element": a }, "to": { "element": b }, "label": "x" })),
         ("element.move", json!({ "ids": [a, b], "delta": [10, 10] })),
         ("element.style", json!({ "ids": [a], "style": { "fillColor": "red" } })),
-        ("element.group", json!({ "ids": [a, b] })),
+        ("arrange.group", json!({ "ids": [a, b] })),
         ("element.duplicate", json!({ "ids": [a] })),
-        ("frame.create", json!({ "box": [0, 0, 500, 500], "children": [b] })),
-        ("page.create", json!({ "name": "Two" })),
+        ("frame.add", json!({ "box": [0, 0, 500, 500], "children": [b] })),
+        ("page.add", json!({ "name": "Two" })),
         ("layout.stack", json!({ "ids": [a, b], "axis": "horizontal" })),
     ];
     for (command, params) in steps {
@@ -719,7 +718,7 @@ fn mind_maps_grow_collapse_and_turn_in_one_command_each() {
     let mut doc = board();
     let root = ids(&run(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({ "elements": [{ "kind": "shape", "shapeStyle": "mind-node", "position": [0, 0], "size": [160, 60], "text": "Plan", "mindMapDirection": "right" }] }),
     ))
     .remove(0);
@@ -838,11 +837,11 @@ fn templates_are_placed_whole_in_one_command() {
 fn every_command_is_described_and_reading_commands_answer_their_output_schema() {
     let mut doc = board();
     kition_kit::testing::check_commands(&doc.commands(), &[]).unwrap();
-    let made = run(&mut doc, "element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "size": [100, 60], "text": "A" }] }));
+    let made = run(&mut doc, "element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "size": [100, 60], "text": "A" }] }));
     let id = ids(&made)[0].clone();
     let page = doc.inspect().unwrap()["activePage"].as_str().map(str::to_owned);
     let mut answers = vec![
-        ("clipboard.copy", run(&mut doc, "clipboard.copy", json!({ "ids": [id] }))),
+        ("edit.copy", run(&mut doc, "edit.copy", json!({ "ids": [id] }))),
         ("element.getStyle", run(&mut doc, "element.getStyle", json!({ "kind": "shape" }))),
         ("file.export", run(&mut doc, "file.export", json!({ "format": "svg" }))),
     ];
@@ -866,10 +865,10 @@ fn a_local_edit_that_empties_a_group_leaves_nothing_to_repair() {
     let mut doc = board();
     let b = shape(&mut doc, 240.0, 40.0, 120.0, 80.0);
     let c = shape(&mut doc, 440.0, 40.0, 120.0, 80.0);
-    let group = run(&mut doc, "element.group", json!({ "ids": [b, c] }))["group"].as_str().unwrap().to_owned();
-    let frame = run(&mut doc, "frame.create", json!({ "box": [600, 500, 1000, 800] }))["frame"].as_str().unwrap().to_owned();
-    run(&mut doc, "element.update", json!({ "id": b, "set": { "parent": frame } }));
-    run(&mut doc, "element.update", json!({ "id": c, "set": { "parent": frame } }));
+    let group = run(&mut doc, "arrange.group", json!({ "ids": [b, c] }))["group"].as_str().unwrap().to_owned();
+    let frame = run(&mut doc, "frame.add", json!({ "box": [600, 500, 1000, 800] }))["frame"].as_str().unwrap().to_owned();
+    run(&mut doc, "element.set", json!({ "id": b, "set": { "parent": frame } }));
+    run(&mut doc, "element.set", json!({ "id": c, "set": { "parent": frame } }));
     assert!(doc.model().element(&ObjectId::from_string(&group)).is_none(), "the emptied group stayed");
     // Reopened, the replica repairs nothing.
     let snapshot = kition_kit::session::__snapshot(&doc).unwrap();

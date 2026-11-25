@@ -41,7 +41,7 @@ fn shape(doc: &mut BoardDocument, x: f64, y: f64, extra: Value) -> Result<String
     if let (Some(target), Some(extra)) = (element.as_object_mut(), extra.as_object()) {
         target.extend(extra.clone());
     }
-    doc.execute("element.create", json!({ "elements": [element] })).map(|answer| created(&answer))
+    doc.execute("element.add", json!({ "elements": [element] })).map(|answer| created(&answer))
 }
 
 fn main() -> Result<(), String> {
@@ -54,17 +54,17 @@ fn main() -> Result<(), String> {
         (
             "basic.kboard",
             board("Plan.kboard", |doc| {
-                let frame = doc.execute("frame.create", json!({ "box": [0, 0, 640, 320], "title": "Sprint" }))?;
+                let frame = doc.execute("frame.add", json!({ "box": [0, 0, 640, 320], "title": "Sprint" }))?;
                 let frame = frame.get("frame").and_then(Value::as_str).unwrap_or_default().to_owned();
                 let a = shape(doc, 60.0, 120.0, json!({ "parent": frame, "shapeStyle": "flow-node", "text": "Plan" }))?;
                 let b = shape(doc, 420.0, 120.0, json!({ "parent": frame, "shapeStyle": "flow-node", "text": "Build" }))?;
-                doc.execute("connector.create", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] } }))
+                doc.execute("connector.add", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] } }))
                     .map(|_| ())
             })?,
         ),
         (
             "check-card-target-missing.kboard",
-            board("Cards.kboard", |doc| doc.execute("card.create", json!({ "file": "plans/Missing.md", "position": [0, 0] })).map(|_| ()))?,
+            board("Cards.kboard", |doc| doc.execute("card.add", json!({ "file": "plans/Missing.md", "position": [0, 0] })).map(|_| ()))?,
         ),
         (
             "check-image-missing-blob.kboard",
@@ -73,7 +73,7 @@ fn main() -> Result<(), String> {
                     "ref": "picture", "kind": "image", "position": { "x": 0, "y": 0 }, "size": { "w": 200, "h": 120 },
                     "image": { "hash": "0000000000000000000000000000000000000000000000000000000000000000", "mime": "image/png", "size": 67 },
                 }] });
-                doc.execute("element.paste", json!({ "payload": payload })).map(|_| ())
+                doc.execute("edit.paste", json!({ "payload": payload })).map(|_| ())
             })?,
         ),
         (
@@ -86,7 +86,7 @@ fn main() -> Result<(), String> {
             "check-overlapping-label.kboard",
             board("Labels.kboard", |doc| {
                 doc.execute(
-                    "element.create",
+                    "element.add",
                     json!({ "elements": [
                     { "kind": "text", "position": [0, 0], "text": "Notes" },
                     { "kind": "text", "position": [10, 6], "text": "More notes" },
@@ -100,7 +100,7 @@ fn main() -> Result<(), String> {
             board("Overlap.kboard", |doc| {
                 let a = shape(doc, 0.0, 0.0, json!({ "shapeStyle": "flow-node", "text": "Plan" }))?;
                 let b = shape(doc, 80.0, 20.0, json!({ "shapeStyle": "flow-node", "text": "Build" }))?;
-                doc.execute("connector.create", json!({ "from": { "element": a }, "to": { "element": b } })).map(|_| ())
+                doc.execute("connector.add", json!({ "from": { "element": a }, "to": { "element": b } })).map(|_| ())
             })?,
         ),
         (
@@ -114,7 +114,7 @@ fn main() -> Result<(), String> {
         (
             "check-outside-frame.kboard",
             board("Frame.kboard", |doc| {
-                let frame = doc.execute("frame.create", json!({ "box": [0, 0, 300, 200], "title": "Sprint" }))?;
+                let frame = doc.execute("frame.add", json!({ "box": [0, 0, 300, 200], "title": "Sprint" }))?;
                 let frame = frame.get("frame").and_then(Value::as_str).unwrap_or_default().to_owned();
                 shape(doc, 250.0, 150.0, json!({ "parent": frame, "text": "Late" })).map(|_| ())
             })?,
@@ -125,7 +125,7 @@ fn main() -> Result<(), String> {
                 let a = shape(doc, 0.0, 0.0, json!({ "text": "From" }))?;
                 shape(doc, 300.0, 0.0, json!({ "text": "In the way" }))?;
                 let b = shape(doc, 600.0, 0.0, json!({ "text": "To" }))?;
-                doc.execute("connector.create", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] } }))
+                doc.execute("connector.add", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] } }))
                     .map(|_| ())
             })?,
         ),
@@ -134,21 +134,21 @@ fn main() -> Result<(), String> {
             board("Dangling.kboard", |doc| {
                 let a = shape(doc, 0.0, 0.0, json!({ "text": "Plan" }))?;
                 let b = shape(doc, 400.0, 0.0, json!({ "text": "Build" }))?;
-                let made = doc.execute("connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))?;
+                let made = doc.execute("connector.add", json!({ "from": { "element": a }, "to": { "element": b } }))?;
                 write_raw(doc, &created(&made), "end", json!({ "point": [400, 40], "binding": { "target": "gone-element", "anchor": [0, 0.5] } }))
             })?,
         ),
         (
             "check-card-target-changed.kboard",
             board("Changed.kboard", |doc| {
-                let made = doc.execute("card.create", json!({ "file": "plans/Roadmap.md", "position": [0, 0] }))?;
+                let made = doc.execute("card.add", json!({ "file": "plans/Roadmap.md", "position": [0, 0] }))?;
                 let card = json!({ "kind": "board", "target": { "path": "check-card-target-changed.kboard", "docId": OTHER_BOARD } });
                 write_raw(doc, &created(&made), "card", card)
             })?,
         ),
         (
             "check-empty-frame.kboard",
-            board("Empty.kboard", |doc| doc.execute("frame.create", json!({ "box": [0, 0, 300, 200], "title": "Later" })).map(|_| ()))?,
+            board("Empty.kboard", |doc| doc.execute("frame.add", json!({ "box": [0, 0, 300, 200], "title": "Later" })).map(|_| ()))?,
         ),
     ];
     for (name, bytes) in fixtures {

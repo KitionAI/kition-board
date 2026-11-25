@@ -28,14 +28,14 @@ async fn applies(f: &Fixture, basis: Value, command: &str, params: Value) -> boo
 async fn a_turn_keeping_bounds_of_an_end_element_refuses_a_new_connector() {
     for turned in [true, false] {
         let f = Fixture::new();
-        f.outside(&[("element.update", json!({"id":f.a,"set":{"rotation":45}}))]);
+        f.outside(&[("element.set", json!({"id":f.a,"set":{"rotation":45}}))]);
         let basis = f.basis().await;
         if turned {
-            f.outside(&[("element.update", json!({"id":f.a,"set":{"rotation":135}}))]);
+            f.outside(&[("element.set", json!({"id":f.a,"set":{"rotation":135}}))]);
         } else {
             f.outside(&[("element.setText", json!({"id":f.a,"text":"Colleague"}))]);
         }
-        let wrote = applies(&f, basis, "connector.create", json!({"page":f.page,"from":{"element":f.a},"to":{"element":f.b}})).await;
+        let wrote = applies(&f, basis, "connector.add", json!({"page":f.page,"from":{"element":f.a},"to":{"element":f.b}})).await;
         assert_eq!(wrote, !turned, "turned={turned}");
         f.shutdown().await;
     }
@@ -48,12 +48,12 @@ async fn a_turn_keeping_bounds_of_an_end_element_refuses_a_new_connector() {
 async fn a_paste_rests_on_the_live_elements_its_payload_names() {
     for (bound, deleted) in [(false, true), (false, false), (true, true), (true, false)] {
         let f = Fixture::new();
-        f.outside(&[("connector.create", json!({"page":f.page,"from":{"element":f.a},"to":{"element":f.b}}))]);
+        f.outside(&[("connector.add", json!({"page":f.page,"from":{"element":f.a},"to":{"element":f.b}}))]);
         let doc = f.doc();
         let page = doc.model().pages()[0].id.clone();
         let connector = doc.model().elements_of(&doc.model().pages()[0]).find(|e| e.kind.as_str() == "connector").unwrap().id.clone();
         let mut doc = doc;
-        let copied = doc.execute("clipboard.copy", json!({"ids":[if bound { json!(connector.as_str()) } else { f.a.clone() }]})).unwrap();
+        let copied = doc.execute("edit.copy", json!({"ids":[if bound { json!(connector.as_str()) } else { f.a.clone() }]})).unwrap();
         let basis = f.basis().await;
         if deleted {
             f.outside(&[("element.delete", json!({"ids":[if bound { &f.b } else { &f.a }]}))]);
@@ -61,7 +61,7 @@ async fn a_paste_rests_on_the_live_elements_its_payload_names() {
             f.outside(&[("element.style", json!({"ids":[f.a, f.b],"style":{"fillColor":"red"}}))]);
         }
         let params = if bound { json!({"page":page.as_str(),"payload":copied,"at":[0,600]}) } else { json!({"page":page.as_str(),"payload":copied}) };
-        let wrote = applies(&f, basis, "element.paste", params).await;
+        let wrote = applies(&f, basis, "edit.paste", params).await;
         assert_eq!(wrote, !deleted, "bound={bound} deleted={deleted}");
         f.shutdown().await;
     }
@@ -77,7 +77,7 @@ async fn a_lone_elements_move_does_not_rest_on_its_container() {
         if moved {
             f.outside(&[("element.move", json!({"ids":[f.a],"delta":[5,0]}))]);
         } else {
-            f.outside(&[("element.update", json!({"id":f.a,"set":{"parent":f.frame}}))]);
+            f.outside(&[("element.set", json!({"id":f.a,"set":{"parent":f.frame}}))]);
         }
         let wrote = applies(&f, basis, "element.move", json!({"ids":[f.a],"delta":[10,0]})).await;
         assert_eq!(wrote, !moved, "moved={moved}");
@@ -92,14 +92,14 @@ async fn turning_in_place_and_aligning_do_not_rest_on_what_they_do_not_read() {
     for (command, params, change, wrote) in [
         ("element.rotate", json!({"degrees":90}), ("element.move", json!({"delta":[5,0]})), true),
         ("element.rotate", json!({"degrees":90}), ("element.rotate", json!({"degrees":10})), false),
-        ("layout.align", json!({"edge":"left"}), ("element.update", json!({"set":{"rotation":135}})), true),
+        ("layout.align", json!({"edge":"left"}), ("element.set", json!({"set":{"rotation":135}})), true),
         ("layout.align", json!({"edge":"left"}), ("element.move", json!({"delta":[5,0]})), false),
     ] {
         let f = Fixture::new();
-        f.outside(&[("element.update", json!({"id":f.a,"set":{"rotation":45}}))]);
+        f.outside(&[("element.set", json!({"id":f.a,"set":{"rotation":45}}))]);
         let basis = f.basis().await;
         let mut colleague = change.1.clone();
-        if change.0 == "element.update" {
+        if change.0 == "element.set" {
             colleague["id"] = f.a.clone();
         } else {
             colleague["ids"] = json!([f.a]);
@@ -117,15 +117,15 @@ async fn turning_in_place_and_aligning_do_not_rest_on_what_they_do_not_read() {
 async fn an_ungroup_does_not_rest_on_its_members_styles() {
     for left in [true, false] {
         let f = Fixture::new();
-        f.outside(&[("element.group", json!({"ids":[f.a, f.b]}))]);
+        f.outside(&[("arrange.group", json!({"ids":[f.a, f.b]}))]);
         let group = f.doc().model().element(&kition_kit::kdm::ObjectId::from_string(f.a.as_str().unwrap())).unwrap().parent.clone().unwrap();
         let basis = f.basis().await;
         if left {
-            f.outside(&[("element.update", json!({"id":f.a,"set":{"parent":f.frame}}))]);
+            f.outside(&[("element.set", json!({"id":f.a,"set":{"parent":f.frame}}))]);
         } else {
             f.outside(&[("element.style", json!({"ids":[f.a],"style":{"fillColor":"red"}}))]);
         }
-        let wrote = applies(&f, basis, "element.ungroup", json!({"groupIds":[group.as_str()]})).await;
+        let wrote = applies(&f, basis, "arrange.ungroup", json!({"groupIds":[group.as_str()]})).await;
         assert_eq!(wrote, !left, "left={left}");
         f.shutdown().await;
     }
@@ -138,14 +138,14 @@ async fn page_copies_and_new_containers_do_not_rest_on_other_structure() {
     for (command, colleague, wrote) in [
         ("page.duplicate", "bind-elsewhere", true),
         ("page.duplicate", "add-to-page", false),
-        ("element.update", "bind-elsewhere", true),
-        ("element.update", "delete-container", false),
+        ("element.set", "bind-elsewhere", true),
+        ("element.set", "delete-container", false),
     ] {
         let f = Fixture::new();
         let basis = f.basis().await;
         match colleague {
-            "bind-elsewhere" => f.outside(&[("connector.create", json!({"page":f.page,"from":{"element":f.b},"to":{"element":f.child}}))]),
-            "add-to-page" => f.outside(&[("element.create", json!({"page":f.other_page,"elements":[{"kind":"shape","position":[0,0]}]}))]),
+            "bind-elsewhere" => f.outside(&[("connector.add", json!({"page":f.page,"from":{"element":f.b},"to":{"element":f.child}}))]),
+            "add-to-page" => f.outside(&[("element.add", json!({"page":f.other_page,"elements":[{"kind":"shape","position":[0,0]}]}))]),
             _ => f.outside(&[("element.delete", json!({"ids":[f.frame]}))]),
         }
         let params = if command == "page.duplicate" { json!({"page":f.other_page}) } else { json!({"id":f.a,"set":{"parent":f.frame}}) };

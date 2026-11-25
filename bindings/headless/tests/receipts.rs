@@ -24,7 +24,7 @@ async fn property_move_parent_and_uniform_offset_receipt_sizes() {
     for count in [5, 200] {
         let f = Fixture::new();
         let elements = (1..count).map(|n| json!({"kind":"shape","parent":f.frame,"position":[f64::from(n)*5.0,450.0]})).collect::<Vec<_>>();
-        f.outside(&[("element.create", json!({"elements":elements}))]);
+        f.outside(&[("element.add", json!({"elements":elements}))]);
         let receipt = f.write(f.basis().await, "element.move", json!({"ids":[f.frame],"delta":[10,20]})).await.unwrap();
         assert_eq!(receipt["completed"][0]["result"]["moved"].as_array().unwrap().len(), count as usize + 1);
         bytes(&format!("parent-{count}-children"), &receipt);
@@ -32,7 +32,7 @@ async fn property_move_parent_and_uniform_offset_receipt_sizes() {
     }
     let f = Fixture::new();
     let elements = (0..200).map(|n| json!({"kind":"shape","position":[f64::from(n)*5.0,800.0]})).collect::<Vec<_>>();
-    f.outside(&[("element.create", json!({"elements":elements}))]);
+    f.outside(&[("element.add", json!({"elements":elements}))]);
     let doc = f.doc();
     let ids = doc
         .model()

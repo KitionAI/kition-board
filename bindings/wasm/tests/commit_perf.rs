@@ -50,8 +50,8 @@ fn median(mut values: Vec<f64>) -> f64 {
 #[test]
 fn a_20_shape_move_at_5000_elements_stays_in_budget() {
     let mut doc = BoardDocument::create("Perf.kboard", 1920, 1080).unwrap();
-    doc.execute("page.create", json!({ "name": "Perf", "activate": true })).unwrap();
-    let pasted = doc.execute("element.paste", json!({ "payload": payload() })).unwrap();
+    doc.execute("page.add", json!({ "name": "Perf", "activate": true })).unwrap();
+    let pasted = doc.execute("edit.paste", json!({ "payload": payload() })).unwrap();
     let created: Vec<String> = pasted["created"].as_array().unwrap().iter().map(|id| id.as_str().unwrap().to_owned()).collect();
     assert_eq!(created.len(), 5000);
     for chunk in created.chunks(500) {
@@ -89,8 +89,8 @@ fn a_20_shape_move_at_5000_elements_stays_in_budget() {
 #[test]
 fn one_move_is_one_undo_step_at_5000_elements() {
     let mut doc = BoardDocument::create("Perf.kboard", 1920, 1080).unwrap();
-    doc.execute("page.create", json!({ "name": "Perf", "activate": true })).unwrap();
-    doc.execute("element.paste", json!({ "payload": payload() })).unwrap();
+    doc.execute("page.add", json!({ "name": "Perf", "activate": true })).unwrap();
+    doc.execute("edit.paste", json!({ "payload": payload() })).unwrap();
     let page = doc.active_page().unwrap().clone();
     let ids: Vec<_> =
         page.elements.iter().filter(|id| doc.model().element(id).is_some_and(|element| element.kind == Kind::Shape)).take(20).cloned().collect();

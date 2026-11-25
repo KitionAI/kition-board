@@ -1,5 +1,5 @@
 /**
- * Thinning a freehand stroke before it becomes `stroke.create`: radial distance, then
+ * Thinning a freehand stroke before it becomes `stroke.add`: radial distance, then
  * Douglas–Peucker.
  *
  * Ported from Kition's `packages/board-editor/src/lib/boardFreehand.ts`.

@@ -2,7 +2,7 @@ format: 1
 id: board.agent.context/explicit-targets
 feature: board.agent.context
 intent: >-
-  An agent's command leaves the person's page as it was, also when it fails; page.activate and page.create with activate keep their effect, so a page the agent makes and shows takes its next steps.
+  An agent's command leaves the person's page as it was, also when it fails; page.activate and page.add with activate keep their effect, so a page the agent makes and shows takes its next steps.
 layer: gate
 source:
   kind: synthetic

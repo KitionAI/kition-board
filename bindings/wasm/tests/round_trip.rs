@@ -23,7 +23,7 @@ fn ids(value: &Value) -> Vec<String> {
 }
 
 fn shape(doc: &mut BoardDocument, x: f64, y: f64, text: &str) -> String {
-    ids(&run(doc, "element.create", json!({ "elements": [{ "kind": "shape", "position": [x, y], "size": [120, 60], "text": text }] }))).remove(0)
+    ids(&run(doc, "element.add", json!({ "elements": [{ "kind": "shape", "position": [x, y], "size": [120, 60], "text": text }] }))).remove(0)
 }
 
 fn element(doc: &BoardDocument, id: &str) -> kition_board_kdm::Element {
@@ -65,11 +65,9 @@ fn frames_and_strokes_survive_save_and_reopen() {
     let mut doc = board();
     let a = shape(&mut doc, 20.0, 20.0, "Inside");
     let stroke =
-        ids(&run(&mut doc, "stroke.create", json!({ "points": [[30, 30], [60, 90], [120, 40]], "style": { "strokeColor": "blue" } }))).remove(0);
-    let frame = run(&mut doc, "frame.create", json!({ "box": [0, 0, 400, 300], "title": "Q4", "children": [a, stroke] }))["frame"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+        ids(&run(&mut doc, "stroke.add", json!({ "points": [[30, 30], [60, 90], [120, 40]], "style": { "strokeColor": "blue" } }))).remove(0);
+    let frame =
+        run(&mut doc, "frame.add", json!({ "box": [0, 0, 400, 300], "title": "Q4", "children": [a, stroke] }))["frame"].as_str().unwrap().to_owned();
     run(&mut doc, "frame.fit", json!({ "id": frame, "padding": 16 }));
     assert_eq!(element(&doc, &stroke).points.len(), 3);
     let fitted = element(&doc, &frame);
@@ -85,7 +83,7 @@ fn connectors_with_labels_and_waypoints_survive_save_and_reopen() {
     let a = shape(&mut doc, 0.0, 0.0, "Plan");
     let b = shape(&mut doc, 400.0, 0.0, "Ship");
     let c = shape(&mut doc, 400.0, 300.0, "Review");
-    let connector = ids(&run(&mut doc, "connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
+    let connector = ids(&run(&mut doc, "connector.add", json!({ "from": { "element": a }, "to": { "element": b } }))).remove(0);
     run(&mut doc, "connector.bind", json!({ "id": connector, "terminal": "end", "to": { "element": c } }));
     run(&mut doc, "connector.setLabel", json!({ "id": connector, "text": "then", "position": 0.25 }));
     run(&mut doc, "connector.setWaypoints", json!({ "id": connector, "waypoints": [[200, 0], [200, 300]] }));
@@ -117,7 +115,7 @@ fn mind_maps_survive_save_and_reopen() {
     let mut doc = board();
     let root = ids(&run(
         &mut doc,
-        "element.create",
+        "element.add",
         json!({ "elements": [{ "kind": "shape", "shapeStyle": "mind-node", "position": [0, 0], "size": [160, 60], "text": "Plan", "mindMapDirection": "right" }] }),
     ))
     .remove(0);
@@ -138,7 +136,7 @@ fn pages_survive_save_and_reopen() {
     let mut doc = board();
     shape(&mut doc, 0.0, 0.0, "First page");
     let first = doc.model().pages()[0].id.to_string();
-    let second = run(&mut doc, "page.create", json!({ "name": "Ideas", "activate": true }))["page"].as_str().unwrap().to_owned();
+    let second = run(&mut doc, "page.add", json!({ "name": "Ideas", "activate": true }))["page"].as_str().unwrap().to_owned();
     shape(&mut doc, 0.0, 0.0, "On Ideas");
     run(&mut doc, "page.rename", json!({ "page": second, "name": "Later" }));
     run(&mut doc, "page.duplicate", json!({ "page": first }));
@@ -162,7 +160,7 @@ fn pictures_and_link_cards_survive_save_and_reopen() {
     );
     let picture_id = ids(&picture).remove(0);
     run(&mut doc, "image.setAlt", json!({ "id": picture_id, "alt": "Kition logo" }));
-    let link = ids(&run(&mut doc, "card.create", json!({ "url": "https://kition.ai", "title": "Kition" }))).remove(0);
+    let link = ids(&run(&mut doc, "card.add", json!({ "url": "https://kition.ai", "title": "Kition" }))).remove(0);
     let blob = picture["blob"].as_str().unwrap().to_owned();
     let back = round_trip(&mut doc);
     assert!(back.has_blob(&blob), "the picture's bytes travel in the file");

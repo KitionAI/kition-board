@@ -223,8 +223,8 @@ try {
   await tab(second).click()
   await until(async () => (await personPage()) === second)
   const run = await ai([
-    { command: 'page.create', params: { name: 'Agent', activate: true } },
-    { command: 'element.create', params: { elements: [{ kind: 'shape', position: [0, 0], text: 'by the agent' }] } },
+    { command: 'page.add', params: { name: 'Agent', activate: true } },
+    { command: 'element.add', params: { elements: [{ kind: 'shape', position: [0, 0], text: 'by the agent' }] } },
   ])
   const agentPage = run.completed?.[0]?.result?.page
   await page.waitForTimeout(300)

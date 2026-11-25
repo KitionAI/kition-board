@@ -11,14 +11,14 @@ use serde_json::{Value, json};
 fn board() -> (BoardDocument, String) {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     doc.execute(
-        "element.create",
+        "element.add",
         json!({ "elements": [
             { "kind": "shape", "position": [0, 0], "size": [160, 100], "text": "Idea", "fillColor": "purple" },
             { "kind": "shape", "position": [300, 200], "size": [100, 100], "shapeType": "ellipse" },
         ] }),
     )
     .unwrap();
-    let frame = doc.execute("frame.create", json!({ "box": [600, 0, 900, 200], "title": "Later" })).unwrap()["frame"].as_str().unwrap().to_owned();
+    let frame = doc.execute("frame.add", json!({ "box": [600, 0, 900, 200], "title": "Later" })).unwrap()["frame"].as_str().unwrap().to_owned();
     (doc, frame)
 }
 
@@ -61,7 +61,7 @@ fn a_frame_exports_alone_and_bad_requests_are_refused() {
     let (_, svg) = export(&mut doc, json!({ "format": "svg", "frame": frame }));
     assert!(!String::from_utf8(svg).unwrap().to_ascii_lowercase().contains("#ece9fb"), "what is outside the frame is left out");
     // Too large at its scale, a PNG is refused, or drawn smaller with `fit`.
-    let big = doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "size": [40000, 100] }] })).unwrap();
+    let big = doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [0, 0], "size": [40000, 100] }] })).unwrap();
     assert!(big["created"].is_array());
     assert!(doc.execute("file.export", json!({ "format": "png", "scale": 1 })).unwrap_err().starts_with("invalid-params"));
     let (fitted, _) = export(&mut doc, json!({ "format": "png", "scale": 1, "fit": true }));

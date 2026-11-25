@@ -50,7 +50,7 @@ solution:
       path: retro.kboard
       target: { page: 2 }
       steps:
-        - { command: element.create, params: { elements: [{ kind: shape, shapeStyle: sticky, parent: 01a1cef6-5adf-70ae-a855-bed7df6b4dd8, position: [260, 80], size: [160, 120], text: Wins }] } }
+        - { command: element.add, params: { elements: [{ kind: shape, shapeStyle: sticky, parent: 01a1cef6-5adf-70ae-a855-bed7df6b4dd8, position: [260, 80], size: [160, 120], text: Wins }] } }
         - { command: element.setText, on: [01a1cef6-5ade-703b-9d65-4d56573cbb49], params: { text: Sprint 12 } }
 since: "2026-11-17"
 timeout_s: 600

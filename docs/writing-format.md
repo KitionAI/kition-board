@@ -35,26 +35,26 @@ Commands by namespace (the part of the id before the first dot):
 
 | Namespace | Commands | Change the document | Open to the agent | Examples |
 | --- | ---: | ---: | ---: | --- |
-| `card` | 2 | 2 | 2 | `card.create`, `card.setTarget` |
-| `clipboard` | 1 | 0 | 1 | `clipboard.copy` |
-| `connector` | 4 | 4 | 4 | `connector.create`, `connector.bind`, `connector.setLabel` |
+| `card` | 2 | 2 | 2 | `card.add`, `card.setTarget` |
+| `clipboard` | 1 | 0 | 1 | `edit.copy` |
+| `connector` | 4 | 4 | 4 | `connector.add`, `connector.bind`, `connector.setLabel` |
 | `edit` | 2 | 2 | 2 | `edit.undo`, `edit.redo` |
-| `element` | 15 | 14 | 15 | `element.duplicate`, `element.delete`, `element.paste` |
+| `element` | 15 | 14 | 15 | `element.duplicate`, `element.delete`, `edit.paste` |
 | `file` | 1 | 0 | 1 | `file.export` |
-| `frame` | 2 | 2 | 2 | `frame.create`, `frame.fit` |
+| `frame` | 2 | 2 | 2 | `frame.add`, `frame.fit` |
 | `image` | 2 | 2 | 2 | `image.insert`, `image.setAlt` |
 | `layout` | 4 | 4 | 4 | `layout.align`, `layout.distribute`, `layout.stack` |
-| `links` | 1 | 1 | 1 | `links.retarget` |
+| `links` | 1 | 1 | 1 | `link.retarget` |
 | `mindmap` | 4 | 4 | 4 | `mindmap.addChild`, `mindmap.addSibling`, `mindmap.collapse` |
-| `page` | 6 | 5 | 6 | `page.create`, `page.rename`, `page.duplicate` |
-| `stroke` | 1 | 1 | 1 | `stroke.create` |
+| `page` | 6 | 5 | 6 | `page.add`, `page.rename`, `page.duplicate` |
+| `stroke` | 1 | 1 | 1 | `stroke.add` |
 | `template` | 1 | 1 | 1 | `template.insert` |
 | `text` | 1 | 1 | 1 | `text.mark` |
 
 ### How things are addressed
 
 - **Elements are addressed by id**, a UUID string. Get them from `board_query` or from a command's
-  answer: `element.create` answers `{"created": [id, …]}` in the order you gave the elements.
+  answer: `element.add` answers `{"created": [id, …]}` in the order you gave the elements.
 - **Ids are only known after a call answers.** A later step in the same `board_run` cannot refer to
   an element an earlier step made: there are no references such as `$0.created.0`, and `key` is an
   authoring label, not an id. Make the elements, read the ids from the answer, then connect them in
@@ -111,22 +111,22 @@ schema says which.
 
 | Parameter | Values | Used by |
 | --- | --- | --- |
-| `connectorType` | `straight`, `elbow`, `curved` | `element.create`, `element.style` |
-| `dashStyle` | `solid`, `dashed`, `dotted` | `element.create`, `element.style`, `stroke.create` |
+| `connectorType` | `straight`, `elbow`, `curved` | `element.add`, `element.style` |
+| `dashStyle` | `solid`, `dashed`, `dotted` | `element.add`, `element.style`, `stroke.add` |
 | `direction` | `both`, `right`, `left`, `down` | `mindmap.setDirection` |
-| `fillStyle` | `none`, `solid`, `semi`, `pattern` | `element.create`, `element.style` |
-| `fontFamily` | `sans`, `serif`, `mono` | `element.create`, `element.style` |
+| `fillStyle` | `none`, `solid`, `semi`, `pattern` | `element.add`, `element.style` |
+| `fontFamily` | `sans`, `serif`, `mono` | `element.add`, `element.style` |
 | `format` | `png`, `svg`, `pdf` | `file.export` |
-| `kind` | `note`, `table`, `board`, `file`, `link` | `card.create`, `card.setTarget` |
-| `kind` | `shape`, `text`, `frame`, `stroke` | `element.create` |
+| `kind` | `note`, `table`, `board`, `file`, `link` | `card.add`, `card.setTarget` |
+| `kind` | `shape`, `text`, `frame`, `stroke` | `element.add` |
 | `kind` | `shape`, `text`, `stroke`, `connector`, `image`, `card`, `frame` | `element.getStyle` |
-| `shapeStyle` | `default`, `sticky`, `mind-node`, `flow-node`, `image-placeholder` | `element.create`, `element.getStyle` |
-| `shapeType` | `rectangle`, `ellipse`, `triangle`, `diamond`, `hexagon`, `pill`, `parallelogram`, `star`, `cloud`, `heart`, `x-box`, `check-box`, `check`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`, `line`, `pentagon`, `octagon`, `trapezoid`, `right-triangle`, `cross`, `chevron`, `arrow-left-right`, `arrow-up-down`, `callout`, `brace-left`, `brace-right`, `document`, `multi-document`, `predefined-process`, `cylinder`, `manual-input`, `manual-operation`, `delay`, `display`, `off-page`, `stored-data`, `internal-storage`, `summing-junction`, `or-junction`, `note`, `actor` | `element.create` |
-| `strokeSize` | `s`, `m`, `l`, `xl` | `element.create`, `element.style`, `stroke.create` |
+| `shapeStyle` | `default`, `sticky`, `mind-node`, `flow-node`, `image-placeholder` | `element.add`, `element.getStyle` |
+| `shapeType` | `rectangle`, `ellipse`, `triangle`, `diamond`, `hexagon`, `pill`, `parallelogram`, `star`, `cloud`, `heart`, `x-box`, `check-box`, `check`, `arrow-left`, `arrow-right`, `arrow-up`, `arrow-down`, `line`, `pentagon`, `octagon`, `trapezoid`, `right-triangle`, `cross`, `chevron`, `arrow-left-right`, `arrow-up-down`, `callout`, `brace-left`, `brace-right`, `document`, `multi-document`, `predefined-process`, `cylinder`, `manual-input`, `manual-operation`, `delay`, `display`, `off-page`, `stored-data`, `internal-storage`, `summing-junction`, `or-junction`, `note`, `actor` | `element.add` |
+| `strokeSize` | `s`, `m`, `l`, `xl` | `element.add`, `element.style`, `stroke.add` |
 | `template` | `mindmap`, `flowchart`, `roadmap`, `kanban`, `retrospective`, `storyboard` | `template.insert` |
-| `textAlign` | `left`, `center`, `right` | `element.create`, `element.style` |
-| `textFormat` | `plain`, `markdown` | `element.create` |
-| `type` | `straight`, `elbow`, `curved` | `connector.create` |
+| `textAlign` | `left`, `center`, `right` | `element.add`, `element.style` |
+| `textFormat` | `plain`, `markdown` | `element.add` |
+| `type` | `straight`, `elbow`, `curved` | `connector.add` |
 | `units` | `scalar`, `utf16` | `text.mark` |
 
 ## Examples
@@ -139,7 +139,7 @@ lists the frame `Sprint` (`01a18a90-…e169c1`, at 0,0, 640 × 320) holding flow
 
 ```json
 {"tool": "board_run", "arguments": {"path": "plan.kboard", "steps": [
-  {"command": "element.create", "params": {"elements": [{"kind": "shape", "shapeStyle": "flow-node",
+  {"command": "element.add", "params": {"elements": [{"kind": "shape", "shapeStyle": "flow-node",
     "parent": "01a18a90-f63d-74f3-bebb-52aee9e169c1", "position": [780, 120], "size": [160, 80], "text": "Ship"}]}}
 ]}}
 {"tool": "board_check", "arguments": {"path": "plan.kboard"}}
@@ -150,7 +150,7 @@ reaches outside `Sprint`, with fixes. Run them with the new id:
 
 ```json
 {"tool": "board_run", "arguments": {"path": "plan.kboard", "steps": [
-  {"command": "connector.create", "params": {"from": {"element": "01a18a90-f63e-7428-86a6-6e459211c5e1", "anchor": [1, 0.5]},
+  {"command": "connector.add", "params": {"from": {"element": "01a18a90-f63e-7428-86a6-6e459211c5e1", "anchor": [1, 0.5]},
     "to": {"element": "01a18a95-a876-7716-b136-47cc59a663c6", "anchor": [0, 0.5]}}},
   {"command": "frame.fit", "params": {"id": "01a18a90-f63d-74f3-bebb-52aee9e169c1"}}
 ]}}
@@ -164,7 +164,7 @@ The check now finds nothing wrong.
 ```json
 {"tool": "board_create", "arguments": {"path": "ideas.kboard"}}
 {"tool": "board_run", "arguments": {"path": "ideas.kboard", "steps": [
-  {"command": "element.create", "params": {"elements": [{"kind": "shape", "shapeStyle": "mind-node", "position": [0, 0], "text": "Launch"}]}}
+  {"command": "element.add", "params": {"elements": [{"kind": "shape", "shapeStyle": "mind-node", "position": [0, 0], "text": "Launch"}]}}
 ]}}
 ```
 
@@ -187,7 +187,7 @@ nothing wrong.
 1. `board_inspect`, then `board_query {follow: "pages.0.elements"}` to get ids and positions.
 2. `board_commands` with keywords; use only command ids it returned.
 3. `board_run` a few steps; take new ids from the answer.
-4. `board_check`. Most diagnostics carry a `fix` (`connector.create`, `frame.fit`, …): run it with
+4. `board_check`. Most diagnostics carry a `fix` (`connector.add`, `frame.fit`, …): run it with
    the ids it names.
 
 ## Pitfalls

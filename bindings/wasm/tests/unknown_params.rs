@@ -29,11 +29,11 @@ fn dump_commands() {
 #[test]
 fn keys_commands_read_are_in_their_schemas() {
     let mut board = doc();
-    // page.create {activate} and connector.create {style}: read by the commands, so declared.
-    board.execute("page.create", serde_json::json!({ "name": "Ideas", "activate": true })).unwrap();
+    // page.add {activate} and connector.add {style}: read by the commands, so declared.
+    board.execute("page.add", serde_json::json!({ "name": "Ideas", "activate": true })).unwrap();
     let shapes = board
         .execute(
-            "element.create",
+            "element.add",
             serde_json::json!({ "elements": [
                 { "kind": "shape", "shapeType": "rectangle", "position": [0, 0], "size": [100, 60] },
                 { "kind": "shape", "shapeType": "rectangle", "position": [300, 0], "size": [100, 60] },
@@ -43,7 +43,7 @@ fn keys_commands_read_are_in_their_schemas() {
     let ids = shapes["created"].as_array().unwrap();
     board
         .execute(
-            "connector.create",
+            "connector.add",
             serde_json::json!({ "from": { "element": ids[0] }, "to": { "element": ids[1] }, "style": { "strokeColor": "#5645d4" } }),
         )
         .unwrap();

@@ -9,7 +9,7 @@ async fn mindmap_holds_node_fields_it_reads_but_allows_unrelated_labels() {
     for change in 0..4 {
         let f = Fixture::new();
         f.outside(&[
-            ("element.update", json!({"id":f.a,"set":{"shapeStyle":"mind-node"}})),
+            ("element.set", json!({"id":f.a,"set":{"shapeStyle":"mind-node"}})),
             ("mindmap.addChild", json!({"node":f.a,"text":"Map child"})),
         ]);
         let doc = f.doc();
@@ -28,7 +28,7 @@ async fn mindmap_holds_node_fields_it_reads_but_allows_unrelated_labels() {
             0 => f.outside(&[("element.setText", json!({"id":f.b,"text":"Unrelated"}))]),
             1 => f.outside(&[("element.move", json!({"ids":[child],"delta":[40,0]}))]),
             2 => f.outside(&[("element.setText", json!({"id":f.a,"text":"Root label"}))]),
-            _ => f.outside(&[("element.update", json!({"id":child,"set":{"shapeStyle":"default"}}))]),
+            _ => f.outside(&[("element.set", json!({"id":child,"set":{"shapeStyle":"default"}}))]),
         }
         let before = f.file();
         let result = f.write(basis, "layout.mindmap", json!({"root":f.a})).await;

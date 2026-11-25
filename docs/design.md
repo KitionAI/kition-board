@@ -150,7 +150,7 @@ Kit-standard has no `atomic` groups (`spec/sets/model.md`: `json` is "for couple
 Rule: **when an end has a `binding` whose target exists on the same page, every reader (the engine's view, render, export, inspect, check) computes the end point from the target's `position`, `size`, `rotation`, `shapeType` and the `anchor`: it is the point where the ray from the target box's centre through the anchor's point leaves the target's outline; the stored `point` is ignored.** Commands still write the freshly computed `point` (so a reader of the raw KDM JSON, such as `state_json` or a third-party tool, sees a near value), but nothing depends on it being current.
 
 - The outline (`kition_board_kdm::outline::outline_point`, the one derivation every reader and every cache write goes through): the ellipse inscribed in the box for `ellipse`, `summing-junction` and `or-junction`; the polygon of `outline::POLYGONS` for a shape in that table, and the hexagon and the parallelogram with the insets they are drawn with; for the curved `document`, `delay`, `display` and `stored-data`, whose curves are fixed fractions of the box, the polygon of `outline::CURVES`, each Bezier of the drawing sampled at equal steps (within 0.3% of the box of the drawn curve; used for ends only, the renderer still draws the curves); the box for every other shape (the star, cloud, heart, cylinder, pill, multi-document, note, the single arrows, the open marks) and every other kind. Rectangles, sticky notes, frames, cards, pictures and text therefore resolve exactly to the anchor's point on the box, as they always did. An anchor at the centre, a box with a zero side, or anything not finite resolves to the anchor's point on the box.
-- The anchor stays a point on the box (`nearest_edge_anchor` picks it when a connector is dropped on an element's body, facing the other end), so a board written before ends met outlines keeps its anchors and draws its ends on the outline without any write; a save of it without edits writes the same bytes. A new `shapeType` (`element.update`) writes the bound ends' cached points on the new outline in the same command.
+- The anchor stays a point on the box (`nearest_edge_anchor` picks it when a connector is dropped on an element's body, facing the other end), so a board written before ends met outlines keeps its anchors and draws its ends on the outline without any write; a save of it without edits writes the same bytes. A new `shapeType` (`element.set`) writes the bound ends' cached points on the new outline in the same command.
 - The editor derives the same point with the outlines the engine answers in `shape.previews` (`outline` per shape; `web/src/board/outline.ts`); until that answer arrives it uses the box.
 
 - No repair transaction runs after a move: when the shapes of a connector move, the connector is drawn between them with no system change.
@@ -258,7 +258,7 @@ Zip round trip (open → save → open gives the same `state_json`, M15); an unc
 | `file` | any other workspace file | as `note` |
 | `link` | a URL | by the engine: the person's title or the URL's host name, and the URL |
 
-- **No nesting:** `card.create` refuses this board as its own target (`invalid-params`).
+- **No nesting:** `card.add` refuses this board as its own target (`invalid-params`).
 - **Read-only:** a card shows its target; nothing is edited inside it.
 - **Caption:** the element's `text` is an optional caption drawn under the card.
 
@@ -281,7 +281,7 @@ Zip round trip (open → save → open gives the same `state_json`, M15); an unc
 | `target.docId` | string, optional | the target's M7 `docId` when known; lets a host follow a target moved while the board was closed (LK7) |
 | `view` | object, optional | where in the target: `heading` (path) and `blockId` for notes; the KHP-0004 A24 `target` shape (`page`, `object`, `range`) for tables and boards |
 | `title` | string, optional | `link` cards: the person's title (kits have no network, so there is no unfurl) |
-| `url` | string, optional | `link` cards only; `http`, `https`, `mailto` schemes; anything else is refused at `card.create` |
+| `url` | string, optional | `link` cards only; `http`, `https`, `mailto` schemes; anything else is refused at `card.add` |
 
 Handles are never stored (KHP-0002 FA5). Links on a board are its cards only.
 
@@ -300,9 +300,9 @@ Other targets' `docId`s come only from the host (`links/resolve`), which gives t
 
 ### 3.4 Insertion and rename
 
-- **Insert:** the editor's card tool places a file or link card and runs `card.create`.
-- **Agent:** `board_run card.create { file: <file, access read>, kind?, view?, position?, size? }` (A28 typed parameter) or `{ url, title? }`.
-- **Rename and move:** the host's `links.retarget { from, to }` on the board (KHP-0005 LK2) rewrites `card.target.path` of matching cards in one transaction, keeps `docId`, `view` and caption; idempotent.
+- **Insert:** the editor's card tool places a file or link card and runs `card.add`.
+- **Agent:** `board_run card.add { file: <file, access read>, kind?, view?, position?, size? }` (A28 typed parameter) or `{ url, title? }`.
+- **Rename and move:** the host's `link.retarget { from, to }` on the board (KHP-0005 LK2) rewrites `card.target.path` of matching cards in one transaction, keeps `docId`, `view` and caption; idempotent.
 
 ### 3.5 Previews in the page
 
@@ -348,12 +348,12 @@ The other extras are `textMetrics(request)` (the engine's line layout, to measur
 ### 4.3 Gestures and commits
 
 - **During a gesture** (drag, resize, rotate, draw, connect), the editor changes only its own view: it transforms cached fragments (scale for resize, approximate until commit), draws the live connector of a drag as a plain polyline, and draws the pen stroke itself. Nothing is sent to the worker until the gesture ends.
-- **At the end**, one command (`element.move { ids, delta }`, `element.resize`, `connector.create`, `stroke.create`, …) with the explicit targets (PT10); one gesture = one command = one undo step labelled with the command title (PT4). Bound connectors of moved shapes are recomputed by the engine in the same transaction (1.4).
+- **At the end**, one command (`element.move { ids, delta }`, `element.resize`, `connector.add`, `stroke.add`, …) with the explicit targets (PT10); one gesture = one command = one undo step labelled with the command title (PT4). Bound connectors of moved shapes are recomputed by the engine in the same transaction (1.4).
 - **No flicker:** the editor keeps the gesture's transform as a pending override until the relay delivers the command's change, then drops the override and swaps in the new fragments. A refused command drops the override (the element returns) and shows the error.
 - **Text:** a focused text box over the element (UI-K6). An Enter during an IME composition does not commit: the composition is tracked as well as `isComposing`, because WebKit reports that Enter with `isComposing: false` (`web/src/board/ime.ts`). Typing stays local; commit (blur, Escape, or Enter without composition) runs `element.setText { id, text }`, which the engine applies as a minimal diff on the KDM `text` (so concurrent typing into one label keeps both, KDM sequence merge; marks on characters the edit does not touch stay).
 - **Marks in a label** (`web/src/canvas/TextEditor.tsx`): over a shape's label or a text whose `textFormat` is not `markdown` (a Markdown label writes its emphasis as Markdown), a bar above the text box offers Bold (Cmd/Ctrl+B), Italic (Cmd/Ctrl+I) and Link (Cmd/Ctrl+K: a field for the address, `https://` added to a bare host and an `http`, `https` or `mailto` scheme sent in lower case, as `text.mark` takes it; an empty address removes the link), on the text box's selection; Cmd is the key on a Mac and Ctrl elsewhere, as kit-editor's shortcuts, and the keys are taken only while the bar is shown and no composition is under way. The text box stays a plain text box: the label's stored marks (read from the page replica's runs) and the marks made while typing wait beside the text as `{ start, end, mark, value }` in UTF-16 offsets of the current text and move with each edit before them (`web/src/board/marks.ts`; bold and italic grow with typing at their end, as the schema's `expand: after`; a link does not). An edit is placed at the text box's caret (it ends at `selectionEnd`), so typing inside a run of identical characters moves a mark by exactly what was typed before it, and no boundary falls inside a surrogate pair. The stored text itself changes by `element.setText`, which compares the old and new text from both ends (kition-sdk's `diff_text`): typing inside such a run is stored at the run's end, where a stored mark beside it can take the typed character (`board.editing`'s recorded difference). A bar button is pressed when every character of the selection (or the one before the caret) has that mark, stored or waiting. The focus moving between the text box and the link field does not close the box (Cmd/Ctrl+K with the field already open moves the focus to it), and a press on the canvas commits and closes the box whatever has the focus. On commit the editor runs `element.setText` when the text changed, then one `text.mark { id, range, mark, value?, units: "utf16" }` per waiting mark in the order they were made (a refused one does not stop the others, and a notice names the refusals); the engine has no command that writes a text and its marks together, so a label edit with marks is one undo step for the text and one per mark. The engine's fragment shows the marks once committed.
-- **Shape type** (`web/src/panels/StylePanel.tsx`): when every selected element is an unlocked shape whose `shapeStyle` is the default or `flow-node`, the style panel's Shape section lists the library's 44 shapes in its four groups (`shape.previews`); choosing one runs `element.update { id, set: { shapeType } }` on each selected shape whose type differs. Box, label, style and bound connectors stay, and the connectors' ends move to the new outline in the same command (1.4). `element.style` does not take `shapeType` and `element.update` takes one id, so changing several shapes is one undo step per shape.
-- **Clipboard** (`web/src/board/clipboard.ts`): Cmd/Ctrl+C copies the selection with `clipboard.copy` (a reading command, so also in a read-only board); the editor keeps the engine's payload and also writes it to the system clipboard as text prefixed `kition-board:` when the browser lets it (an embedded frame or headless WebKit may refuse). Cmd/Ctrl+X is that copy, then `element.delete`; like Delete, it does nothing (the selection kept) when something in the selection, or inside it, is locked, as the canvas menu has Cut and Delete off. Cmd/Ctrl+V is not taken by the editor's key handler, so the browser's `paste` event follows on the focused canvas and carries the system clipboard without a permission prompt: a picture in it wins (below); else a `kition-board:` text, when the last copy here reached the system clipboard or there is none here; else the copy kept here. Where a browser sends no `paste` event, the key pastes the copy kept here after 50 ms, and a late event of the same key is dropped. One `element.paste { page, payload, at }` puts the copies' top-left at the pointer (the middle of the view when the pointer is outside the canvas), each further paste at the same place 16 units on (a new copy starts again), and selects the copies' outermost elements. The payload names a picture by its blob's hash, so a payload copied on another board can name bytes this board does not store: `element.paste` leaves such a picture out and names it in `skipped` (reason `board.image-missing-blob`), and refuses a payload of nothing but such pictures (`not-found`); the editor shows a notice either way. A read-only board neither cuts nor pastes.
+- **Shape type** (`web/src/panels/StylePanel.tsx`): when every selected element is an unlocked shape whose `shapeStyle` is the default or `flow-node`, the style panel's Shape section lists the library's 44 shapes in its four groups (`shape.previews`); choosing one runs `element.set { id, set: { shapeType } }` on each selected shape whose type differs. Box, label, style and bound connectors stay, and the connectors' ends move to the new outline in the same command (1.4). `element.style` does not take `shapeType` and `element.set` takes one id, so changing several shapes is one undo step per shape.
+- **Clipboard** (`web/src/board/clipboard.ts`): Cmd/Ctrl+C copies the selection with `edit.copy` (a reading command, so also in a read-only board); the editor keeps the engine's payload and also writes it to the system clipboard as text prefixed `kition-board:` when the browser lets it (an embedded frame or headless WebKit may refuse). Cmd/Ctrl+X is that copy, then `element.delete`; like Delete, it does nothing (the selection kept) when something in the selection, or inside it, is locked, as the canvas menu has Cut and Delete off. Cmd/Ctrl+V is not taken by the editor's key handler, so the browser's `paste` event follows on the focused canvas and carries the system clipboard without a permission prompt: a picture in it wins (below); else a `kition-board:` text, when the last copy here reached the system clipboard or there is none here; else the copy kept here. Where a browser sends no `paste` event, the key pastes the copy kept here after 50 ms, and a late event of the same key is dropped. One `edit.paste { page, payload, at }` puts the copies' top-left at the pointer (the middle of the view when the pointer is outside the canvas), each further paste at the same place 16 units on (a new copy starts again), and selects the copies' outermost elements. The payload names a picture by its blob's hash, so a payload copied on another board can name bytes this board does not store: `edit.paste` leaves such a picture out and names it in `skipped` (reason `board.image-missing-blob`), and refuses a payload of nothing but such pictures (`not-found`); the editor shows a notice either way. A read-only board neither cuts nor pastes.
 - **Alt-drag duplicate:** Alt pressed during a move turns it into a copy: the originals stay drawn where they are, a dashed box shows where the copies land, and the drop runs one `element.duplicate { ids, offset }` on the unlocked elements the move would move (copies of a frame or a group take what is inside; a connector goes along only when it is selected, and its ends bound to copied elements are bound to their copies; copies are never locked). Releasing Alt before the drop makes it a move again. Alt held from the press moves without snapping, as before (`web/tests/flow.mjs` relies on it).
 - **Canvas menu** (`web/src/canvas/CanvasMenu.tsx`, kit-editor's `ContextMenu`): a right-click on an element outside the selection selects it first; on elements the menu offers Copy, Cut, Paste, Duplicate, Bring to front, Bring forward, Send backward, Send to back (`element.reorder`), Group, Ungroup, Lock or Unlock (`element.lock`) and Delete, each one command on the elements the menu opened on, and a row that cannot apply is off (Cut, Delete and Group when something in the selection is locked); on the empty canvas Paste (at the right-click) and Select all; in a read-only board Copy only. The menu's Paste reads the system clipboard's text with `navigator.clipboard.readText` only when it could be newer than the copy here, and waits for it at most 500 ms.
 - **Pasted and dropped pictures:** a paste whose clipboard holds a picture file (PNG, JPEG, GIF, WebP, SVG) and a drop of picture files on the canvas each make one `image.insert { page, data, mime, position, size }` per picture, the picture tool's path: centred on the pointer (or the drop point), at its natural size limited to 800 units on its longer side, each further picture 24 units on; a dropped file's name is its alternative text. A picture the engine refuses (larger than its blob limit, or not the type it claims) is reported as the picture tool reports one, and nothing is inserted. The canvas takes every drag that carries files (in a read-only board it takes none of them, without inserting), so the browser never opens a dropped file in the editor's frame; a dropped file that is not a picture gets a notice naming it.
@@ -368,8 +368,8 @@ Conventions: every command has an id, title, menu path or none, shortcut or none
 
 | Group | Command | Params (summary) | Notes |
 | --- | --- | --- | --- |
-| Elements | `element.create` | `{ page, elements: [{ kind, position?, size?, text?, style fields…, key? }] }` | ids are assigned by the engine and answered |
-| | `element.update` | `{ id, set: { field: value } }` | only fields valid for the kind (1.2 table); a new `shapeType` moves the ends bound to the shape onto its new outline in the same transaction; the style panel's Shape section runs it once per selected shape (4.3) |
+| Elements | `element.add` | `{ page, elements: [{ kind, position?, size?, text?, style fields…, key? }] }` | ids are assigned by the engine and answered |
+| | `element.set` | `{ id, set: { field: value } }` | only fields valid for the kind (1.2 table); a new `shapeType` moves the ends bound to the shape onto its new outline in the same transaction; the style panel's Shape section runs it once per selected shape (4.3) |
 | | `element.delete` | `{ ids }` | deletes descendants of frames and groups; connectors bound to them keep their last point (V6) |
 | | `element.move` | `{ ids, delta: [dx, dy] }` or `{ ids, to: [x, y] }` | recomputes bound connectors (1.4) |
 | | `element.resize` | `{ id, box: [x0, y0, x1, y1] }` or `{ ids, box }` | |
@@ -382,15 +382,15 @@ Conventions: every command has an id, title, menu path or none, shortcut or none
 | | `element.duplicate` | `{ ids, offset? }` | |
 | | `element.reorder` | `{ ids, placement: front \| forward \| backward \| back }` | |
 | | `element.lock` | `{ ids, locked }` | |
-| | `element.group` / `element.ungroup` | `{ ids }` → new `group` id / `{ groupIds }` | |
-| Frames | `frame.create` | `{ page, box, title?, children? }` | |
+| | `arrange.group` / `arrange.ungroup` | `{ ids }` → new `group` id / `{ groupIds }` | |
+| Frames | `frame.add` | `{ page, box, title?, children? }` | |
 | | `frame.fit` | `{ id }` | fix hint of `board.outside-frame` |
-| Strokes | `stroke.create` | `{ page, points, style? }` | |
-| Connectors | `connector.create` | `{ page, from: end, to: end, label?, type?, arrowheads?, waypoints? }`, `end` = `{ element, anchor? }` or `{ point }` | |
+| Strokes | `stroke.add` | `{ page, points, style? }` | |
+| Connectors | `connector.add` | `{ page, from: end, to: end, label?, type?, arrowheads?, waypoints? }`, `end` = `{ element, anchor? }` or `{ point }` | |
 | | `connector.bind` | `{ id, terminal: start \| end, to: end }` | fix hint of `board.dangling-binding` |
 | | `connector.setLabel` | `{ id, text, position? }` | |
 | | `connector.setWaypoints` | `{ id, waypoints }` | |
-| Cards | `card.create` | `{ page, file?: file(read), url?, title?, kind?, view?, position?, size?, caption? }` | 3.4; refuses this board as target |
+| Cards | `card.add` | `{ page, file?: file(read), url?, title?, kind?, view?, position?, size?, caption? }` | 3.4; refuses this board as target |
 | | `card.setTarget` | `{ id, file?: file(read), url?, title?, kind?, view? }` | fix hint of both card checks |
 | Images | `image.insert` | `{ page, file: file(read), position?, size?, alt? }` | reads the file once into a blob |
 | | `image.setAlt` | `{ id, alt }` | |
@@ -399,14 +399,14 @@ Conventions: every command has an id, title, menu path or none, shortcut or none
 | | `layout.stack` | `{ ids, axis, gap? }` | |
 | | `layout.mindmap` | `{ root }` | |
 | Mind maps | `mindmap.addChild`, `mindmap.addSibling`, `mindmap.collapse`, `mindmap.setDirection` | `{ node, … }` | |
-| Pages | `page.create`, `page.rename`, `page.duplicate`, `page.delete`, `page.move` | | |
-| | `page.activate` | `{ page }` | `mutates: false`, editor; the active page is view state (M2). When the shown page goes (a delete, an undo, an agent's step, a co-editor), the editor shows the page the person came from to a page they made with `page.create { activate }`, else the page before it (or the one that took its place); a redo or an undo that brings it back shows it again. The editor's page tabs under the canvas run these commands |
-| Clipboard | `clipboard.copy` | `{ ids }` → payload (`application/x-kition-board+json`) | `mutates: false` |
-| | `element.paste` | `{ page, payload, at? }` → `{ created, skipped? }` | a picture whose bytes the board does not store is left out and named in `skipped` (`{ ref, reason: board.image-missing-blob }`); only such pictures: refused |
+| Pages | `page.add`, `page.rename`, `page.duplicate`, `page.delete`, `page.move` | | |
+| | `page.activate` | `{ page }` | `mutates: false`, editor; the active page is view state (M2). When the shown page goes (a delete, an undo, an agent's step, a co-editor), the editor shows the page the person came from to a page they made with `page.add { activate }`, else the page before it (or the one that took its place); a redo or an undo that brings it back shows it again. The editor's page tabs under the canvas run these commands |
+| Clipboard | `edit.copy` | `{ ids }` → payload (`application/x-kition-board+json`) | `mutates: false` |
+| | `edit.paste` | `{ page, payload, at? }` → `{ created, skipped? }` | a picture whose bytes the board does not store is left out and named in `skipped` (`{ ref, reason: board.image-missing-blob }`); only such pictures: refused |
 | Templates | `template.insert` | `{ page, template: mindmap \| flowchart \| roadmap \| kanban \| retrospective \| storyboard, at? }` | |
 | Files | `file.export` | `{ format: png \| svg \| pdf, page?, frame?, scale?, background? }` | a page or one frame, drawn from the engine's scene, answered as base64; the SVG is the scene as usvg writes it (its arcs as cubic curves); the editor's export dialog writes the file next to the board through the host (`exportFile`, which keeps existing files) |
 | | `file.render` | a view (a page, a frame, an element or an area) | a PNG for looking at the board, without changing it |
-| Links | `links.retarget` | `{ from, to }` | KHP-0005 LK2; host-run with origin `system` |
+| Links | `link.retarget` | `{ from, to }` | KHP-0005 LK2; host-run with origin `system` |
 | Edit | `edit.undo`, `edit.redo` | `{ scope? }` | per person and per agent |
 
 The parameter schemas in `crates/engine/model/src/spec.rs` are the reference; this table summarises them.
@@ -428,7 +428,7 @@ Each code has a synthetic trigger file in `conformance/` and an entry in the pac
 | `board.label-overflow` | warning | element | `element.resize` |
 | `board.overlapping-label` | warning | element | `element.move` |
 | `board.overlap` | warning | elements | `layout.distribute` |
-| `board.disconnected-node` | warning | element | `connector.create` |
+| `board.disconnected-node` | warning | element | `connector.add` |
 | `board.missing-label` | warning | element | `element.setText` |
 | `board.outside-frame` | warning | element | `frame.fit` |
 | `board.connector-crosses-node` | info | connector | `connector.setWaypoints` |

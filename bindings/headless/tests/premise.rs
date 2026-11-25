@@ -32,7 +32,7 @@ fn board() -> Vec<u8> {
     doc.execute("page.rename", json!({ "page": first, "name": "Plan" })).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [0, 0], "text": "Plan" },
                 { "kind": "shape", "position": [300, 0], "text": "Build" },
@@ -41,11 +41,11 @@ fn board() -> Vec<u8> {
         )
         .unwrap();
     let (plan, build) = (made["created"][0].clone(), made["created"][1].clone());
-    doc.execute("connector.create", json!({ "from": { "element": plan }, "to": { "element": build } })).unwrap();
-    let inside = doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": [40, 440], "text": "Inside" }] })).unwrap();
-    doc.execute("frame.create", json!({ "box": [0, 400, 400, 640], "title": "Sprint", "children": inside["created"] })).unwrap();
-    let ideas = doc.execute("page.create", json!({ "name": "Ideas" })).unwrap()["page"].clone();
-    doc.execute("element.create", json!({ "page": ideas, "elements": [{ "kind": "shape", "position": [0, 0], "text": "Idea" }] })).unwrap();
+    doc.execute("connector.add", json!({ "from": { "element": plan }, "to": { "element": build } })).unwrap();
+    let inside = doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": [40, 440], "text": "Inside" }] })).unwrap();
+    doc.execute("frame.add", json!({ "box": [0, 400, 400, 640], "title": "Sprint", "children": inside["created"] })).unwrap();
+    let ideas = doc.execute("page.add", json!({ "name": "Ideas" })).unwrap()["page"].clone();
+    doc.execute("element.add", json!({ "page": ideas, "elements": [{ "kind": "shape", "position": [0, 0], "text": "Idea" }] })).unwrap();
     doc.save(None).unwrap()
 }
 
@@ -174,7 +174,7 @@ async fn a_receipt_names_exactly_the_changed_element_by_its_id_with_before_and_a
         "{ran}"
     );
     // A new element: `created` names it by the id the command answered and board_query lists.
-    let ran = f.ok("run", json!({ "steps": [{ "command": "element.create", "params": { "elements": [{ "kind": "shape", "position": [900, 0], "text": "Review" }] } }] })).await;
+    let ran = f.ok("run", json!({ "steps": [{ "command": "element.add", "params": { "elements": [{ "kind": "shape", "position": [900, 0], "text": "Review" }] } }] })).await;
     let made = ran["completed"][0]["result"]["created"][0].as_str().unwrap().to_owned();
     assert_eq!(ids(&ran["changes"]["created"]), std::slice::from_ref(&made), "{ran}");
     assert_eq!(f.id(0, "Review").await, made);
@@ -226,10 +226,10 @@ async fn a_run_acts_on_two_pages_and_leaves_the_shown_page_alone() {
         .ok(
             "run",
             json!({ "target": { "page": 2 }, "steps": [
-                { "command": "element.create", "params": shape("On Ideas") },
+                { "command": "element.add", "params": shape("On Ideas") },
                 { "command": "element.style", "on": [idea], "params": { "style": { "fillColor": "green" } } },
-                { "command": "element.create", "at": { "part": { "page": 1 } }, "params": shape("On Plan") },
-                { "command": "frame.create", "params": { "box": [0, 600, 300, 800], "title": "Also Ideas" } }
+                { "command": "element.add", "at": { "part": { "page": 1 } }, "params": shape("On Plan") },
+                { "command": "frame.add", "params": { "box": [0, 600, 300, 800], "title": "Also Ideas" } }
             ] }),
         )
         .await;
@@ -238,19 +238,19 @@ async fn a_run_acts_on_two_pages_and_leaves_the_shown_page_alone() {
     assert_eq!(texts(f.elements(1).await), ["Idea", "On Ideas", "Also Ideas"]);
     assert!(texts(f.elements(0).await).contains(&"On Plan".to_owned()));
     // Nothing carried over: a run naming no page acts on the page the editor shows (the first).
-    f.ok("run", json!({ "steps": [{ "command": "element.create", "params": shape("Unnamed") }] })).await;
+    f.ok("run", json!({ "steps": [{ "command": "element.add", "params": shape("Unnamed") }] })).await;
     assert!(texts(f.elements(0).await).contains(&"Unnamed".to_owned()), "the target of the last run did not stay");
     // A page the run makes and shows takes the steps after it that name none; the next run does not.
     f.ok(
         "run",
         json!({ "steps": [
-            { "command": "page.create", "params": { "name": "Fresh", "activate": true } },
-            { "command": "element.create", "params": shape("First on Fresh") }
+            { "command": "page.add", "params": { "name": "Fresh", "activate": true } },
+            { "command": "element.add", "params": shape("First on Fresh") }
         ] }),
     )
     .await;
     assert_eq!(texts(f.elements(2).await), ["First on Fresh"]);
-    f.ok("run", json!({ "steps": [{ "command": "element.create", "params": shape("Back on Plan") }] })).await;
+    f.ok("run", json!({ "steps": [{ "command": "element.add", "params": shape("Back on Plan") }] })).await;
     assert!(texts(f.elements(0).await).contains(&"Back on Plan".to_owned()), "the new page is not left shown");
     f.shutdown().await;
 }
@@ -265,7 +265,7 @@ async fn a_failing_later_step_changes_nothing() {
             "run",
             json!({ "steps": [
                 { "command": "element.setText", "on": [ship], "params": { "text": "kept?" } },
-                { "command": "element.create", "params": { "page": "nowhere", "elements": [{ "kind": "shape" }] } }
+                { "command": "element.add", "params": { "page": "nowhere", "elements": [{ "kind": "shape" }] } }
             ] }),
         )
         .await;
@@ -285,10 +285,10 @@ async fn a_page_the_board_lacks_a_time_or_a_stray_on_is_refused() {
     let before = f.file();
     let shape = json!({ "elements": [{ "kind": "shape" }] });
     for (input, says) in [
-        (json!({ "target": { "page": 3 }, "steps": [{ "command": "element.create", "params": shape }] }), "the board has 2 pages"),
-        (json!({ "target": { "page": "nowhere" }, "steps": [{ "command": "element.create", "params": shape }] }), "no page `nowhere`"),
-        (json!({ "target": { "sheet": 1 }, "steps": [{ "command": "element.create", "params": shape }] }), "names no part"),
-        (json!({ "steps": [{ "command": "element.create", "at": { "time": 2 }, "params": shape }] }), "no timeline"),
+        (json!({ "target": { "page": 3 }, "steps": [{ "command": "element.add", "params": shape }] }), "the board has 2 pages"),
+        (json!({ "target": { "page": "nowhere" }, "steps": [{ "command": "element.add", "params": shape }] }), "no page `nowhere`"),
+        (json!({ "target": { "sheet": 1 }, "steps": [{ "command": "element.add", "params": shape }] }), "names no part"),
+        (json!({ "steps": [{ "command": "element.add", "at": { "time": 2 }, "params": shape }] }), "no timeline"),
         (json!({ "steps": [{ "command": "page.rename", "on": [ship], "params": { "page": page, "name": "X" } }] }), "on"),
         (json!({ "steps": [{ "command": "element.style", "on": [ship], "params": { "ids": [ship], "style": { "fillColor": "red" } } }] }), "ids"),
         (json!({ "steps": [{ "command": "element.setText", "on": ["nothing"], "params": { "text": "x" } }] }), "nothing"),

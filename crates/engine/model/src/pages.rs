@@ -1,4 +1,4 @@
-//! Page commands: `page.create`, `page.rename`, `page.duplicate`, `page.delete`, `page.move`.
+//! Page commands: `page.add`, `page.rename`, `page.duplicate`, `page.delete`, `page.move`.
 //! (`page.activate` is view state, kept by the document.)
 //!
 //! Ported from the page commands of Kition's `packages/board-editor/src/lib/boardCommands.ts`
@@ -36,7 +36,7 @@ fn new_page(tx: &mut Tx<'_>, name: &str, at: usize) -> Result<ObjectId> {
     Ok(page)
 }
 
-/// `page.create { name?, at? }`: a new empty page (at the end by default).
+/// `page.add { name?, at? }`: a new empty page (at the end by default).
 pub fn create(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Value> {
     let count = tx.list_items(&root_id(), "pages")?.len();
     let name = name(params, "name")?.unwrap_or_else(|| format!("Page {}", model.pages().len() + 1));

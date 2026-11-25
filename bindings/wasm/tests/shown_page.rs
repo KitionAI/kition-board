@@ -31,7 +31,7 @@ fn first(doc: &BoardDocument) -> String {
 /// Pages named A (the board's own), B, C and D, in that order; answers their ids.
 fn four_pages(doc: &mut BoardDocument) -> [String; 4] {
     let a = first(doc);
-    let [b, c, d] = ["B", "C", "D"].map(|name| run(doc, "page.create", json!({ "name": name }))["page"].as_str().unwrap().to_owned());
+    let [b, c, d] = ["B", "C", "D"].map(|name| run(doc, "page.add", json!({ "name": name }))["page"].as_str().unwrap().to_owned());
     [a, b, c, d]
 }
 
@@ -77,7 +77,7 @@ fn an_undo_of_the_persons_new_page_takes_them_back_and_a_redo_shows_it_again() {
     let mut doc = board();
     let [a, ..] = four_pages(&mut doc);
     run(&mut doc, "page.activate", json!({ "page": a }));
-    let made = run(&mut doc, "page.create", json!({ "activate": true }))["page"].as_str().unwrap().to_owned();
+    let made = run(&mut doc, "page.add", json!({ "activate": true }))["page"].as_str().unwrap().to_owned();
     assert_eq!(shown(&doc), made);
     run(&mut doc, "edit.undo", json!({}));
     assert_eq!(doc.model().pages().len(), 4);

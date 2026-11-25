@@ -2,7 +2,7 @@ format: 1
 id: board.drawing/save-reopen
 feature: board.drawing
 intent: >-
-  A freehand stroke made with stroke.create keeps its points and colour through a .kboard save and reopen, and a second save.
+  A freehand stroke made with stroke.add keeps its points and colour through a .kboard save and reopen, and a second save.
 layer: gate
 source:
   kind: synthetic

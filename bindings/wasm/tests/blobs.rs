@@ -87,7 +87,7 @@ fn a_board_opens_from_a_stored_replica_and_its_blobs() {
     let file = a.save(None).unwrap();
     let mut later = BoardDocument::open("Plan.kboard", &file).unwrap();
     later
-        .execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 300 }, "size": { "w": 50, "h": 50 } }] }))
+        .execute("element.add", json!({ "elements": [{ "kind": "shape", "position": { "x": 300, "y": 300 }, "size": { "w": 50, "h": 50 } }] }))
         .unwrap();
     let newer_file = later.save(None).unwrap();
     let both = BoardDocument::open_with_replica("Plan.kboard", &newer_file, &snapshot, &[]).unwrap();
@@ -102,13 +102,12 @@ fn a_board_opens_from_a_stored_replica_and_its_blobs() {
 fn saves_write_the_content_the_document_holds_now() {
     let mut doc = BoardDocument::create("Plan.kboard", 1920, 1080).unwrap();
     let shapes: Vec<_> = (0..40).map(|x| json!({ "kind": "shape", "position": { "x": x * 30, "y": 400 }, "size": { "w": 20, "h": 20 } })).collect();
-    doc.execute("element.create", json!({ "elements": shapes })).unwrap();
+    doc.execute("element.add", json!({ "elements": shapes })).unwrap();
     let first = doc.save(None).unwrap();
     doc.mark_saved();
     assert_eq!(doc.save(None).unwrap(), first, "a save of the version the file holds writes the same bytes");
     let mut doc = BoardDocument::open("Plan.kboard", &first).unwrap();
-    doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "position": { "x": 0, "y": 0 }, "size": { "w": 50, "h": 50 } }] }))
-        .unwrap();
+    doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "position": { "x": 0, "y": 0 }, "size": { "w": 50, "h": 50 } }] })).unwrap();
     let second = doc.save(None).unwrap();
     assert!(doc.dirty(), "save leaves the document dirty until mark_saved");
     doc.mark_saved();

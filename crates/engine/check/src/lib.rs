@@ -13,7 +13,7 @@
 //! | `board.label-overflow` | warning | `element.resize` |
 //! | `board.overlapping-label` | warning | `element.move` |
 //! | `board.overlap` | warning | `layout.distribute` |
-//! | `board.disconnected-node` | warning | `connector.create` |
+//! | `board.disconnected-node` | warning | `connector.add` |
 //! | `board.missing-label` | warning | `element.setText` |
 //! | `board.outside-frame` | warning | `frame.fit` |
 //! | `board.connector-crosses-node` | info | `connector.setWaypoints` |
@@ -155,7 +155,7 @@ fn check_page(model: &BoardModel, page: &PageView, index: usize, blobs: &dyn Blo
                 format!("The flow-chart node {} has no connector.", label(element)),
                 index,
                 id,
-                Some(("connector.create", json!({ "from": { "element": id } }))),
+                Some(("connector.add", json!({ "from": { "element": id } }))),
             ));
         }
         if let Some(parent) = element.parent.as_ref().and_then(|parent| model.element(parent)).filter(|parent| parent.kind == Kind::Frame)

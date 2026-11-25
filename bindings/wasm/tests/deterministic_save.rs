@@ -20,7 +20,7 @@ const OUT: &str = "KITION_BOARD_DETERMINISM_OUT";
 fn build() -> Vec<u8> {
     let mut doc = BoardDocument::create("plan.kboard", 800, 600).unwrap();
     doc.execute(
-        "element.create",
+        "element.add",
         json!({ "elements": [
             { "kind": "shape", "shapeType": "rectangle", "position": [100, 100], "size": [200, 120], "text": "Idea" },
             { "kind": "shape", "shapeType": "ellipse", "position": [400, 100], "size": [120, 120], "text": "Ship it" },

@@ -16,7 +16,7 @@ fn board() -> BoardDocument {
 }
 
 fn create(doc: &mut BoardDocument, element: Value) -> String {
-    doc.execute("element.create", json!({ "elements": [element] })).unwrap()["created"][0].as_str().unwrap().to_owned()
+    doc.execute("element.add", json!({ "elements": [element] })).unwrap()["created"][0].as_str().unwrap().to_owned()
 }
 
 fn element(doc: &BoardDocument, id: &str) -> kition_board_kdm::Element {

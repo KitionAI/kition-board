@@ -60,7 +60,7 @@ async fn destination_frame_moved_away_refuses_the_point_addressed_reparent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn equal_area_frame_order_changes_are_not_replayed_as_if_unchanged() {
     let f = Fixture::new();
-    f.outside(&[("frame.create", json!({"page":f.page,"box":[0,400,500,700],"title":"Second"}))]);
+    f.outside(&[("frame.add", json!({"page":f.page,"box":[0,400,500,700],"title":"Second"}))]);
     let basis = f.basis().await;
     f.outside(&[("element.reorder", json!({"ids":[f.frame],"placement":"front"}))]);
     let before = f.file();
@@ -75,9 +75,9 @@ async fn insertion_before_an_index_refuses_but_insertion_after_applies() {
     for before in [true, false] {
         let f = Fixture::new();
         let basis = f.basis().await;
-        f.outside(&[("page.create", json!({"at":if before {0} else {2},"name":"Colleague"}))]);
+        f.outside(&[("page.add", json!({"at":if before {0} else {2},"name":"Colleague"}))]);
         let bytes = f.file();
-        let answer = f.write(basis, "page.create", json!({"at":1,"name":"Agent"})).await;
+        let answer = f.write(basis, "page.add", json!({"at":1,"name":"Agent"})).await;
         if before {
             assert_eq!(answer.unwrap_err()["error"]["code"], "conflict");
             assert_eq!(f.file(), bytes);

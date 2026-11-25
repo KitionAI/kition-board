@@ -41,7 +41,7 @@ fn marks_and_markdown_are_drawn() {
     let words = "Quarterly targets met";
     let ids = created(
         &doc.execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "text", "position": [0, 0], "size": [400, 100], "text": words, "strokeColor": "#000000" },
                 { "kind": "text", "position": [0, 200], "size": [400, 100], "text": words, "strokeColor": "#000000" },

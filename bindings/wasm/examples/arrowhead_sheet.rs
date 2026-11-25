@@ -47,7 +47,7 @@ fn main() {
             let y = 60.0 + index as f64 * ROW;
             for (from, to) in [([x0 + 30.0, y + 20.0], [x0 + 360.0, y + 20.0]), ([x0 + 470.0, y - 25.0], [x0 + 680.0, y + 70.0])] {
                 doc.execute(
-                    "connector.create",
+                    "connector.add",
                     json!({ "from": { "point": from }, "to": { "point": to }, "label": head, "startArrowhead": head, "endArrowhead": head, "style": { "strokeSize": size } }),
                 )
                 .unwrap();

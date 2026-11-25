@@ -96,7 +96,7 @@ fn a_card_on_the_board_it_was_made_for_is_not_changed() {
     kition_kit::host::set_root(Some(lent.clone()));
     kition_kit::host::set_folder("");
     let mut doc = BoardDocument::create("Here.kboard", 1920, 1080).unwrap();
-    let made = doc.execute("card.create", serde_json::json!({ "file": "Target.kboard", "position": [0, 0] })).unwrap();
+    let made = doc.execute("card.add", serde_json::json!({ "file": "Target.kboard", "position": [0, 0] })).unwrap();
     assert_eq!(made["card"]["target"]["docId"], serde_json::json!(target.doc_id()));
     let codes: Vec<String> = doc.check().into_iter().map(|diagnostic| diagnostic.code).collect();
     kition_kit::host::set_root(None);

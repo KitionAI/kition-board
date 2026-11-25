@@ -30,13 +30,13 @@ fn refused(doc: &mut BoardDocument, command: &str, params: Value) {
 }
 
 fn shape(doc: &mut BoardDocument, x: f64, y: f64) -> String {
-    let made = run(doc, "element.create", json!({"elements":[{"kind":"shape","position":[x,y],"size":[100,50]}]}));
+    let made = run(doc, "element.add", json!({"elements":[{"kind":"shape","position":[x,y],"size":[100,50]}]}));
     made["created"][0].as_str().unwrap().to_owned()
 }
 
 fn frame_with_child(doc: &mut BoardDocument) -> (String, String) {
     let child = shape(doc, 30.0, 30.0);
-    let frame = run(doc, "frame.create", json!({"box":[0,0,400,300],"children":[child]}))["frame"].as_str().unwrap().to_owned();
+    let frame = run(doc, "frame.add", json!({"box":[0,0,400,300],"children":[child]}))["frame"].as_str().unwrap().to_owned();
     (frame, child)
 }
 
@@ -50,7 +50,7 @@ fn deleting_a_container_refuses_its_locked_member() {
     refused(&mut doc, "element.delete", json!({"ids":[frame]}));
     let group_member = shape(&mut doc, 600.0, 0.0);
     let other = shape(&mut doc, 800.0, 0.0);
-    let group = run(&mut doc, "element.group", json!({"ids":[group_member, other]}))["group"].as_str().unwrap().to_owned();
+    let group = run(&mut doc, "arrange.group", json!({"ids":[group_member, other]}))["group"].as_str().unwrap().to_owned();
     run(&mut doc, "element.lock", json!({"ids":[group_member],"locked":true}));
     refused(&mut doc, "element.delete", json!({"ids":[group]}));
 }
@@ -59,8 +59,8 @@ fn deleting_a_container_refuses_its_locked_member() {
 #[test]
 fn deleting_a_page_refuses_its_locked_element() {
     let mut doc = board();
-    let other = run(&mut doc, "page.create", json!({"name":"Other"}))["page"].as_str().unwrap().to_owned();
-    let made = run(&mut doc, "element.create", json!({"page":other,"elements":[{"kind":"shape","position":[0,0]}]}));
+    let other = run(&mut doc, "page.add", json!({"name":"Other"}))["page"].as_str().unwrap().to_owned();
+    let made = run(&mut doc, "element.add", json!({"page":other,"elements":[{"kind":"shape","position":[0,0]}]}));
     let id = made["created"][0].as_str().unwrap().to_owned();
     run(&mut doc, "element.lock", json!({"ids":[id],"locked":true}));
     refused(&mut doc, "page.delete", json!({"page":other}));
@@ -74,11 +74,8 @@ fn deleting_a_page_refuses_its_locked_element() {
 #[test]
 fn a_locked_branch_refuses_the_maps_layout() {
     let mut doc = board();
-    let made = run(
-        &mut doc,
-        "element.create",
-        json!({"elements":[{"kind":"shape","shapeStyle":"mind-node","position":[0,0],"size":[142,56],"text":"Root"}]}),
-    );
+    let made =
+        run(&mut doc, "element.add", json!({"elements":[{"kind":"shape","shapeStyle":"mind-node","position":[0,0],"size":[142,56],"text":"Root"}]}));
     let root = made["created"][0].as_str().unwrap().to_owned();
     let added = run(&mut doc, "mindmap.addChild", json!({"node":root,"text":"One"}));
     let branch = added["created"][0].as_str().unwrap().to_owned();
@@ -104,7 +101,7 @@ fn resizing_one_box_checks_the_box_it_writes() {
     refused(&mut doc, "element.resize", json!({"id":frame,"box":[0,0,300,300]}));
     let a = shape(&mut doc, 600.0, 0.0);
     let b = shape(&mut doc, 800.0, 0.0);
-    let group = run(&mut doc, "element.group", json!({"ids":[a, b]}))["group"].as_str().unwrap().to_owned();
+    let group = run(&mut doc, "arrange.group", json!({"ids":[a, b]}))["group"].as_str().unwrap().to_owned();
     run(&mut doc, "element.lock", json!({"ids":[a],"locked":true}));
     refused(&mut doc, "element.resize", json!({"id":group,"box":[600,0,1000,100]}));
 }

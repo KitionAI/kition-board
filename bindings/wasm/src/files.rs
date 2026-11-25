@@ -11,7 +11,7 @@ const CARD_TARGETS: &[&str] = &["md", "markdown", "ktable", "kboard"];
 const PICTURES: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 pub const FILES: &[FileParam] = &[
-    FileParam::read("card.create", "file", CARD_TARGETS),
+    FileParam::read("card.add", "file", CARD_TARGETS),
     FileParam::read("image.insert", "file", PICTURES),
     FileParam::read("card.setTarget", "file", CARD_TARGETS),
 ];

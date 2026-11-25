@@ -4,7 +4,7 @@
 //! in, and kept out of an agent's commands.
 //!
 //! A board's only editor state is the **page the editor shows**. Commands that make content
-//! (`element.create`, `frame.create`, `connector.create`, …) and `file.export` work there when
+//! (`element.add`, `frame.add`, `connector.add`, …) and `file.export` work there when
 //! their parameters name no `page`; nothing else reads it. There is no selection.
 //!
 //! A call's **part** is a page: `{"page": "<id>"}`, the page's UUID as `board_inspect`
@@ -32,7 +32,7 @@ const LISTED: &str = "the pages' ids are in board_inspect's `pages`";
 
 /// Commands whose work is moving the editor: they keep their effect for an agent too.
 pub(crate) fn moves_the_editor(command: &str, params: &Value) -> bool {
-    command == "page.activate" || command == "page.create" && params.get("activate").and_then(Value::as_bool) == Some(true)
+    command == "page.activate" || command == "page.add" && params.get("activate").and_then(Value::as_bool) == Some(true)
 }
 
 impl BoardDocument {

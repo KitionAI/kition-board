@@ -17,20 +17,20 @@ use crate::edit::{self, check_key_free, check_parent, check_unlocked, created, i
 use crate::fields::{self, STYLE_FIELDS, UPDATABLE};
 use crate::params::{self, MAX_OBJECTS, Result, invalid, not_found};
 
-/// The kinds `element.create` makes; the others have their own commands.
+/// The kinds `element.add` makes; the others have their own commands.
 const CREATABLE: &[Kind] = &[Kind::Shape, Kind::Text, Kind::Frame, Kind::Stroke];
 
-/// Checks one element description of `element.create` into its stored fields and its text.
+/// Checks one element description of `element.add` into its stored fields and its text.
 fn describe(model: &BoardModel, page: &PageView, spec: &Value, keys: &mut BTreeSet<String>) -> Result<(Map<String, Value>, String)> {
     let spec = spec.as_object().ok_or_else(|| invalid("each element must be an object"))?;
     let kind_name = spec.get("kind").and_then(Value::as_str).ok_or_else(|| invalid("each element needs a `kind`"))?;
     let kind = Kind::parse(kind_name).ok_or_else(|| invalid(format!("unknown kind `{kind_name}`")))?;
     if !CREATABLE.contains(&kind) {
         let hint = match kind {
-            Kind::Connector => "connector.create",
+            Kind::Connector => "connector.add",
             Kind::Image => "image.insert",
-            Kind::Card => "card.create",
-            _ => "element.group",
+            Kind::Card => "card.add",
+            _ => "arrange.group",
         };
         return Err(invalid(format!("make a {kind_name} with {hint}")));
     }
@@ -95,7 +95,7 @@ pub fn create_one(tx: &mut Tx<'_>, list: &mut edit::Appender, fields: Map<String
     Ok(id)
 }
 
-/// `element.create { page?, elements: [{ kind, position?, size?, text?, style fields…, key? }] }`.
+/// `element.add { page?, elements: [{ kind, position?, size?, text?, style fields…, key? }] }`.
 pub fn create(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value) -> Result<Value> {
     let page = params::page(model, params, ctx.active_page)?;
     let specs = params.get("elements").and_then(Value::as_array).ok_or_else(|| invalid("`elements` must be a list"))?;
@@ -112,7 +112,7 @@ pub fn create(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value
     Ok(created(&ids))
 }
 
-/// `element.update { id, set: { field: value } }`: registers of the element's kind; `null`
+/// `element.set { id, set: { field: value } }`: registers of the element's kind; `null`
 /// clears an optional one.
 pub fn update(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Value> {
     let id = params::id(params, "id")?;
@@ -134,7 +134,7 @@ pub fn update(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Val
                 "locked" => " (use element.lock)",
                 _ => "",
             };
-            return Err(invalid(format!("`{field}` cannot be set by element.update{hint}")));
+            return Err(invalid(format!("`{field}` cannot be set by element.set{hint}")));
         }
         let checked = fields::check(element.kind, field, value)?;
         match (field.as_str(), checked.as_str()) {
@@ -405,7 +405,7 @@ pub fn rotate(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Val
                             tx.set(&id, "position", Point::new(rect.x0 + dx, rect.y0 + dy).to_object())?;
                         }
                     }
-                    // A frame or a card has no rotation (`element.update` refuses it): it only moves.
+                    // A frame or a card has no rotation (`element.set` refuses it): it only moves.
                     if fields::uses(element.kind, "rotation") {
                         let rotation = (element.rotation + degrees).rem_euclid(360.0);
                         tx.set(&id, "rotation", json!(rotation))?;
@@ -625,7 +625,7 @@ pub fn lock(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Value
     Ok(json!({ "updated": id_list(&ids) }))
 }
 
-/// `element.group { ids }`: a new group holding the selection's roots, inside their common parent.
+/// `arrange.group { ids }`: a new group holding the selection's roots, inside their common parent.
 pub fn group(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Value> {
     let ids = params::ids(params, "ids")?;
     let (_, page) = params::elements_on_one_page(model, &ids)?;
@@ -646,7 +646,7 @@ pub fn group(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Valu
     Ok(json!({ "group": group.as_str(), "members": id_list(&members) }))
 }
 
-/// `element.ungroup { groupIds }`: the members move to the group's parent; the groups go.
+/// `arrange.ungroup { groupIds }`: the members move to the group's parent; the groups go.
 pub fn ungroup(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Value> {
     let ids = params::ids(params, "groupIds")?;
     let (groups, page) = params::elements_on_one_page(model, &ids)?;
@@ -688,7 +688,7 @@ pub fn ungroup(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Va
     Ok(json!({ "ungrouped": id_list(&ids), "members": id_list(&freed) }))
 }
 
-/// `frame.create { page?, box, title?, children? }`: a frame behind its children.
+/// `frame.add { page?, box, title?, children? }`: a frame behind its children.
 pub fn frame_create(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value) -> Result<Value> {
     let page = params::page(model, params, ctx.active_page)?;
     let rect = params::rect(params.get("box").unwrap_or(&Value::Null), "box")?;
@@ -752,7 +752,7 @@ pub fn frame_fit(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<
     Ok(json!({ "updated": [id.as_str()] }))
 }
 
-/// `stroke.create { page?, points, style? }`.
+/// `stroke.add { page?, points, style? }`.
 pub fn stroke_create(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value) -> Result<Value> {
     let page = params::page(model, params, ctx.active_page)?;
     let points = params::points(params.get("points").unwrap_or(&Value::Null), "points", 100_000)?;

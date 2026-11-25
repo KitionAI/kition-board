@@ -1,5 +1,5 @@
-//! Cards, pictures and links (design note 3, 5.1): `card.create`, `card.setTarget`,
-//! `image.insert`, `image.setAlt`, `links.retarget`.
+//! Cards, pictures and links (design note 3, 5.1): `card.add`, `card.setTarget`,
+//! `image.insert`, `image.setAlt`, `link.retarget`.
 //!
 //! A card points at a workspace file (`target.path`, relative to the board's folder or rooted with
 //! `/`, plus the target's `docId` when known) or a web address. A picture is read once into a blob.
@@ -126,7 +126,7 @@ fn default_position(model: &BoardModel, page: &kition_board_kdm::PageView) -> Po
     model.content_bounds(page).map_or(Point::new(40.0, 40.0), |bounds: Rect| Point::new(bounds.x1 + 40.0, bounds.y0))
 }
 
-/// `card.create { page?, file? | url?, kind?, view?, position?, size?, caption?, title? }`.
+/// `card.add { page?, file? | url?, kind?, view?, position?, size?, caption?, title? }`.
 pub fn create(model: &BoardModel, tx: &mut Tx<'_>, ctx: &Ctx<'_>, params: &Value) -> Result<Value> {
     let page = params::page(model, params, ctx.active_page)?;
     let title = params::opt_string(params, "title")?;
@@ -279,7 +279,7 @@ pub fn image_set_alt(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Res
     Ok(json!({ "updated": [id.as_str()] }))
 }
 
-/// `links.retarget { from, to }` (KitLinks LK2): cards whose target is `from`, or inside the
+/// `link.retarget { from, to }` (KitLinks LK2): cards whose target is `from`, or inside the
 /// folder `from`, point at `to` instead; `docId`, `view` and the caption stay. Idempotent.
 pub fn retarget(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Value> {
     let from = check_path(params::string(params, "from")?)?;

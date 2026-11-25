@@ -39,7 +39,7 @@ impl Board {
 
     /// Creates one element and answers its id.
     fn create(&mut self, element: Value) -> String {
-        let answer = self.run("element.create", json!({ "elements": [element] }));
+        let answer = self.run("element.add", json!({ "elements": [element] }));
         answer["created"][0].as_str().unwrap().to_owned()
     }
 
@@ -119,13 +119,13 @@ fn text_frames_cards_and_pictures() {
     assert!(piece.svg.contains(">Sprint</tspan>"));
     assert!(piece.bounds.y0 < -10.0, "the title sits above the frame: {:?}", piece.bounds);
 
-    let card = board.run("card.create", json!({ "file": "notes/Plan.ktable", "position": [0, 0], "size": [320, 200], "caption": "Budget" }));
+    let card = board.run("card.add", json!({ "file": "notes/Plan.ktable", "position": [0, 0], "size": [320, 200], "caption": "Budget" }));
     let card = card["created"][0].as_str().unwrap().to_owned();
     let piece = board.fragment(&card, Lod::Full, Pictures::Reference);
     assert!(piece.svg.contains(">Plan.ktable</tspan>") && piece.svg.contains(">notes/Plan.ktable</tspan>"), "{}", piece.svg);
     assert!(piece.svg.contains(">Budget</tspan>"), "the caption is drawn under the card");
     assert_eq!(piece.slot.map(|slot| (slot.x0, slot.y0)), Some((12.0, 56.0)), "a table card has a preview slot");
-    let link = board.run("card.create", json!({ "url": "https://kition.ai/docs", "position": [0, 0] }));
+    let link = board.run("card.add", json!({ "url": "https://kition.ai/docs", "position": [0, 0] }));
     let link = board.svg(link["created"][0].as_str().unwrap());
     assert!(link.contains(">kition.ai</tspan>"), "{link}");
 
@@ -140,14 +140,14 @@ fn text_frames_cards_and_pictures() {
 #[test]
 fn strokes_and_connectors_are_in_world_coordinates() {
     let mut board = Board::new();
-    let stroke = board.run("stroke.create", json!({ "points": [[0, 0], [10, 0], [20, 10]] }));
+    let stroke = board.run("stroke.add", json!({ "points": [[0, 0], [10, 0], [20, 10]] }));
     let piece = board.fragment(stroke["created"][0].as_str().unwrap(), Lod::Full, Pictures::Reference);
     assert!(!piece.local && piece.svg.contains("d=\"M 0 0 Q 10 0 15 5 L 20 10\""), "{}", piece.svg);
 
     let a = board.create(json!({ "kind": "shape", "position": [0, 0], "size": [100, 100] }));
     let b = board.create(json!({ "kind": "shape", "position": [300, 0], "size": [100, 100] }));
     let link = board.run(
-        "connector.create",
+        "connector.add",
         json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] }, "label": "next", "startArrowhead": "dot" }),
     );
     let link = link["created"][0].as_str().unwrap().to_owned();
@@ -173,7 +173,7 @@ fn revisions_move_with_the_look_not_the_place() {
     let mut board = Board::new();
     let a = board.create(json!({ "kind": "shape", "position": [0, 0], "size": [100, 100] }));
     let b = board.create(json!({ "kind": "shape", "position": [300, 0], "size": [100, 100] }));
-    let link = board.run("connector.create", json!({ "from": { "element": a }, "to": { "element": b } }))["created"][0].as_str().unwrap().to_owned();
+    let link = board.run("connector.add", json!({ "from": { "element": a }, "to": { "element": b } }))["created"][0].as_str().unwrap().to_owned();
     let mut revisions = Revisions::default();
     let ask = |board: &Board, revisions: &mut Revisions, known: Value| {
         revisions.answer(board.model(), &json!({ "ids": [a, b, link, "nope"], "known": known }), &board.blobs).unwrap()
@@ -269,7 +269,7 @@ fn hex_contrast(a: &str, b: &str) -> f64 {
 #[test]
 fn card_badges_read_in_both_schemes() {
     let mut board = Board::new();
-    let card = |board: &mut Board, params: Value| board.run("card.create", params)["created"][0].as_str().unwrap().to_owned();
+    let card = |board: &mut Board, params: Value| board.run("card.add", params)["created"][0].as_str().unwrap().to_owned();
     let cards = [
         ("purple", card(&mut board, json!({ "file": "plans/Roadmap.md", "position": [0, 0] }))),
         ("green", card(&mut board, json!({ "file": "data/Budget.ktable", "position": [0, 0] }))),

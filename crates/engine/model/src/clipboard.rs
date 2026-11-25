@@ -1,4 +1,4 @@
-//! Copies of elements: the clipboard payload (`clipboard.copy`, `element.paste`), and the same
+//! Copies of elements: the clipboard payload (`edit.copy`, `edit.paste`), and the same
 //! machinery for `element.duplicate` and `page.duplicate`.
 //!
 //! The payload (`application/x-kition-board+json`, version 1) lists elements with a `ref` (their
@@ -237,12 +237,12 @@ fn write_runs(tx: &mut Tx<'_>, id: &ObjectId, runs: Option<&Value>) -> Result<()
     Ok(())
 }
 
-/// `clipboard.copy { ids }`: the payload of the elements and everything inside them.
+/// `edit.copy { ids }`: the payload of the elements and everything inside them.
 pub fn copy(model: &BoardModel, params: &Value) -> Result<Value> {
     payload(model, &params::ids(params, "ids")?)
 }
 
-/// `element.paste { page?, payload, at? }`: copies of a payload; `at` puts the copies' top-left
+/// `edit.paste { page?, payload, at? }`: copies of a payload; `at` puts the copies' top-left
 /// there, otherwise copies of elements still on the page are offset by 24. A picture whose bytes
 /// the board does not store is left out and named in `skipped`; a payload of only such pictures is
 /// refused (`not-found`, `board.image-missing-blob`).

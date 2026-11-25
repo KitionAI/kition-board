@@ -24,7 +24,7 @@ fn held(doc: &BoardDocument, command: &str) -> Vec<Value> {
 #[test]
 fn waiting_for_sdk_an_agents_undo_holds_the_objects_of_the_step_it_takes_back() {
     let mut doc = BoardDocument::create("Undo.kboard", 1920, 1080).unwrap();
-    let made = doc.execute("element.create", json!({"elements":[{"kind":"shape","position":[0,0]},{"kind":"shape","position":[300,0]}]})).unwrap();
+    let made = doc.execute("element.add", json!({"elements":[{"kind":"shape","position":[0,0]},{"kind":"shape","position":[300,0]}]})).unwrap();
     let (a, b) = (made["created"][0].clone(), made["created"][1].clone());
     let agent = Origin::agent("agent:test");
     doc.execute_as("element.move", json!({"ids":[a],"delta":[10,0]}), &agent).unwrap();

@@ -172,7 +172,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
         }
     }
     match command {
-        "element.style" | "element.update" => {
+        "element.style" | "element.set" => {
             let key = if command == "element.style" { "style" } else { "set" };
             for id in &targets {
                 let fields = params
@@ -180,9 +180,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                     .and_then(Value::as_object)
                     .into_iter()
                     .flatten()
-                    .filter(|(field, _)| {
-                        command == "element.update" || model.element(id).is_none_or(|element| crate::fields::uses(element.kind, field))
-                    })
+                    .filter(|(field, _)| command == "element.set" || model.element(id).is_none_or(|element| crate::fields::uses(element.kind, field)))
                     .map(|(field, _)| field.clone());
                 // Property commands never read ancestry or the target's list index.
                 needs.add(id, fields);
@@ -272,11 +270,11 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                 }
             }
         }
-        "connector.create" | "connector.bind" => {
+        "connector.add" | "connector.bind" => {
             // A rebind to an explicit anchor reads no box: the binding is the element and the
             // anchor, and the stored point is a cache derived from them (design note 1.4).
             let anchored = command == "connector.bind" && params["to"].get("anchor").is_some_and(|anchor| !anchor.is_null());
-            for path in if command == "connector.create" { &["from.element", "to.element"][..] } else { &["to.element"][..] } {
+            for path in if command == "connector.add" { &["from.element", "to.element"][..] } else { &["to.element"][..] } {
                 for value in object_values(params, path) {
                     if let Some(id) = value.as_str() {
                         if anchored {
@@ -287,7 +285,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                     }
                 }
             }
-            if command == "connector.create" {
+            if command == "connector.add" {
                 // An end given an anchor aims the other end, bound without one, at its outline
                 // point: the other end's anchor is the edge facing it (`aim`).
                 let anchored = |end: &str| params[end].get("anchor").is_some_and(|anchor| !anchor.is_null());
@@ -334,14 +332,14 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                 needs.root("keys");
             }
         }
-        "element.group" | "frame.create" => {
-            let targets = if command == "frame.create" { ids(params, "children") } else { targets };
+        "arrange.group" | "frame.add" => {
+            let targets = if command == "frame.add" { ids(params, "children") } else { targets };
             let containers = targets.iter().any(|id| model.element(id).is_some_and(|element| element.kind.can_contain()));
             for id in &targets {
                 needs.element(model, id, ["parent"], containers);
             }
         }
-        "element.ungroup" => {
+        "arrange.ungroup" => {
             // The group goes; its members take its parent.
             for id in &targets {
                 needs.hierarchy(model, id);
@@ -353,7 +351,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                 }
             }
         }
-        "element.delete" | "element.duplicate" | "clipboard.copy" => {
+        "element.delete" | "element.duplicate" | "edit.copy" => {
             for id in &targets {
                 if model.element(id).is_some_and(|element| element.kind.can_contain()) {
                     needs.root("structure");
@@ -419,11 +417,11 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                 needs.add(&id, ["name"]);
             }
         }
-        "page.create" | "page.move" => {
-            if command == "page.create" && params.get("name").is_none() {
+        "page.add" | "page.move" => {
+            if command == "page.add" && params.get("name").is_none() {
                 needs.root("pageCount");
             }
-            let key = if command == "page.create" { "at" } else { "to" };
+            let key = if command == "page.add" { "at" } else { "to" };
             let at = params.get(key).and_then(Value::as_u64).and_then(|n| usize::try_from(n).ok());
             if let Some(at) = at {
                 within.push(Within { parent: json!(root_id().as_str()), field: "pages".into(), from: at, to: at, time: None });
@@ -462,7 +460,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                 }
             }
         }
-        "element.create" | "element.paste" | "stroke.create" | "card.create" | "image.insert" | "template.insert" => {
+        "element.add" | "edit.paste" | "stroke.add" | "card.add" | "image.insert" | "template.insert" => {
             let page = params
                 .get("page")
                 .and_then(Value::as_str)
@@ -472,13 +470,13 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
             if let Some(page) = &page {
                 needs.add(page, std::iter::empty::<String>());
             }
-            if (matches!(command, "card.create" | "image.insert") && params.get("position").is_none()
+            if (matches!(command, "card.add" | "image.insert") && params.get("position").is_none()
                 || command == "template.insert" && params.get("at").is_none())
                 && let Some(page) = &page
             {
                 needs.add(page, ["~geometry"]);
             }
-            if command == "element.create" && object_values(params, "elements[].key").iter().any(|value| value.is_string()) {
+            if command == "element.add" && object_values(params, "elements[].key").iter().any(|value| value.is_string()) {
                 needs.root("keys");
             }
             for value in object_values(params, "elements[].parent") {
@@ -486,7 +484,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
                     needs.add(&ObjectId::from_string(id), ["kind"]);
                 }
             }
-            if command == "element.paste" {
+            if command == "edit.paste" {
                 paste_sources(model, params, &mut needs);
             }
         }
@@ -535,7 +533,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
             // The root fingerprint catches newly connected or reclassified nodes as well.
             needs.root("mapStructure");
         }
-        "links.retarget" => {}
+        "link.retarget" => {}
         _ => return None,
     }
     let mut under = Under { premises: needs.finish(), within, ..Under::default() };
@@ -555,7 +553,7 @@ pub fn under(model: &BoardModel, active: Option<&ObjectId>, command: &str, param
             under.premises.push(Premise::on(id.clone()).fields(["kind"]).positions(std::iter::empty::<String>()));
         }
     }
-    if command == "links.retarget" {
+    if command == "link.retarget" {
         under.objects = linked(model, params);
         under.covers = Some(Covers { fields: vec!["~link".into()] });
         for id in &under.objects {
@@ -837,7 +835,7 @@ fn destination_frames(model: &BoardModel, params: &Value, frames: &[(ObjectId, R
 /// by the target's positional premise. Deleted frames have no surviving page identity in the
 /// SDK's replay request, so consider their old rectangle conservatively on this page.
 pub fn covered(model: &BoardModel, command: &str, params: &Value, objects: &[CoveredAsk]) -> Option<CoveredAt> {
-    if command == "links.retarget" {
+    if command == "link.retarget" {
         return Some(covered_links(model, params, objects));
     }
     if command != "element.move" || params["reparent"] != true {

@@ -11,8 +11,7 @@ use serde_json::json;
 fn direct_and_exchange_batches_refresh_cached_area_and_pixels() {
     for direct in [true, false] {
         let mut doc = BoardDocument::create("Cache.kboard", 800, 600).unwrap();
-        let id =
-            doc.execute("element.create", json!({"elements":[{"kind":"shape","position":[0,0],"fillColor":"red"}]})).unwrap()["created"][0].clone();
+        let id = doc.execute("element.add", json!({"elements":[{"kind":"shape","position":[0,0],"fillColor":"red"}]})).unwrap()["created"][0].clone();
         doc.mark_saved();
         let width = doc.width();
         let pixels = doc.render(0.0, 0.0, 1.0, 100, 100).unwrap();

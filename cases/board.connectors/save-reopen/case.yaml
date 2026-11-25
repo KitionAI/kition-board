@@ -2,7 +2,7 @@ format: 1
 id: board.connectors/save-reopen
 feature: board.connectors
 intent: >-
-  A connector made with connector.create, rebound with connector.bind and given a label and waypoints keeps its ends, label and route through a .kboard save and reopen, and a second save.
+  A connector made with connector.add, rebound with connector.bind and given a label and waypoints keeps its ends, label and route through a .kboard save and reopen, and a second save.
 layer: gate
 source:
   kind: synthetic

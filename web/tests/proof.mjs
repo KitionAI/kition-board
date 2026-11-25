@@ -50,7 +50,7 @@ const until = async (check, tries = 100) => {
 const ai = (steps) => page.evaluate(async (steps) => window.devHost.connection().ai.run(steps, false), steps)
 const inspect = () => page.evaluate(async () => (await window.devHost.connection().ai.inspect()).details ?? (await window.devHost.connection().ai.inspect()))
 const elementCount = async () => (await inspect()).elements
-const copy = async (ids) => (await ai([{ command: 'clipboard.copy', params: { ids } }])).completed[0].result
+const copy = async (ids) => (await ai([{ command: 'edit.copy', params: { ids } }])).completed[0].result
 
 /** A stored element's box, whichever form its position and size take. */
 const boxOf = (element) => {
@@ -101,7 +101,7 @@ try {
   const ownPage = async () => {
     const before = await personPage()
     await kit.getByTestId('ribbon-tab-View').click()
-    await kit.getByTestId('board-cmd-page.create').click()
+    await kit.getByTestId('board-cmd-page.add').click()
     await kit.getByTestId('ribbon-tab-Edit').click()
     await until(async () => (await personPage()) !== before && (await shown()).length === 0)
     await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
@@ -128,7 +128,7 @@ try {
   // 1. Export (case board.export/editor): a cylinder alone on a page of its own, exported from the
   // export dialog as PNG, SVG and PDF; each file is written next to the board through the host.
   const exportPage = await ownPage()
-  const cylinder = (await ai([{ command: 'element.create', params: { page: exportPage, elements: [{ kind: 'shape', shapeType: 'cylinder', position: { x: 100, y: 100 }, size: { w: 200, h: 150 } }] } }]))
+  const cylinder = (await ai([{ command: 'element.add', params: { page: exportPage, elements: [{ kind: 'shape', shapeType: 'cylinder', position: { x: 100, y: 100 }, size: { w: 200, h: 150 } }] } }]))
     .completed[0].result.created[0]
   await until(async () => JSON.stringify(await shown()) === JSON.stringify([cylinder]))
   await page.keyboard.press('Escape')
@@ -163,7 +163,7 @@ try {
   step('the exported SVG contains a library shape drawn as itself', curved >= 2, `${curved} curved paths in ${svg?.size} bytes`)
 
   // 2. Undo and redo (case board.history/editor) on a page of its own: the person draws a rectangle
-  // (element.create), moves it with Alt held (element.move, no snapping), fills it green from the
+  // (element.add), moves it with Alt held (element.move, no snapping), fills it green from the
   // style panel (element.style) and deletes it (element.delete).
   const historyPage = await ownPage()
   const pageElements = async () => (await inspect()).pages.find((listed) => listed.id === historyPage)?.elements ?? -1

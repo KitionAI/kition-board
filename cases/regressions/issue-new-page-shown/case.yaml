@@ -2,11 +2,11 @@ format: 1
 id: regressions/issue-new-page-shown
 feature: board.pages
 intent: >-
-  The person's New page (View) shows the page it makes, and an agent's `page.create { activate }`
+  The person's New page (View) shows the page it makes, and an agent's `page.add { activate }`
   makes its page and puts the run's next steps there without moving the person's page (Kit UI
   protocol 2.9: an agent's step runs in an editor state of its own). The editor has no other way
   to reach a page, so before, a page the person made could not be shown at all; and the browser
-  flow went to its own page through an agent's `page.create { activate }`, which since kit-editor
+  flow went to its own page through an agent's `page.add { activate }`, which since kit-editor
   0.5 leaves the person's page, so its marquee, resize and undo steps ran on the sample board.
 layer: gate
 source:

@@ -131,7 +131,7 @@ export function PageTabs({ pages, shown, onDone }: { pages: readonly PageTab[]; 
         icon={Plus}
         label={t('addPage')}
         disabled={readOnly}
-        onClick={() => void run('page.create', { activate: true })}
+        onClick={() => void run('page.add', { activate: true })}
         data-testid="board-page-add"
       />
       <div ref={strip} className="board-page-strip" role="tablist" aria-label={t('pages')} aria-orientation="horizontal" data-testid="board-page-tabs">

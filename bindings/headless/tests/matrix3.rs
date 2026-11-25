@@ -33,7 +33,7 @@ impl Board {
         ]);
         let made = doc
             .execute(
-                "element.create",
+                "element.add",
                 json!({"page":f.page,"elements":[
                     {"kind":"text","position":[230,440],"text":"Sibling","parent":f.frame},
                     {"kind":"shape","position":[700,400],"text":"G1"},
@@ -45,16 +45,16 @@ impl Board {
         for (name, id) in ["s", "g1", "g2", "m"].into_iter().zip(made["created"].as_array().unwrap()) {
             ids.insert(name, id.clone());
         }
-        let group = doc.execute("element.group", json!({"ids":[ids["g1"],ids["g2"]]})).unwrap();
+        let group = doc.execute("arrange.group", json!({"ids":[ids["g1"],ids["g2"]]})).unwrap();
         ids.insert("g", group["group"].clone());
         let branch = doc.execute("mindmap.addChild", json!({"node":ids["m"],"text":"Branch"})).unwrap();
         ids.insert("n", branch["node"].clone());
         ids.insert("edge", branch["created"][0].clone());
-        let connector = doc.execute("connector.create", json!({"page":f.page,"from":{"element":f.child},"to":{"element":f.b}})).unwrap();
+        let connector = doc.execute("connector.add", json!({"page":f.page,"from":{"element":f.child},"to":{"element":f.b}})).unwrap();
         ids.insert("k", connector["created"][0].clone());
         let other = doc
             .execute(
-                "element.create",
+                "element.add",
                 json!({"page":f.other_page,"elements":[
                     {"kind":"shape","position":[0,0],"text":"Unrelated"},
                     {"kind":"frame","position":[600,0],"text":"Other container"}
@@ -64,7 +64,7 @@ impl Board {
         ids.insert("u", other["created"][0].clone());
         ids.insert("uf", other["created"][1].clone());
         for name in ["r", "v", "w"] {
-            ids.insert(name, doc.execute("page.create", json!({"name":name})).unwrap()["page"].clone());
+            ids.insert(name, doc.execute("page.add", json!({"name":name})).unwrap()["page"].clone());
         }
         std::fs::write(f.dir.path().join("Test.kboard"), doc.save(None).unwrap()).unwrap();
         Self { f, ids }
@@ -80,8 +80,8 @@ impl Board {
             "resize" => ("element.resize", json!({"id":id,"box":if role == "f" {json!([600,450,820,580])} else {json!([40,450,260,580])}})),
             "rotate" => ("element.rotate", json!({"ids":[id],"degrees":37})),
             "reorder" => ("element.reorder", json!({"ids":[id],"placement":"front"})),
-            "out" => ("element.update", json!({"id":id,"set":{"parent":null}})),
-            "in" => ("element.update", json!({"id":id,"set":{"parent":self.ids[match role { "u" => "uf", "g" | "g1" => "f", _ => "g" }]}})),
+            "out" => ("element.set", json!({"id":id,"set":{"parent":null}})),
+            "in" => ("element.set", json!({"id":id,"set":{"parent":self.ids[match role { "u" => "uf", "g" | "g1" => "f", _ => "g" }]}})),
             "lock" => ("element.lock", json!({"ids":[id],"locked":true})),
             _ => panic!("unknown change {change}"),
         };
@@ -102,15 +102,15 @@ struct Row {
 const ADDRESS: &[Row] = &[
     Row { name: "id-fill", command: "element.style", expected: ["CADAAAAAAC", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "id-delta", command: "element.move", expected: ["AADRRAAAAC", "AADRARAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "frame-child", command: "element.create", expected: ["AAAAAAAAAA", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "group-child", command: "element.create", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "frame-child", command: "element.add", expected: ["AAAAAAAAAA", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "group-child", command: "element.add", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "bound-end", command: "connector.bind", expected: ["AADAAAAAAA", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "mind-node", command: "element.style", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "page-id", command: "element.create", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "page-index", command: "element.create", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "active-page", command: "element.create", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "paste-ref", command: "element.paste", expected: ["AADAAAAAAA", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "paste-at", command: "element.paste", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "page-id", command: "element.add", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "page-index", command: "element.add", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "active-page", command: "element.add", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "paste-ref", command: "edit.paste", expected: ["AADAAAAAAA", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "paste-at", command: "edit.paste", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     // A deleted frame the move would have entered is a departed recipient that no longer exists:
     // kition-sdk reports it `deleted` (call-context.md, "Missing Covered Objects"), as a create
     // into that frame is.
@@ -132,7 +132,7 @@ fn params(b: &Board, row: &Row) -> Value {
         "page-gap" => json!({"name":"Agent","at":1}),
         "paste-ref" | "paste-at" => {
             let mut doc = b.f.doc();
-            let payload = doc.execute("clipboard.copy", json!({"ids":[i["c"]]})).unwrap();
+            let payload = doc.execute("edit.copy", json!({"ids":[i["c"]]})).unwrap();
             let mut p = json!({"page":i["p"],"payload":payload});
             if row.name == "paste-at" {
                 p["at"] = json!([800, 800]);
@@ -351,14 +351,14 @@ const DERIVED: &[Row] = &[
     Row { name: "distribute", command: "layout.distribute", expected: ["AADRRC AAAC", "AADRARAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "stack", command: "layout.stack", expected: ["AADRRC AAAC", "AADRARAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "fit", command: "frame.fit", expected: ["AADRR CARRA", "AADRR RAAAC", "ACDRRCARRA", "AAAAAAAAAA"] },
-    Row { name: "connect", command: "connector.create", expected: ["AADRRCAAAA", "AADRARAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "connect", command: "connector.add", expected: ["AADRRCAAAA", "AADRARAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "route", command: "connector.setWaypoints", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "group", command: "element.group", expected: ["AADAAAARRC", "AADAAAAAAA", "AADAAAARRC", "AAAAAAAAAA"] },
-    Row { name: "ungroup", command: "element.ungroup", expected: ["AAAAAAAARA", "AAAAAAAARA", "AAAAAAAARA", "AAAAAAAAAA"] },
+    Row { name: "group", command: "arrange.group", expected: ["AADAAAARRC", "AADAAAAAAA", "AADAAAARRC", "AAAAAAAAAA"] },
+    Row { name: "ungroup", command: "arrange.ungroup", expected: ["AAAAAAAARA", "AAAAAAAARA", "AAAAAAAARA", "AAAAAAAAAA"] },
     Row { name: "forward", command: "element.reorder", expected: ["AADAAARAAA", "AADAAARAAA", "AADAAARAAA", "AAAAAAAAAA"] },
     Row { name: "front", command: "element.reorder", expected: ["AADAAAAAAA", "AADAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "card-auto", command: "card.create", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
-    Row { name: "card-fixed", command: "card.create", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "card-auto", command: "card.add", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
+    Row { name: "card-fixed", command: "card.add", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
     Row { name: "text-measure", command: "element.setText", expected: ["AAAAAAAAAA", "AADAAAAAAA", "ACDAAAAAAC", "AAAAAAAAAA"] },
     Row { name: "font-measure", command: "element.style", expected: ["AAAAAAAAAA", "AADAAAAAAA", "AADAAAAAAC", "AAAAAAAAAA"] },
     Row { name: "map-layout", command: "layout.mindmap", expected: ["AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA", "AAAAAAAAAA"] },
@@ -428,10 +428,10 @@ async fn waiting_for_sdk_scoped_facts_and_z_windows() {
 const PAGE_CHANGES: [&str; 9] =
     ["insert-before", "delete-before", "move-before", "insert-after", "delete-after", "move-after", "rename-target", "delete-target", "move-target"];
 const PAGES: &[(&str, &str, &str)] = &[
-    ("page-id", "element.create", "AAAAAAADA"),
-    ("page-index", "element.create", "RRRAAAARR"),
-    ("active-page", "element.create", "RDRAAAAAA"),
-    ("page-gap", "page.create", "RRRAAAARR"),
+    ("page-id", "element.add", "AAAAAAADA"),
+    ("page-index", "element.add", "RRRAAAARR"),
+    ("active-page", "element.add", "RDRAAAAAA"),
+    ("page-gap", "page.add", "RRRAAAARR"),
 ];
 
 async fn pages(waiting: bool) {
@@ -451,10 +451,10 @@ async fn pages(waiting: bool) {
             let basis = b.f.basis().await;
             let i = &b.ids;
             let step = match *change {
-                "insert-before" => ("page.create", json!({"name":"Colleague","at":0})),
+                "insert-before" => ("page.add", json!({"name":"Colleague","at":0})),
                 "delete-before" => ("page.delete", json!({"page":i["p"]})),
                 "move-before" => ("page.move", json!({"page":i["p"],"to":3})),
-                "insert-after" => ("page.create", json!({"name":"Colleague","at":5})),
+                "insert-after" => ("page.add", json!({"name":"Colleague","at":5})),
                 "delete-after" => ("page.delete", json!({"page":i["w"]})),
                 "move-after" => ("page.move", json!({"page":i["w"],"to":3})),
                 "rename-target" => ("page.rename", json!({"page":i["q"],"name":"Colleague"})),
@@ -487,7 +487,7 @@ async fn ungroup_holds_member_locks() {
     let basis = b.f.basis().await;
     b.f.outside(&[("element.lock", json!({"ids":[b.ids["g1"]],"locked":true}))]);
     let before = b.f.file();
-    let answer = b.f.write(basis, "element.ungroup", json!({"groupIds":[b.ids["g"]]})).await;
+    let answer = b.f.write(basis, "arrange.ungroup", json!({"groupIds":[b.ids["g"]]})).await;
     assert!(answer.as_ref().is_err_and(|error| error["error"]["code"] == "conflict"), "{answer:?}");
     assert_eq!(b.f.file(), before);
     b.f.shutdown().await;
@@ -499,7 +499,7 @@ fn ungroup_refuses_a_locked_member_without_writing() {
     let mut doc = b.f.doc();
     doc.execute("element.lock", json!({"ids":[b.ids["g1"]],"locked":true})).unwrap();
     let before = doc.session().replica().state_json().unwrap();
-    let answer = doc.execute("element.ungroup", json!({"groupIds":[b.ids["g"]]}));
+    let answer = doc.execute("arrange.ungroup", json!({"groupIds":[b.ids["g"]]}));
     assert!(answer.as_ref().is_err_and(|error| error.contains("locked")), "{answer:?}");
     assert_eq!(doc.session().replica().state_json().unwrap(), before);
 }
@@ -508,7 +508,7 @@ fn ungroup_refuses_a_locked_member_without_writing() {
 // The second scope is on the other page. These expectations predate this supplement's run.
 const DEPENDENTS: &[(&str, &str, &str, &str)] = &[
     ("group-delta", "element.move", "g1", "AADRRAARRC"),
-    ("ungroup", "element.ungroup", "g1", "AADAAAARRC"),
+    ("ungroup", "arrange.ungroup", "g1", "AADAAAARRC"),
     ("map-layout", "layout.mindmap", "n", "AADRRCAAAC"),
     ("map-child-node", "mindmap.addChild", "n", "AADRRCAARC"),
     ("map-sibling", "mindmap.addSibling", "n", "AADRRCAAAC"),
@@ -632,9 +632,9 @@ async fn waiting_for_sdk_raw_z_indexes() {
 async fn named_targets_and_content_extremes(waiting: bool) {
     let mut counts = Counts::default();
     for (name, command, role, expected) in [
-        ("group-child", "element.create", "g", "AADAAAAAAA"),
+        ("group-child", "element.add", "g", "AADAAAAAAA"),
         ("mind-node", "element.style", "n", "CADAAAAAAC"),
-        ("card-auto", "card.create", "extreme", "AADRRCAAAA"),
+        ("card-auto", "card.add", "extreme", "AADRRCAAAA"),
         ("image-auto", "image.insert", "extreme", "AADRRCAAAA"),
     ] {
         let row = Row { name, command, expected: [""; 4] };
@@ -651,7 +651,7 @@ async fn named_targets_and_content_extremes(waiting: bool) {
                 let mut doc = b.f.doc();
                 let added = doc
                     .execute(
-                        "element.create",
+                        "element.add",
                         json!({"page":b.ids["p"],"elements":[
                             {"kind":"shape","position":[5000,-500],"size":[300,100],"text":"Extreme"}
                         ]}),
@@ -687,7 +687,7 @@ async fn new_point_candidates_matrix() {
     for (kind, expected) in [("shape", 'A'), ("frame", 'R')] {
         let b = Board::new();
         b.f.outside(&[(
-            "element.create",
+            "element.add",
             json!({"page":b.ids["p"],"elements":[
                 {"kind":kind,"position":[1500,400],"size":[200,200],"text":"Candidate"}
             ]}),

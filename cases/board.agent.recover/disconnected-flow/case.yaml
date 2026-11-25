@@ -40,6 +40,6 @@ solution:
     args:
       path: flow.kboard
       steps:
-        - { command: connector.create, params: { from: { element: 01a16848-e64d-76be-b587-6843e3e683e3, anchor: [1, 0.5] }, to: { element: 01a16848-e64e-745b-b4c7-e7b1a2bd7d78, anchor: [0, 0.5] } } }
+        - { command: connector.add, params: { from: { element: 01a16848-e64d-76be-b587-6843e3e683e3, anchor: [1, 0.5] }, to: { element: 01a16848-e64e-745b-b4c7-e7b1a2bd7d78, anchor: [0, 0.5] } } }
 since: "2026-11-17"
 timeout_s: 600

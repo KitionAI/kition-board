@@ -60,8 +60,8 @@ const DEFAULT_TAB = 'Edit'
 const PRIMARY_ROWS: Readonly<Record<string, readonly string[]>> = {
   Edit: ['edit.undo', 'edit.redo', 'element.duplicate', 'element.delete'],
   Insert: [],
-  Arrange: ['element.group', 'element.ungroup', 'element.reorder', 'element.lock', 'element.rotate', 'frame.fit'],
-  View: ['page.create', 'page.rename', 'page.duplicate', 'page.delete', 'page.move'],
+  Arrange: ['arrange.group', 'arrange.ungroup', 'element.reorder', 'element.lock', 'element.rotate', 'frame.fit'],
+  View: ['page.add', 'page.rename', 'page.duplicate', 'page.delete', 'page.move'],
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
@@ -165,7 +165,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
   const onCommand = useCallback(
     (id: string) => {
       const ids = selectionRef.current
-      if (id === 'page.create') void editor.run(id, { activate: true })
+      if (id === 'page.add') void editor.run(id, { activate: true })
       else if (ids.length && idsOnly(byId.get(id))) void editor.run(id, { ids })
       else void editor.run(id)
     },
@@ -212,7 +212,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       const file = await pickTarget()
       if (!file) return
       const position = middle(320, 200)
-      await place('card.create', { file, ...(position ? { position } : {}) })
+      await place('card.add', { file, ...(position ? { position } : {}) })
     } catch (error) {
       toast('error', t('cardFailed'), message(error))
     }
@@ -225,7 +225,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       if (dialog.id) void editor.run('card.setTarget', { id: dialog.id, url, ...(title ? { title } : {}) })
       else {
         const position = middle(320, 120)
-        void place('card.create', { url, size: [320, 120], ...(title ? { title } : {}), ...(position ? { position } : {}) })
+        void place('card.add', { url, size: [320, 120], ...(title ? { title } : {}), ...(position ? { position } : {}) })
       }
     },
     [editor, linkDialog, middle, place],
@@ -359,7 +359,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [change.revision, previews, readOnly, selectedChanged, selection, sync, tool]))
   /**
-   * Another shape for the selected shapes: one `element.update` per shape (the engine has no
+   * Another shape for the selected shapes: one `element.set` per shape (the engine has no
    * command that sets `shapeType` on several elements at once, so several shapes are as many undo
    * steps); the keys go to the canvas again.
    */
@@ -367,7 +367,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     async (shape: string) => {
       for (const id of selectionRef.current) {
         const element = sync?.view.elements.get(id)
-        if (element?.kind === 'shape' && (element.shapeType ?? 'rectangle') !== shape) await editor.run('element.update', { id, set: { shapeType: shape } })
+        if (element?.kind === 'shape' && (element.shapeType ?? 'rectangle') !== shape) await editor.run('element.set', { id, set: { shapeType: shape } })
       }
       canvasApi.current?.focus()
     },

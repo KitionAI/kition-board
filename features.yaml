@@ -52,7 +52,7 @@ features:
     dimension: [ai]
     priority: P0
     status: has
-    commands: [file.render, page.activate, page.create, element.create]
+    commands: [file.render, page.activate, page.add, element.add]
     paths: [bindings/wasm/src/context.rs, bindings/wasm/src/lib.rs, crates/engine/model/src/acts.rs, kit.json]
     requirements: [AX13]
     cases: [board.agent.context/check-context, board.agent.context/editor-state-hidden, board.agent.context/explicit-targets, board.agent.context/failed-run, board.agent.context/headless-run, board.agent.context/published-commands, board.agent.context/reads-declared, board.agent.context/refused-contexts, board.agent.context/tool-refusals, board.agent.context/two-pages-one-run, board.agent.context/two-pages-run, regressions/issue-c8-board-page-context]
@@ -80,7 +80,7 @@ features:
     priority: P0
     status: partial
     paths: [crates/engine/model/src/premises.rs, crates/engine/model/src/acts.rs, crates/kdm/kdm-model/model/schema.json, bindings/headless/tests/outside.rs, bindings/headless/tests/mixed.rs, bindings/headless/tests/land12.rs, bindings/headless/tests/gaps12.rs, bindings/headless/tests/matrix3.rs, bindings/wasm/tests/declarations_independent.rs, bindings/headless/tests/independent.rs, bindings/wasm/tests/undo_premises.rs, bindings/wasm/src/lib.rs, bindings/wasm/tests/reread.rs, bindings/wasm/tests/outline_premises.rs]
-    gap: "Measured on kition-sdk 2ce294a1 (the kit pins f5ea478): the SDK permits stale numeric/implicit page destinations and deleted page gaps; raw z-index writes and deletion coverage hold (their waiting_for_sdk tests pass). Scoped hierarchy facts and z-order windows give false refusals; removed/moved derived dependencies can report changed instead of deleted/relocated. waiting_for_sdk tests keep their necessity expectations. Undo and redo hold the objects and fields of the step they take back or put back. All 83 independent reading rows run on flat and nested boards. A bound end on a shape meets its outline, so a connector's route and an anchored connector.create end hold the shape's shapeType (regressions/issue-outline-end-premises); connector.bind without an anchor also reads the other end's target shapeType (the new end faces that end's outline point) and does not hold it: the two connector.bind rows of bindings/wasm/tests/declarations_independent.rs (every_write_rests_on_what_its_handler_reads, nested_write_rows_match_the_second_independent_reading) pin that target's premise as rotation and ~bounds, and changing them needs a maintainer."
+    gap: "Measured on kition-sdk 2ce294a1 (the kit pins f5ea478): the SDK permits stale numeric/implicit page destinations and deleted page gaps; raw z-index writes and deletion coverage hold (their waiting_for_sdk tests pass). Scoped hierarchy facts and z-order windows give false refusals; removed/moved derived dependencies can report changed instead of deleted/relocated. waiting_for_sdk tests keep their necessity expectations. Undo and redo hold the objects and fields of the step they take back or put back. All 83 independent reading rows run on flat and nested boards. A bound end on a shape meets its outline, so a connector's route and an anchored connector.add end hold the shape's shapeType (regressions/issue-outline-end-premises); connector.bind without an anchor also reads the other end's target shapeType (the new end faces that end's outline point) and does not hold it: the two connector.bind rows of bindings/wasm/tests/declarations_independent.rs (every_write_rests_on_what_its_handler_reads, nested_write_rows_match_the_second_independent_reading) pin that target's premise as rotation and ~bounds, and changing them needs a maintainer."
     cases: [board.agent.guard/outside-tables, regressions/issue-c8-board-pin-reread, regressions/issue-c8-board-index-gap, regressions/issue-c8-board-map-premises, regressions/issue-c8-board-page-copy, regressions/issue-c8-board-land12, regressions/issue-c8-board-deleted-gap12, regressions/issue-c8-board-read, regressions/issue-c8-board-read-writers, regressions/issue-c8-board-3-address, regressions/issue-c8-board-3-derived, regressions/issue-c8-board-3-nested, regressions/issue-c8-board-3-ungroup-lock, regressions/issue-c8-board-3-dependencies, regressions/issue-c8-board-3-named, regressions/issue-c8-board-undo-premises, regressions/issue-outline-end-premises]
     since: "2026-11-17"
   - id: board.agent.environment
@@ -152,7 +152,7 @@ features:
     dimension: [function, data-safety]
     priority: P0
     status: has
-    commands: [element.duplicate, element.delete, element.paste, element.create, element.update, element.move, element.resize, element.rotate, element.style, element.getStyle, element.setText, element.group, element.ungroup, element.reorder, element.lock, clipboard.copy]
+    commands: [element.duplicate, element.delete, edit.paste, element.add, element.set, element.move, element.resize, element.rotate, element.style, element.getStyle, element.setText, arrange.group, arrange.ungroup, element.reorder, element.lock, edit.copy]
     paths: [crates/engine/check/src/lib.rs, bindings/wasm/examples/checks.rs, crates/engine/model/src/elements.rs, bindings/wasm/src/lib.rs]
     target: "Miro (web, 2026-11)"
     cases: [board.elements/save-reopen-append, regressions/issue-c8-board-engine-locks, regressions/issue-c8-board-engine-structure, regressions/issue-c8-board-engine-paste, regressions/issue-c8-board-engine-derived]
@@ -191,7 +191,7 @@ features:
     dimension: [function]
     priority: P0
     status: has
-    commands: [frame.create, frame.fit]
+    commands: [frame.add, frame.fit]
     paths: [crates/engine/check/src/lib.rs, bindings/wasm/examples/sample.rs, bindings/wasm/examples/checks.rs]
     cases: [board.frames/save-reopen]
     since: "2026-11-17"
@@ -200,7 +200,7 @@ features:
     dimension: [function]
     priority: P0
     status: has
-    commands: [stroke.create]
+    commands: [stroke.add]
     cases: [board.drawing/save-reopen, regressions/issue-3]
     since: "2026-11-17"
   - id: board.connectors
@@ -208,7 +208,7 @@ features:
     dimension: [function]
     priority: P0
     status: has
-    commands: [connector.create, connector.bind, connector.setLabel, connector.setWaypoints]
+    commands: [connector.add, connector.bind, connector.setLabel, connector.setWaypoints]
     paths: [crates/engine/check/src/lib.rs, crates/engine/model/src/elements.rs, bindings/wasm/examples/sample.rs, bindings/wasm/examples/checks.rs, crates/render/scene/src/route.rs, bindings/wasm/tests/elbow_sides.rs, bindings/wasm/examples/flowchart_sheet.rs]
     target: "Miro (web, 2026-11)"
     cases: [board.connectors/save-reopen, regressions/issue-elbow-sides]
@@ -228,9 +228,9 @@ features:
     dimension: [function]
     priority: P1
     status: partial
-    commands: [card.create, card.setTarget, links.retarget]
+    commands: [card.add, card.setTarget, link.retarget]
     paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/files.rs, crates/engine/model/src/elements.rs, crates/engine/check/src/lib.rs]
-    gap: "Link cards (card.create with `url`) survive save and reopen (bindings/wasm/tests/round_trip.rs); file cards need a lent file and are covered by the command tests only, not by a round trip."
+    gap: "Link cards (card.add with `url`) survive save and reopen (bindings/wasm/tests/round_trip.rs); file cards need a lent file and are covered by the command tests only, not by a round trip."
     since: "2026-11-17"
   - id: board.images
     title: "Pictures on the board, with alternative text"
@@ -265,7 +265,7 @@ features:
     dimension: [function]
     priority: P0
     status: has
-    commands: [page.create, page.rename, page.duplicate, page.delete, page.move, page.activate]
+    commands: [page.add, page.rename, page.duplicate, page.delete, page.move, page.activate]
     paths: [bindings/wasm/src/lib.rs, bindings/wasm/src/context.rs, web/src/strings.ts, web/tests/strings.mjs, web/src/panels/PageTabs.tsx, web/src/canvas/BoardCanvas.tsx, web/src/canvas/Minimap.tsx]
     cases: [board.pages/save-reopen, board.pages/switcher, board.pages/shown-page, regressions/issue-new-page-shown, regressions/issue-deleted-shown-page, regressions/issue-status-plural]
     since: "2026-11-17"

@@ -85,8 +85,8 @@ fn dispatch(model: &BoardModel, tx: &mut Tx<'_>, ctx: &mut Ctx<'_>, id: &str, pa
         return Err(params::invalid("params must be an object"));
     }
     match id {
-        "element.create" => elements::create(model, tx, ctx, params),
-        "element.update" => elements::update(model, tx, params),
+        "element.add" => elements::create(model, tx, ctx, params),
+        "element.set" => elements::update(model, tx, params),
         "element.delete" => elements::delete(model, tx, params),
         "element.move" => elements::move_elements(model, tx, params),
         "element.resize" => elements::resize(model, tx, params),
@@ -96,22 +96,22 @@ fn dispatch(model: &BoardModel, tx: &mut Tx<'_>, ctx: &mut Ctx<'_>, id: &str, pa
         "text.mark" => elements::mark(model, tx, params),
         "element.reorder" => elements::reorder(model, tx, params),
         "element.lock" => elements::lock(model, tx, params),
-        "element.group" => elements::group(model, tx, params),
-        "element.ungroup" => elements::ungroup(model, tx, params),
+        "arrange.group" => elements::group(model, tx, params),
+        "arrange.ungroup" => elements::ungroup(model, tx, params),
         "element.duplicate" => clipboard::duplicate(model, tx, params),
-        "element.paste" => clipboard::paste(model, tx, ctx, params),
-        "frame.create" => elements::frame_create(model, tx, ctx, params),
+        "edit.paste" => clipboard::paste(model, tx, ctx, params),
+        "frame.add" => elements::frame_create(model, tx, ctx, params),
         "frame.fit" => elements::frame_fit(model, tx, params),
-        "stroke.create" => elements::stroke_create(model, tx, ctx, params),
-        "connector.create" => connectors::create(model, tx, ctx, params),
+        "stroke.add" => elements::stroke_create(model, tx, ctx, params),
+        "connector.add" => connectors::create(model, tx, ctx, params),
         "connector.bind" => connectors::bind(model, tx, params),
         "connector.setLabel" => connectors::set_label(model, tx, params),
         "connector.setWaypoints" => connectors::set_waypoints(model, tx, params),
-        "card.create" => cards::create(model, tx, ctx, params),
+        "card.add" => cards::create(model, tx, ctx, params),
         "card.setTarget" => cards::set_target(model, tx, ctx, params),
         "image.insert" => cards::image_insert(model, tx, ctx, params),
         "image.setAlt" => cards::image_set_alt(model, tx, params),
-        "links.retarget" => cards::retarget(model, tx, params),
+        "link.retarget" => cards::retarget(model, tx, params),
         "layout.align" => layout::align(model, tx, params),
         "layout.distribute" => layout::distribute(model, tx, params),
         "layout.stack" => layout::stack(model, tx, params),
@@ -121,7 +121,7 @@ fn dispatch(model: &BoardModel, tx: &mut Tx<'_>, ctx: &mut Ctx<'_>, id: &str, pa
         "mindmap.collapse" => mindmap::collapse(model, tx, params),
         "mindmap.setDirection" => mindmap::set_direction(model, tx, params),
         "template.insert" => templates::insert(model, tx, ctx, params),
-        "page.create" => pages::create(model, tx, params),
+        "page.add" => pages::create(model, tx, params),
         "page.rename" => pages::rename(model, tx, params),
         "page.duplicate" => pages::duplicate(model, tx, params),
         "page.delete" => pages::delete(model, tx, params),
@@ -133,7 +133,7 @@ fn dispatch(model: &BoardModel, tx: &mut Tx<'_>, ctx: &mut Ctx<'_>, id: &str, pa
 /// Runs a command that reads the board without changing it.
 pub fn read(model: &BoardModel, id: &str, params: &Value) -> Result<Value> {
     match id {
-        "clipboard.copy" => clipboard::copy(model, params),
+        "edit.copy" => clipboard::copy(model, params),
         other => Err(params::invalid(format!("{other} is not a reading command"))),
     }
 }

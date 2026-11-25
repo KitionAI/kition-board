@@ -22,7 +22,7 @@ fn fragment(doc: &BoardDocument, id: &str) -> String {
 fn shape(doc: &mut BoardDocument, shape: &str) -> String {
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [{ "kind": "shape", "shapeType": shape, "position": [100, 100], "size": [200, 120], "strokeColor": "#000000", "fillStyle": "none" }] }),
         )
         .unwrap();
@@ -62,7 +62,7 @@ fn open_shapes_are_not_filled() {
         let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
         let made = doc
             .execute(
-                "element.create",
+                "element.add",
                 json!({ "elements": [{ "kind": "shape", "shapeType": name, "position": [100, 100], "size": [200, 120], "fillColor": "#000000", "fillStyle": "solid" }] }),
             )
             .unwrap();
@@ -92,7 +92,7 @@ fn degenerate_boxes_do_not_break_a_shape() {
             let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
             let made = doc
                 .execute(
-                    "element.create",
+                    "element.add",
                     json!({ "elements": [{ "kind": "shape", "shapeType": name, "position": [10, 10], "size": size, "text": "Label" }] }),
                 )
                 .unwrap();
@@ -105,7 +105,7 @@ fn degenerate_boxes_do_not_break_a_shape() {
 #[test]
 fn an_unknown_shape_is_refused_and_a_known_one_survives_reopening() {
     let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
-    let refused = doc.execute("element.create", json!({ "elements": [{ "kind": "shape", "shapeType": "blob" }] }));
+    let refused = doc.execute("element.add", json!({ "elements": [{ "kind": "shape", "shapeType": "blob" }] }));
     assert!(format!("{refused:?}").contains("invalid-params"), "{refused:?}");
     let id = shape(&mut doc, "cylinder");
     let bytes = doc.save(None).unwrap();
@@ -123,7 +123,7 @@ fn a_callouts_label_stays_above_its_tail() {
     let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [{ "kind": "shape", "shapeType": "callout", "position": [0, 0], "size": [200, 200], "text": "Hello" }] }),
         )
         .unwrap();
@@ -139,7 +139,7 @@ fn an_actors_label_is_under_its_figure() {
     let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [{ "kind": "shape", "shapeType": "actor", "position": [0, 0], "size": [120, 200], "text": "Buyer" }] }),
         )
         .unwrap();
@@ -222,7 +222,7 @@ fn previews_carry_the_outline_a_bound_end_meets() {
 }
 
 /// The style panel's Shape section (case `board.editing/change-shape`): the person's
-/// `element.update { shapeType }` on a shape an agent drew and joined keeps the connector bound to
+/// `element.set { shapeType }` on a shape an agent drew and joined keeps the connector bound to
 /// it, and the person's one undo brings back the shape and the connector as they were.
 #[test]
 fn a_persons_shape_change_keeps_the_connector_and_one_undo_restores_both() {
@@ -232,7 +232,7 @@ fn a_persons_shape_change_keeps_the_connector_and_one_undo_restores_both() {
     let mut doc = BoardDocument::create("Shapes.kboard", 800, 600).unwrap();
     let made = doc
         .execute_as(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [80, 120], "size": [200, 120], "text": "Report" },
                 { "kind": "shape", "position": [480, 120], "size": [160, 100], "text": "Archive" },
@@ -241,14 +241,14 @@ fn a_persons_shape_change_keeps_the_connector_and_one_undo_restores_both() {
         )
         .unwrap();
     let (a, b) = (made["created"][0].as_str().unwrap().to_owned(), made["created"][1].as_str().unwrap().to_owned());
-    let joined = doc.execute_as("connector.create", json!({ "from": { "element": a }, "to": { "element": b } }), &agent).unwrap();
+    let joined = doc.execute_as("connector.add", json!({ "from": { "element": a }, "to": { "element": b } }), &agent).unwrap();
     let connector = joined["created"][0].as_str().unwrap().to_owned();
     let stored = |doc: &mut BoardDocument, id: &str| -> Value {
-        let payload = doc.execute("clipboard.copy", json!({ "ids": [id] })).unwrap();
+        let payload = doc.execute("edit.copy", json!({ "ids": [id] })).unwrap();
         payload["elements"].as_array().unwrap().iter().find(|element| element["ref"] == id).cloned().unwrap()
     };
     let before = stored(&mut doc, &connector);
-    doc.execute("element.update", json!({ "id": a, "set": { "shapeType": "document" } })).unwrap();
+    doc.execute("element.set", json!({ "id": a, "set": { "shapeType": "document" } })).unwrap();
     let changed = stored(&mut doc, &connector);
     assert_eq!(stored(&mut doc, &a)["shapeType"], json!("document"));
     assert_eq!((changed["start"]["binding"]["target"].clone(), changed["end"]["binding"]["target"].clone()), (json!(a), json!(b)), "{changed}");

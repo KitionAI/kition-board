@@ -98,7 +98,7 @@ fn edit(doc: &mut BoardDocument, rng: &mut Rng, origin: &Origin) -> Option<&'sta
     let (label, command, params) = match (rng.below(18), target) {
         (0..=2, _) => (
             "shape",
-            "element.create",
+            "element.add",
             json!({ "elements": [{ "kind": "shape", "position": [value % 1200, value / 7 % 800], "size": [120, 80], "fillColor": color(value) }] }),
         ),
         (3, Some(id)) => ("fill", "element.style", json!({ "ids": [id], "style": { "fillColor": color(value) } })),
@@ -114,17 +114,17 @@ fn edit(doc: &mut BoardDocument, rng: &mut Rng, origin: &Origin) -> Option<&'sta
             if other == id {
                 return None;
             }
-            ("group", "element.group", json!({ "ids": [id, other] }))
+            ("group", "arrange.group", json!({ "ids": [id, other] }))
         }
         (9, _) => {
             let group = rng.pick(&elements(doc, Some(Kind::Group)))?;
-            ("ungroup", "element.ungroup", json!({ "groupIds": [group] }))
+            ("ungroup", "arrange.ungroup", json!({ "groupIds": [group] }))
         }
         (10, _) => {
             let ends = bindable(doc);
             let (from, to) = (rng.pick(&ends)?, rng.pick(&ends)?);
             let anchor = [(value % 11) as f64 / 10.0, (value % 7) as f64 / 6.0];
-            ("connect", "connector.create", json!({ "from": { "element": from }, "to": { "element": to, "anchor": anchor } }))
+            ("connect", "connector.add", json!({ "from": { "element": from }, "to": { "element": to, "anchor": anchor } }))
         }
         (11, _) => {
             let (connector, to) = (rng.pick(&elements(doc, Some(Kind::Connector)))?, rng.pick(&bindable(doc))?);
@@ -134,7 +134,7 @@ fn edit(doc: &mut BoardDocument, rng: &mut Rng, origin: &Origin) -> Option<&'sta
         }
         (12, _) => {
             let (x, y) = ((value % 1000) as f64, (value % 600) as f64);
-            ("frame", "frame.create", json!({ "box": [x, y, x + 300.0, y + 200.0] }))
+            ("frame", "frame.add", json!({ "box": [x, y, x + 300.0, y + 200.0] }))
         }
         (13, Some(id)) => {
             // Into a frame or out of one, as a drag's drop does.
@@ -146,7 +146,7 @@ fn edit(doc: &mut BoardDocument, rng: &mut Rng, origin: &Origin) -> Option<&'sta
         }
         (14, Some(id)) => {
             let parent = rng.pick(&elements(doc, Some(Kind::Frame))).map_or(Value::Null, Value::String);
-            ("parent", "element.update", json!({ "id": id, "set": { "parent": parent } }))
+            ("parent", "element.set", json!({ "id": id, "set": { "parent": parent } }))
         }
         (15, Some(id)) => {
             let element = doc.model().element(&ObjectId::from_string(&id))?.clone();
@@ -157,7 +157,7 @@ fn edit(doc: &mut BoardDocument, rng: &mut Rng, origin: &Origin) -> Option<&'sta
         }
         (16, _) => {
             let file = ["notes/plan.md", "data/table.ktable", "docs/brief.pdf", "boards/other.kboard"][rng.below(4)];
-            ("card", "card.create", json!({ "file": file, "position": [value % 1200, value % 800] }))
+            ("card", "card.add", json!({ "file": file, "position": [value % 1200, value % 800] }))
         }
         (17, Some(id)) => ("rotate", "element.rotate", json!({ "ids": [id], "degrees": (value % 90) as f64 })),
         _ => return None,

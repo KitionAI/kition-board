@@ -192,7 +192,7 @@ pub fn uses(kind: Kind, field: &str) -> bool {
     field == "kind" || COMMON.contains(&field) || kind_fields(kind).contains(&field)
 }
 
-/// The fields `element.update` may set (the rest have their own commands).
+/// The fields `element.set` may set (the rest have their own commands).
 pub const UPDATABLE: &[&str] = &[
     "position",
     "size",

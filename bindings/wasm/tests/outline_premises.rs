@@ -12,7 +12,7 @@ fn board(a_shape: &str) -> (BoardDocument, [Value; 4]) {
     let mut doc = BoardDocument::create("Outline.kboard", 1200, 800).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({"elements":[
                 {"kind":"shape","shapeType":a_shape,"position":[0,0],"size":[100,100],"text":"A"},
                 {"kind":"shape","shapeType":"diamond","position":[300,200],"size":[100,100],"text":"B"},
@@ -39,8 +39,8 @@ fn holds(fields: &[String], field: &str) -> bool {
 #[test]
 fn a_connectors_route_holds_the_outline_of_the_shapes_it_ends_on() {
     let (mut doc, [a, b, c, t]) = board("rectangle");
-    let k = doc.execute("connector.create", json!({"from":{"element":a},"to":{"element":b}})).unwrap()["created"][0].clone();
-    let text = doc.execute("connector.create", json!({"from":{"element":c},"to":{"element":t}})).unwrap()["created"][0].clone();
+    let k = doc.execute("connector.add", json!({"from":{"element":a},"to":{"element":b}})).unwrap()["created"][0].clone();
+    let text = doc.execute("connector.add", json!({"from":{"element":c},"to":{"element":t}})).unwrap()["created"][0].clone();
     // Aligning the connectors moves them by their bounds, whose ends are on A's, B's and C's
     // outlines and on T's box.
     let params = json!({"ids":[k, text],"edge":"left"});
@@ -63,9 +63,9 @@ fn an_anchored_end_aims_the_other_end_from_its_outline() {
     for shape in ["rectangle", "diamond"] {
         let (mut doc, [a, b, _, _]) = board(shape);
         let params = json!({"from":{"element":a,"anchor":[1,0]},"to":{"element":b}});
-        assert!(holds(&held(&doc, "connector.create", &params, &a), "shapeType"), "{shape}: the anchored end's outline");
-        assert!(!holds(&held(&doc, "connector.create", &params, &b), "shapeType"), "{shape}: B's point is only a cache");
-        ends.push(doc.execute("connector.create", params.clone()).unwrap()["end"].clone());
+        assert!(holds(&held(&doc, "connector.add", &params, &a), "shapeType"), "{shape}: the anchored end's outline");
+        assert!(!holds(&held(&doc, "connector.add", &params, &b), "shapeType"), "{shape}: B's point is only a cache");
+        ends.push(doc.execute("connector.add", params.clone()).unwrap()["end"].clone());
     }
     assert_ne!(ends[0], ends[1], "B's end follows A's outline");
     // Without anchors each end aims at the other's centre; with both anchored nothing is aimed.
@@ -73,7 +73,7 @@ fn an_anchored_end_aims_the_other_end_from_its_outline() {
     for params in [json!({"from":{"element":a},"to":{"element":b}}), json!({"from":{"element":a,"anchor":[1,0]},"to":{"element":b,"anchor":[0,0.5]}})]
     {
         for id in [&a, &b] {
-            assert!(!holds(&held(&doc, "connector.create", &params, id), "shapeType"), "{params}");
+            assert!(!holds(&held(&doc, "connector.add", &params, id), "shapeType"), "{params}");
         }
     }
 }
@@ -81,17 +81,17 @@ fn an_anchored_end_aims_the_other_end_from_its_outline() {
 #[test]
 fn a_new_shape_type_is_held_like_a_new_position() {
     let (mut doc, [a, b, _, _]) = board("rectangle");
-    let k = doc.execute("connector.create", json!({"from":{"element":a},"to":{"element":b}})).unwrap()["created"][0].clone();
+    let k = doc.execute("connector.add", json!({"from":{"element":a},"to":{"element":b}})).unwrap()["created"][0].clone();
     for set in [json!({"shapeType":"ellipse"}), json!({"position":[10,10]})] {
         let params = json!({"id":a,"set":set});
-        let under = doc.under("element.update", &params).unwrap().unwrap();
+        let under = doc.under("element.set", &params).unwrap().unwrap();
         // The connector's stored ends are refreshed in the same command (a cache, design note
         // 1.4): no premise on it.
         assert!(under.premises.iter().all(|premise| premise.id != k), "{params}: {:?}", under.premises);
     }
-    assert_eq!(held(&doc, "element.update", &json!({"id":a,"set":{"shapeType":"ellipse"}}), &a), ["kind", "locked", "shapeType"]);
+    assert_eq!(held(&doc, "element.set", &json!({"id":a,"set":{"shapeType":"ellipse"}}), &a), ["kind", "locked", "shapeType"]);
     let before = doc.model().element(&kition_kit::kdm::ObjectId::from_string(k.as_str().unwrap())).unwrap().start.clone().unwrap().point;
-    doc.execute("element.update", json!({"id":a,"set":{"shapeType":"diamond"}})).unwrap();
+    doc.execute("element.set", json!({"id":a,"set":{"shapeType":"diamond"}})).unwrap();
     let after = doc.model().element(&kition_kit::kdm::ObjectId::from_string(k.as_str().unwrap())).unwrap().start.clone().unwrap().point;
     assert_ne!(before, after, "the stored end moved onto the diamond's outline");
 }

@@ -51,7 +51,7 @@ type Props = {
   sync: BoardSync
   page: string | null
   run: (command: string, params: Record<string, unknown>) => Promise<string | null>
-  /** A reading command (`clipboard.copy`), also in a read-only board; answers parsed JSON or null. */
+  /** A reading command (`edit.copy`), also in a read-only board; answers parsed JSON or null. */
   query: (command: string, params: Record<string, unknown>) => Promise<unknown>
   tool: Tool
   shapeType: string
@@ -511,7 +511,7 @@ export function BoardCanvas(props: Props) {
         if (!value.trim()) return
         const at = toWorldFromScreen(current.left, current.top, viewport.current)
         const parent = frameUnder(at)
-        void commit('element.create', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...styleFor('text', latest.current.drawStyle), ...(parent ? { parent } : {}) }] }).then(async (answer) => {
+        void commit('element.add', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...styleFor('text', latest.current.drawStyle), ...(parent ? { parent } : {}) }] }).then(async (answer) => {
           const created = (answer?.created as string[] | undefined) ?? []
           if (created.length) latest.current.onSelection(created)
           if (created.length === 1 && marks.length) await commitMarks(created[0], value, marks)
@@ -592,7 +592,7 @@ export function BoardCanvas(props: Props) {
     if (!payload || latest.current.readOnly) return
     const place = clipboard.pastePlace(at)
     const t = latest.current.t
-    const answer = await commit('element.paste', { ...onPage(), payload, at: [place.x, place.y] }, undefined, (reason) => toast('error', t('pasteFailed'), reason))
+    const answer = await commit('edit.paste', { ...onPage(), payload, at: [place.x, place.y] }, undefined, (reason) => toast('error', t('pasteFailed'), reason))
     if (Array.isArray(answer?.skipped) && answer.skipped.length) toast('warning', t('picturesLeftOut'), t('picturesLeftOutHint'))
     selectMade(createdOf(answer))
   }
@@ -703,13 +703,13 @@ export function BoardCanvas(props: Props) {
     void commit('element.delete', { ids: [...ids] })
   }
   const groupIds = (ids: readonly string[]) => {
-    void commit('element.group', { ids: [...ids] }).then((answer) => {
+    void commit('arrange.group', { ids: [...ids] }).then((answer) => {
       if (typeof answer?.group === 'string') latest.current.onSelection([answer.group])
     })
   }
   const ungroupIds = (ids: readonly string[]) => {
     const groups = ids.filter((id) => sync.view.elements.get(id)?.kind === 'group')
-    if (groups.length) void commit('element.ungroup', { groupIds: groups })
+    if (groups.length) void commit('arrange.ungroup', { groupIds: groups })
   }
 
   /** A row of the canvas menu, on the elements the menu opened on. */
@@ -885,7 +885,7 @@ export function BoardCanvas(props: Props) {
       const root: Record<string, unknown> = { kind: 'shape', shapeStyle: 'mind-node', mindMapDirection: 'right', position: [p.x - 80, p.y - 30], size: [160, 60] }
       const parent = frameUnder(p)
       if (parent) root.parent = parent
-      void commit('element.create', { elements: [root] }).then((answer) => {
+      void commit('element.add', { elements: [root] }).then((answer) => {
         const created = (answer?.created as string[] | undefined) ?? []
         onTool('select')
         if (!created.length) return
@@ -1114,14 +1114,14 @@ export function BoardCanvas(props: Props) {
           onTool('select')
           if (g.tool === 'note' && created[0]) window.setTimeout(() => openText(created[0]), 0)
         }
-        if (g.tool === 'frame') void commit('frame.create', { box: [box.x0, box.y0, box.x1, box.y1] }).then(done)
+        if (g.tool === 'frame') void commit('frame.add', { box: [box.x0, box.y0, box.x1, box.y1] }).then(done)
         else {
           const element: Record<string, unknown> = { kind: 'shape', position: [box.x0, box.y0], size: [box.x1 - box.x0, box.y1 - box.y0], ...styleFor('shape', latest.current.drawStyle) }
           const parent = frameUnder(center(box))
           if (parent) element.parent = parent
           if (g.tool === 'note') element.shapeStyle = 'sticky'
           else element.shapeType = shapeType
-          void commit('element.create', { elements: [element] }).then(done)
+          void commit('element.add', { elements: [element] }).then(done)
         }
         break
       }
@@ -1137,7 +1137,7 @@ export function BoardCanvas(props: Props) {
           params.type = 'elbow'
         }
         if (Object.keys(style).length) params.style = style
-        void commit('connector.create', params).then((answer) => {
+        void commit('connector.add', params).then((answer) => {
           const created = (answer?.created as string[] | undefined) ?? []
           if (created.length) onSelection(created)
           onTool('select')
@@ -1154,7 +1154,7 @@ export function BoardCanvas(props: Props) {
         const params: Record<string, unknown> = { points }
         const style = styleFor('stroke', g.highlight ? latest.current.highlightStyle : latest.current.drawStyle)
         if (Object.keys(style).length) params.style = style
-        void commit('stroke.create', params, () => setDraft(null))
+        void commit('stroke.add', params, () => setDraft(null))
         break
       }
       case 'erase':

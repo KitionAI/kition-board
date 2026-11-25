@@ -39,7 +39,7 @@ impl Board {
         if let (Some(target), Some(extra)) = (element.as_object_mut(), extra.as_object()) {
             target.extend(extra.clone());
         }
-        self.run("element.create", json!({ "elements": [element] }))["created"][0].as_str().unwrap().to_owned()
+        self.run("element.add", json!({ "elements": [element] }))["created"][0].as_str().unwrap().to_owned()
     }
 
     fn check(&self) -> Vec<Diagnostic> {
@@ -60,8 +60,8 @@ fn a_healthy_board_has_nothing_to_report() {
     let mut board = Board::new();
     let a = board.shape(0.0, 0.0, json!({ "shapeStyle": "flow-node", "text": "Start" }));
     let b = board.shape(300.0, 0.0, json!({ "shapeStyle": "flow-node", "text": "End" }));
-    board.run("connector.create", json!({ "from": { "element": a }, "to": { "element": b } }));
-    board.run("frame.create", json!({ "box": [-40, -40, 500, 200], "children": [a, b] }));
+    board.run("connector.add", json!({ "from": { "element": a }, "to": { "element": b } }));
+    board.run("frame.add", json!({ "box": [-40, -40, 500, 200], "children": [a, b] }));
     assert_eq!(board.codes(), Vec::<String>::new());
 }
 
@@ -91,13 +91,13 @@ fn overflowing_overlapping_and_outside_text() {
         json!({ "text": "A label far too long to fit inside a small box at all, wrapping onto many many lines", "size": [80, 40] }),
     );
     board.run(
-        "element.create",
+        "element.add",
         json!({ "elements": [
         { "kind": "text", "position": [0, 300], "text": "Notes" },
         { "kind": "text", "position": [10, 305], "text": "More notes" },
     ] }),
     );
-    let frame = board.run("frame.create", json!({ "box": [500, 0, 700, 200] }))["frame"].as_str().unwrap().to_owned();
+    let frame = board.run("frame.add", json!({ "box": [500, 0, 700, 200] }))["frame"].as_str().unwrap().to_owned();
     let inside = board.shape(520.0, 20.0, json!({ "parent": frame, "text": "In" }));
     board.run("element.move", json!({ "ids": [inside], "delta": [150, 0] }));
     let codes = board.codes();
@@ -105,7 +105,7 @@ fn overflowing_overlapping_and_outside_text() {
     assert_eq!(count(&codes, "board.overlapping-label"), 1, "{codes:?}");
     assert_eq!(count(&codes, "board.outside-frame"), 1, "{codes:?}");
     assert_eq!(count(&codes, "board.empty-frame"), 0, "the frame has a child");
-    let empty = board.run("frame.create", json!({ "box": [900, 0, 1000, 100] }));
+    let empty = board.run("frame.add", json!({ "box": [900, 0, 1000, 100] }));
     assert!(empty["frame"].is_string());
     assert_eq!(count(&board.codes(), "board.empty-frame"), 1);
 }
@@ -117,11 +117,10 @@ fn connectors_through_nodes_and_dangling_bindings() {
     let b = board.shape(600.0, 0.0, json!({ "text": "B" }));
     let middle = board.shape(300.0, 0.0, json!({ "text": "In the way" }));
     let link =
-        board.run("connector.create", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] } }))["created"]
-            [0]
-        .as_str()
-        .unwrap()
-        .to_owned();
+        board.run("connector.add", json!({ "from": { "element": a, "anchor": [1, 0.5] }, "to": { "element": b, "anchor": [0, 0.5] } }))["created"][0]
+            .as_str()
+            .unwrap()
+            .to_owned();
     let found = board.check();
     let crossing = found.iter().find(|found| found.code == "board.connector-crosses-node").unwrap();
     assert_eq!(crossing.severity, Severity::Info);
@@ -147,8 +146,8 @@ fn pictures_without_bytes_and_cards_without_targets() {
     assert_eq!(without.iter().filter(|found| found.code == "board.image-missing-blob").count(), 1);
 
     // A card's target is checked only when files are lent.
-    board.run("card.create", json!({ "file": "plans/Missing.md", "position": [0, 200] }));
-    board.run("card.create", json!({ "url": "https://kition.ai", "position": [400, 200] }));
+    board.run("card.add", json!({ "file": "plans/Missing.md", "position": [0, 200] }));
+    board.run("card.add", json!({ "url": "https://kition.ai", "position": [400, 200] }));
     assert_eq!(count(&board.codes(), "board.card-target-missing"), 0, "nothing lent: unknown, not missing");
     let root = std::env::temp_dir().join(format!("kition-board-check-{}", std::process::id()));
     std::fs::create_dir_all(root.join("plans")).unwrap();

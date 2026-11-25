@@ -42,7 +42,7 @@ fn issue_draft_replica_blobs_a_board_opens_from_its_exported_replica_with_its_pi
     let folder = HostFolder::new(&root).unwrap();
     kit.set_host(folder.host());
     let file = kit.open(OpenRequest { file: &folder.file("Plan.kboard").unwrap(), read_only: false, create: None }).unwrap().id;
-    kit.execute(&file, "element.create", params(json!({ "elements": [{ "kind": "shape", "position": [300, 0], "text": "Idea" }] })), Origin::Agent)
+    kit.execute(&file, "element.add", params(json!({ "elements": [{ "kind": "shape", "position": [300, 0], "text": "Idea" }] })), Origin::Agent)
         .unwrap();
     let before = state(&mut kit, &file);
     assert_eq!(before["missingBlobs"], json!([]), "{before}");
@@ -67,7 +67,7 @@ fn issue_draft_replica_blobs_a_board_opens_from_its_exported_replica_with_its_pi
     assert_eq!(state(&mut kit, &bare)["missingBlobs"], json!([]), "model.import took the picture's bytes");
 
     // The replica takes edits of its own and leaves the file's board alone.
-    kit.execute(&replica, "element.create", params(json!({ "elements": [{ "kind": "shape", "position": [600, 0] }] })), Origin::Agent).unwrap();
+    kit.execute(&replica, "element.add", params(json!({ "elements": [{ "kind": "shape", "position": [600, 0] }] })), Origin::Agent).unwrap();
     assert_eq!(state(&mut kit, &file), before);
     assert_ne!(state(&mut kit, &replica), before);
     let saved = kit.model("model.save", json!({ "documentId": replica })).unwrap();

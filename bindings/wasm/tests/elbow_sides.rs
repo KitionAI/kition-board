@@ -31,14 +31,14 @@ fn d(doc: &BoardDocument, id: &str) -> String {
 }
 
 fn shapes(doc: &mut BoardDocument, list: Value) -> Vec<String> {
-    let made = doc.execute("element.create", json!({ "elements": list })).unwrap();
+    let made = doc.execute("element.add", json!({ "elements": list })).unwrap();
     made["created"].as_array().unwrap().iter().map(|id| id.as_str().unwrap().to_owned()).collect()
 }
 
 fn elbow(doc: &mut BoardDocument, from: (&str, [f64; 2]), to: (&str, [f64; 2])) -> String {
     let made = doc
         .execute(
-            "connector.create",
+            "connector.add",
             json!({ "from": { "element": from.0, "anchor": from.1 }, "to": { "element": to.0, "anchor": to.1 }, "type": "elbow", "endArrowhead": "triangle" }),
         )
         .unwrap();
@@ -100,7 +100,7 @@ fn a_side_facing_away_steps_out_before_it_turns() {
 #[test]
 fn free_ends_keep_the_route_they_had() {
     let mut doc = BoardDocument::create("Elbows.kboard", 800, 600).unwrap();
-    let made = doc.execute("connector.create", json!({ "from": { "point": [0, 0] }, "to": { "point": [100, 50] }, "type": "elbow" })).unwrap();
+    let made = doc.execute("connector.add", json!({ "from": { "point": [0, 0] }, "to": { "point": [100, 50] }, "type": "elbow" })).unwrap();
     let k = made["created"][0].as_str().unwrap().to_owned();
     assert_eq!(d(&doc, &k), "M 0 0 L 38 0 Q 50 0 50 12 L 50 38 Q 50 50 62 50 L 100 50");
     // Two boxes side by side, bound at the facing sides: across, down and across, as before.

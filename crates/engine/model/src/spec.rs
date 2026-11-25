@@ -43,10 +43,10 @@ pub const COMMANDS: &[Spec] = &[
     Spec { shortcut: Some("Cmd+Shift+Z"), ..spec("edit.redo", "Redo", EDIT) },
     Spec { shortcut: Some("Cmd+D"), ..spec("element.duplicate", "Duplicate", EDIT) },
     Spec { shortcut: Some("Delete"), ..spec("element.delete", "Delete", EDIT) },
-    Spec { mutates: false, ..spec("clipboard.copy", "Copy", None) },
-    spec("element.paste", "Paste", None),
-    spec("element.create", "Create elements", None),
-    spec("element.update", "Update an element", None),
+    Spec { mutates: false, ..spec("edit.copy", "Copy", None) },
+    spec("edit.paste", "Paste", None),
+    spec("element.add", "Create elements", None),
+    spec("element.set", "Update an element", None),
     spec("element.move", "Move", None),
     spec("element.resize", "Resize", None),
     spec("element.rotate", "Rotate", ARRANGE),
@@ -55,11 +55,11 @@ pub const COMMANDS: &[Spec] = &[
     Spec { mutates: false, ..spec("shape.previews", "Shape library", None) },
     spec("element.setText", "Edit text", None),
     spec("text.mark", "Format text", None),
-    spec("frame.create", "Frame", INSERT),
-    spec("stroke.create", "Draw a stroke", None),
-    spec("connector.create", "Connector", INSERT),
+    spec("frame.add", "Frame", INSERT),
+    spec("stroke.add", "Draw a stroke", None),
+    spec("connector.add", "Connector", INSERT),
     spec("template.insert", "Template", None),
-    Spec { reads_files: true, ..spec("card.create", "Card", INSERT) },
+    Spec { reads_files: true, ..spec("card.add", "Card", INSERT) },
     Spec { reads_files: true, ..spec("image.insert", "Picture", INSERT) },
     spec("connector.bind", "Attach connector end", None),
     spec("connector.setLabel", "Connector label", None),
@@ -67,8 +67,8 @@ pub const COMMANDS: &[Spec] = &[
     Spec { reads_files: true, ..spec("card.setTarget", "Change card target", None) },
     spec("image.setAlt", "Alternative text", None),
     spec("frame.fit", "Fit frame to content", ARRANGE),
-    Spec { shortcut: Some("Cmd+G"), ..spec("element.group", "Group", ARRANGE) },
-    Spec { shortcut: Some("Cmd+Shift+G"), ..spec("element.ungroup", "Ungroup", ARRANGE) },
+    Spec { shortcut: Some("Cmd+G"), ..spec("arrange.group", "Group", ARRANGE) },
+    Spec { shortcut: Some("Cmd+Shift+G"), ..spec("arrange.ungroup", "Ungroup", ARRANGE) },
     spec("element.reorder", "Order", ARRANGE),
     spec("element.lock", "Lock", ARRANGE),
     spec("layout.align", "Align", ALIGN),
@@ -79,7 +79,7 @@ pub const COMMANDS: &[Spec] = &[
     spec("mindmap.addSibling", "Add sibling", None),
     spec("mindmap.collapse", "Collapse branch", None),
     spec("mindmap.setDirection", "Mind map direction", None),
-    spec("page.create", "New page", VIEW),
+    spec("page.add", "New page", VIEW),
     spec("page.rename", "Rename page", VIEW),
     spec("page.duplicate", "Duplicate page", VIEW),
     spec("page.delete", "Delete page", VIEW),
@@ -87,7 +87,7 @@ pub const COMMANDS: &[Spec] = &[
     Spec { mutates: false, ..spec("page.activate", "Show page", None) },
     Spec { mutates: false, ..spec("file.export", "Export", None) },
     Spec { mutates: false, ..spec("file.render", "Preview a view", None) },
-    spec("links.retarget", "Retarget links", None),
+    spec("link.retarget", "Retarget links", None),
 ];
 
 /// The command `id`.
@@ -246,11 +246,11 @@ pub fn schema(id: &str) -> Option<Value> {
         "edit.redo" => {
             json!({ "scope": choice(&["person", "agent"], "Whose last undone step to redo: the person's or the agent's. By default the scope of whoever runs it") })
         }
-        "element.create" => json!({
+        "element.add" => json!({
             "page": page(),
             "elements": required(json!({ "type": "array", "items": element_spec(), "description": "The elements to make, back to front" })),
         }),
-        "element.update" => json!({
+        "element.set" => json!({
             "id": required(text("The element")),
             "set": required(json!({ "type": "object", "additionalProperties": true, "properties": update_properties(), "description": "Fields to set: position [x, y], size [w, h], rotation, parent, key, points, shapeType, shapeStyle, style fields, labelPosition, mind-map fields; null clears an optional field" })),
         }),
@@ -292,9 +292,9 @@ pub fn schema(id: &str) -> Option<Value> {
             "units": choice(&["scalar", "utf16"], "How range counts: characters (default) or UTF-16 code units"),
         }),
         "element.duplicate" => json!({ "ids": required(ids("The elements")), "offset": pair("[dx, dy] of the copies (24, 24 by default)") }),
-        "element.paste" => json!({
+        "edit.paste" => json!({
             "page": page(),
-            "payload": required(json!({ "type": "object", "additionalProperties": true, "description": "A clipboard.copy payload (application/x-kition-board+json)", "properties": {
+            "payload": required(json!({ "type": "object", "additionalProperties": true, "description": "A edit.copy payload (application/x-kition-board+json)", "properties": {
                 "elements": { "type": "array", "description": "The copied elements", "items": { "type": "object", "additionalProperties": true, "properties": {
                     "ref": text("The copied element's id"),
                     "start": end_binding(),
@@ -308,9 +308,9 @@ pub fn schema(id: &str) -> Option<Value> {
             "placement": required(choice(&["front", "forward", "backward", "back"], "Where in the stacking order")),
         }),
         "element.lock" => json!({ "ids": required(ids("The elements")), "locked": required(json!({ "type": "boolean" })) }),
-        "element.group" => json!({ "ids": required(ids("The elements to group")) }),
-        "element.ungroup" => json!({ "groupIds": required(ids("The groups")) }),
-        "frame.create" => json!({
+        "arrange.group" => json!({ "ids": required(ids("The elements to group")) }),
+        "arrange.ungroup" => json!({ "groupIds": required(ids("The groups")) }),
+        "frame.add" => json!({
             "page": page(),
             "box": required(json!({ "type": "array", "items": number(-crate::params::MAX_COORDINATE, crate::params::MAX_COORDINATE, "Coordinate"), "description": "The frame's box [x0, y0, x1, y1]" })),
             "title": text("The frame's title"),
@@ -319,14 +319,14 @@ pub fn schema(id: &str) -> Option<Value> {
         "frame.fit" => {
             json!({ "id": required(text("The frame")), "padding": number(0.0, 10000.0, "Space around the content (32 by default)") })
         }
-        "stroke.create" => json!({
+        "stroke.add" => json!({
             "page": page(),
             "points": required(points("The stroke's points, at least two")),
             "style": json!({ "type": "object", "additionalProperties": false, "properties": {
                 "strokeColor": color("Ink colour"), "strokeSize": choice(STROKE_SIZES, "Line weight"), "dashStyle": choice(DASH_STYLES, "Solid (default), dashed or dotted"),
                 "opacity": number(0.0, 1.0, "0 to 1") } }),
         }),
-        "connector.create" => json!({
+        "connector.add" => json!({
             "page": page(),
             "from": required(end("The start")),
             "to": required(end("The end")),
@@ -351,7 +351,7 @@ pub fn schema(id: &str) -> Option<Value> {
         "connector.setWaypoints" => {
             json!({ "id": required(text("The connector")), "waypoints": required(points("Bends in path order; empty for an automatic route")) })
         }
-        "card.create" | "card.setTarget" => {
+        "card.add" | "card.setTarget" => {
             let mut properties = json!({
                 "file": text("A workspace file, relative to the board's folder or rooted with /"),
                 "url": text("An http, https or mailto address (instead of file)"),
@@ -360,7 +360,7 @@ pub fn schema(id: &str) -> Option<Value> {
                 "title": text("A link card's title"),
             });
             if let Some(object) = properties.as_object_mut() {
-                if id == "card.create" {
+                if id == "card.add" {
                     object.insert("page".into(), page());
                     object.insert("position".into(), pair("[x, y]; right of the content when absent"));
                     object.insert("size".into(), pair("[w, h]; 320 × 200 by default"));
@@ -398,13 +398,13 @@ pub fn schema(id: &str) -> Option<Value> {
             "template": required(choice(&["mindmap", "flowchart", "roadmap", "kanban", "retrospective", "storyboard"], "The starting structure")),
             "at": pair("[x, y] for the template's centre; right of the content when absent"),
         }),
-        "clipboard.copy" => json!({
-            "ids": required(ids("The elements to copy; the answer is a board clipboard payload for element.paste")),
+        "edit.copy" => json!({
+            "ids": required(ids("The elements to copy; the answer is a board clipboard payload for edit.paste")),
         }),
         "page.activate" => json!({
             "page": required(text("The id of the page to show (view state, not an undo step)")),
         }),
-        "links.retarget" => json!({
+        "link.retarget" => json!({
             "from": required(text("The workspace path cards link to now, a file or a folder (KitLinks LK2)")),
             "to": required(text("The workspace path they link to instead; a folder's cards keep the rest of their path")),
         }),
@@ -446,7 +446,7 @@ pub fn schema(id: &str) -> Option<Value> {
             "node": required(text("Any node of the mind map")),
             "direction": required(choice(MIND_MAP_DIRECTIONS, "Where the map grows")),
         }),
-        "page.create" => {
+        "page.add" => {
             json!({
                 "name": text("The name (Page N by default)"),
                 "at": { "type": "integer", "minimum": 0, "description": "Position among the pages (last by default); at most the current page count" },
@@ -481,16 +481,16 @@ pub fn description(id: &str) -> &'static str {
         "element.delete" => {
             "Removes the elements and everything inside frames and groups among them; connectors attached to them lose that end's binding."
         }
-        "clipboard.copy" => {
-            "Reads the elements into a board clipboard payload without changing the board; pass the payload to element.paste to place copies on any page."
+        "edit.copy" => {
+            "Reads the elements into a board clipboard payload without changing the board; pass the payload to edit.paste to place copies on any page."
         }
-        "element.paste" => {
-            "Places copies of a clipboard.copy payload on a page, at `at` or offset from the originals; answers the new elements' ids, and in `skipped` the pictures left out because this board does not store their bytes (copied on another board)."
+        "edit.paste" => {
+            "Places copies of a edit.copy payload on a page, at `at` or offset from the originals; answers the new elements' ids, and in `skipped` the pictures left out because this board does not store their bytes (copied on another board)."
         }
-        "element.create" => {
-            "Makes one or more elements (shapes, text, sticky notes, strokes, frames, connectors, cards) on a page in one step; use it to build content, element.update to change existing elements."
+        "element.add" => {
+            "Makes one or more elements (shapes, text, sticky notes, strokes, frames, connectors, cards) on a page in one step; use it to build content, element.set to change existing elements."
         }
-        "element.update" => {
+        "element.set" => {
             "Sets fields of one existing element (position, size, rotation, parent, shape type and style, text placement, mind-map fields); null clears an optional field."
         }
         "element.move" => {
@@ -509,15 +509,15 @@ pub fn description(id: &str) -> &'static str {
         }
         "element.setText" => "Replaces the whole text of a shape, text element, connector label, card caption or frame title.",
         "text.mark" => "Applies or removes bold, italic or a link on a character range of one element's text.",
-        "frame.create" => "Makes a frame with a box and title and moves the named elements into it; frames group content and export as one area.",
-        "stroke.create" => "Draws a freehand stroke through at least two points, with optional ink colour, weight and opacity.",
-        "connector.create" => {
+        "frame.add" => "Makes a frame with a box and title and moves the named elements into it; frames group content and export as one area.",
+        "stroke.add" => "Draws a freehand stroke through at least two points, with optional ink colour, weight and opacity.",
+        "connector.add" => {
             "Draws a connector between two ends, each attached to an element or at a free point, with route type, arrowheads, label and bends; answers its id."
         }
         "template.insert" => {
             "Inserts a ready structure (mind map, flowchart, roadmap, kanban, retrospective, storyboard) centred at `at` or right of the content."
         }
-        "card.create" => {
+        "card.add" => {
             "Places a card that links to a workspace file (note, table, board or any file) or a web address; the card shows the target's title and opens it."
         }
         "image.insert" => "Places a picture from a workspace file or base64 bytes (PNG, JPEG, GIF, WebP, SVG); the picture is stored in the board.",
@@ -527,8 +527,8 @@ pub fn description(id: &str) -> &'static str {
         "card.setTarget" => "Points an existing card at another workspace file or web address, keeping its place and size.",
         "image.setAlt" => "Sets or removes a picture's alternative text, read by screen readers and exports.",
         "frame.fit" => "Resizes a frame to wrap its content with padding (32 units by default).",
-        "element.group" => "Groups the elements so they move, resize and select together; answers the group's id.",
-        "element.ungroup" => "Dissolves the groups, leaving their elements in place and in the same order.",
+        "arrange.group" => "Groups the elements so they move, resize and select together; answers the group's id.",
+        "arrange.ungroup" => "Dissolves the groups, leaving their elements in place and in the same order.",
         "element.reorder" => "Moves the elements to the front, one step forward, one step backward or to the back of the stacking order.",
         "element.lock" => "Locks or unlocks the elements; locked elements cannot be selected, moved or edited by the person until unlocked.",
         "layout.align" => "Lines up the elements' left, centre, right, top, middle or bottom edges.",
@@ -539,7 +539,7 @@ pub fn description(id: &str) -> &'static str {
         "mindmap.addSibling" => "Adds a node next to a non-root mind-map node, under the same parent.",
         "mindmap.collapse" => "Hides or shows the branches below a mind-map node (toggles when collapsed is absent).",
         "mindmap.setDirection" => "Sets which way the mind map grows (right, left, both ways, down) and lays it out again.",
-        "page.create" => "Adds a new page with a name (Page N by default) at a position (last by default); answers its id.",
+        "page.add" => "Adds a new page with a name (Page N by default) at a position (last by default); answers its id.",
         "page.rename" => "Gives a page a new name; its id and elements stay the same.",
         "page.duplicate" => "Copies a page with all its elements, under a new name; answers the copy's id.",
         "page.delete" => "Deletes a page and its elements; the board's last page cannot be deleted.",
@@ -551,7 +551,7 @@ pub fn description(id: &str) -> &'static str {
         "file.render" => {
             "Draws one view of the board as a PNG (a page, a frame, an element or an area, by id) for looking at it, without changing the board or the page the editor shows; the same call answers the same picture."
         }
-        "links.retarget" => "Re-points every card that links to a moved or renamed workspace file or folder at its new path.",
+        "link.retarget" => "Re-points every card that links to a moved or renamed workspace file or folder at its new path.",
         _ => "",
     }
 }
@@ -559,10 +559,10 @@ pub fn description(id: &str) -> &'static str {
 /// What a reading command answers (KHP A1 `output.schema`), as a ValueSchemaSpec.
 pub fn output(id: &str) -> Option<Value> {
     let schema = match id {
-        "clipboard.copy" => json!({ "type": "object", "additionalProperties": false, "properties": {
+        "edit.copy" => json!({ "type": "object", "additionalProperties": false, "properties": {
             "type": { "type": "string", "required": true, "description": "application/x-kition-board+json" },
             "version": { "type": "integer", "required": true },
-            "elements": { "type": "array", "required": true, "items": { "type": "json" }, "description": "The copied elements, for element.paste" },
+            "elements": { "type": "array", "required": true, "items": { "type": "json" }, "description": "The copied elements, for edit.paste" },
         } }),
         "element.getStyle" => json!({ "type": "object", "additionalProperties": false, "properties": {
             "fields": { "type": "array", "required": true, "items": { "type": "string" }, "description": "The style fields the elements use, in element.style order" },
@@ -632,11 +632,11 @@ pub fn list(can_undo: bool, can_redo: bool) -> Vec<KitCommand> {
             objects: crate::acts::objects(spec.id),
             object_types: crate::acts::object_types(spec.id),
             places: match spec.id {
-                "page.create" => &["at"],
+                "page.add" => &["at"],
                 "page.move" => &["to", "placement"],
                 "element.reorder" => &["placement"],
                 "element.move" => &["reparent"],
-                "links.retarget" => &["from"],
+                "link.retarget" => &["from"],
                 _ => &[],
             },
             ..KitCommand::default()

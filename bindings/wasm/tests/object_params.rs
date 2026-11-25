@@ -7,12 +7,12 @@ use serde_json::{Value, json};
 
 /// These strings describe data being authored, not an address resolved in this board.
 const NOT_NAMES: &[(&str, &str, &str)] = &[
-    ("page.create", "name", "the new page's label"),
+    ("page.add", "name", "the new page's label"),
     ("page.rename", "name", "the replacement page label"),
     ("page.duplicate", "name", "the copy's label"),
-    ("element.create", "elements[].key", "a new page-local authoring key, checked only for uniqueness"),
-    ("element.update", "set.key", "a replacement authoring key, checked only for uniqueness"),
-    ("connector.create", "key", "a new authoring key, checked only for uniqueness"),
+    ("element.add", "elements[].key", "a new page-local authoring key, checked only for uniqueness"),
+    ("element.set", "set.key", "a replacement authoring key, checked only for uniqueness"),
+    ("connector.add", "key", "a new authoring key, checked only for uniqueness"),
 ];
 
 /// Audited against params::{id,ids,page}, fields::check(parent), connectors::end_spec and render.
@@ -20,9 +20,9 @@ fn references(command: &str) -> Vec<(&'static str, &'static str)> {
     let mut out = Vec::new();
     let target = match command {
         "element.delete" | "element.move" | "element.rotate" | "element.style" | "element.getStyle" | "element.duplicate" | "element.reorder"
-        | "element.lock" | "element.group" | "clipboard.copy" | "layout.align" | "layout.distribute" | "layout.stack" => "ids",
-        "element.ungroup" => "groupIds",
-        "element.update"
+        | "element.lock" | "arrange.group" | "edit.copy" | "layout.align" | "layout.distribute" | "layout.stack" => "ids",
+        "arrange.ungroup" => "groupIds",
+        "element.set"
         | "element.resize"
         | "element.setText"
         | "text.mark"
@@ -40,12 +40,12 @@ fn references(command: &str) -> Vec<(&'static str, &'static str)> {
         out.push((target, "Element"));
     }
     match command {
-        "element.create" => out.extend([("page", "Page"), ("elements[].parent", "Element")]),
-        "element.update" => out.push(("set.parent", "Element")),
+        "element.add" => out.extend([("page", "Page"), ("elements[].parent", "Element")]),
+        "element.set" => out.push(("set.parent", "Element")),
         "element.resize" => out.push(("ids", "Element")),
-        "element.paste" | "stroke.create" | "template.insert" | "card.create" | "image.insert" => out.push(("page", "Page")),
-        "frame.create" => out.extend([("page", "Page"), ("children", "Element")]),
-        "connector.create" => out.extend([("page", "Page"), ("from.element", "Element"), ("to.element", "Element")]),
+        "edit.paste" | "stroke.add" | "template.insert" | "card.add" | "image.insert" => out.push(("page", "Page")),
+        "frame.add" => out.extend([("page", "Page"), ("children", "Element")]),
+        "connector.add" => out.extend([("page", "Page"), ("from.element", "Element"), ("to.element", "Element")]),
         "connector.bind" => out.push(("to.element", "Element")),
         "page.rename" | "page.duplicate" | "page.delete" | "page.move" | "page.activate" => out.push(("page", "Page")),
         "file.export" => out.extend([("page", "Page"), ("frame", "Element")]),
@@ -77,7 +77,7 @@ fn every_uuid_resolver_is_marked_and_typed() {
     assert!(gaps(&commands).is_empty(), "undeclared UUID references:\n{}", gaps(&commands).join("\n"));
     let count: usize = commands.iter().map(|command| references(&command.id).len()).sum();
     println!("UUID references marked/typed: {count}; integer scanner allows: 0");
-    for (id, path) in [("element.create", "elements[].parent"), ("element.update", "set.parent"), ("connector.create", "from.element")] {
+    for (id, path) in [("element.add", "elements[].parent"), ("element.set", "set.parent"), ("connector.add", "from.element")] {
         let mut broken = commands.clone();
         broken.iter_mut().find(|command| command.id == id).unwrap().objects = &[];
         assert!(gaps(&broken).iter().any(|gap| gap.starts_with(&format!("{id} {path}:"))));
@@ -131,9 +131,9 @@ fn names_are_authored_values_never_uuid_aliases() {
         assert!(!command.objects.contains(path), "{id} {path}: {reason}");
     }
     let mut broken = commands.clone();
-    broken.iter_mut().find(|command| command.id == "element.update").unwrap().schema.as_mut().unwrap()["id"]["description"] =
+    broken.iter_mut().find(|command| command.id == "element.set").unwrap().schema.as_mut().unwrap()["id"]["description"] =
         json!("An Element id or name");
-    assert_eq!(name_gaps(&broken), ["element.update id"]);
+    assert_eq!(name_gaps(&broken), ["element.set id"]);
     assert!(doc.execute("page.rename", json!({"page": "Page 1", "name": "Wrong"})).unwrap_err().starts_with("not-found:"));
     println!("name resolvers: 0; authored-name exceptions: {}", NOT_NAMES.len());
 }

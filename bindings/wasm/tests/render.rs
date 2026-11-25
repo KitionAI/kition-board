@@ -23,7 +23,7 @@ fn fixture() -> Fixture {
     doc.execute("page.rename", json!({ "page": plan, "name": "Plan" })).unwrap();
     let made = doc
         .execute(
-            "element.create",
+            "element.add",
             json!({ "elements": [
                 { "kind": "shape", "position": [40, 40], "size": [160, 100], "text": "Idea", "fillColor": "purple" },
                 { "kind": "shape", "position": [300, 200], "size": [100, 100], "shapeType": "ellipse" },
@@ -31,10 +31,10 @@ fn fixture() -> Fixture {
         )
         .unwrap();
     let shape = made["created"][0].as_str().unwrap().to_owned();
-    let frame = doc.execute("frame.create", json!({ "box": [600, 40, 900, 240], "title": "Later" })).unwrap()["frame"].as_str().unwrap().to_owned();
-    let ideas = doc.execute("page.create", json!({ "name": "Ideas", "activate": true })).unwrap()["page"].as_str().unwrap().to_owned();
+    let frame = doc.execute("frame.add", json!({ "box": [600, 40, 900, 240], "title": "Later" })).unwrap()["frame"].as_str().unwrap().to_owned();
+    let ideas = doc.execute("page.add", json!({ "name": "Ideas", "activate": true })).unwrap()["page"].as_str().unwrap().to_owned();
     doc.execute(
-        "element.create",
+        "element.add",
         json!({ "elements": [{ "kind": "shape", "position": [100, 100], "size": [400, 300], "shapeType": "ellipse", "fillColor": "green" }] }),
     )
     .unwrap();
