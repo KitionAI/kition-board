@@ -1,0 +1,24 @@
+format: 1
+id: board.collab.live/nothing-to-repair
+feature: board.collab.live
+intent: >-
+  On one line of changes, seeded random steps (the person's commands on shapes, styles, moves,
+  deletes, duplicates, stacking, groups, bound connectors, frames, drops into and out of frames,
+  parents, labels and cards; Undo and Redo; an agent's draft merged in after the person edited
+  meanwhile, or refused as a collision and changing nothing; the file changed outside and reread)
+  never leave a state the repair (rules V1 to V9) would change: after every step a repair pass
+  writes nothing. Restores the general check the convergence fuzz made.
+layer: gate
+dimension: data-safety
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/nothing_to_repair.rs (the random edits of the deleted convergence suite)
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: nothing_to_repair }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-25"
+timeout_s: 300

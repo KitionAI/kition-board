@@ -1,0 +1,24 @@
+format: 1
+id: regressions/issue-merge-stale-views
+feature: board.agent.draft
+intent: >-
+  A draft merged (`mergeChanges`) or an earlier state restored (`restoreState`) is a change of the
+  board like any other: the revision moves, the board is unsaved, and the engine's view (its cached
+  frame and raster) is the new board's. The merge is one step of the person's Undo even with the
+  agent's origin the host passes (KitModel M12a); one Undo gives back the exact state and view
+  before, and Redo the merged or restored ones, with the person's edit made meanwhile kept. Before,
+  the board left both members to the SDK's defaults, which bypassed its revision, so the editor
+  kept showing the board as it was before the merge.
+layer: gate
+dimension: collab
+source:
+  kind: issue
+  from: schema-freeze review of the engine members (2026-11-25)
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: drafts }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-25"

@@ -45,15 +45,15 @@ impl BoardDocument {
         self.session.replica().doc_id().to_string()
     }
 
-    /// Opens a board with the replica the host stored for it (`snapshot`, its history) and that
-    /// replica's blobs (a blob bundle). Empty `bytes` open the replica alone. When both are given
-    /// and are the same document, the file (which holds the content and no history) is taken into
-    /// the stored replica (`kition_kit::session::take_file`): nothing when the replica has the file's version;
-    /// the changes the file holds beyond it when the file's history starts at a version the replica
-    /// has; and otherwise (the file was saved elsewhere, from changes the store never saw) the
-    /// file's state, as one `system` transaction keyed by object id. Edits the replica has and the
-    /// file lacks are kept. A file of another document, or a replica that does not open, leaves the
-    /// file as [`KitDocument::open`] opens it.
+    /// Opens a board with the replica the host stored for it (`snapshot`: its state and version,
+    /// the head of the host's history) and that replica's blobs (a blob bundle). Empty `bytes` open
+    /// the replica alone. When both are given and are the same document, the file (which holds the
+    /// content and no history) is taken into the stored replica (`kition_kit::session::take_file`):
+    /// nothing when both hold the same state, otherwise (the file was saved elsewhere, or changed
+    /// outside) the file's state written over the replica's as one `system` transaction labelled
+    /// `import`, keyed by object id. Either way the board goes on on the stored replica's line of
+    /// changes, with its object ids. A file of another document, or a replica that does not open,
+    /// leaves the file as [`KitDocument::open`] opens it.
     pub fn open_with_replica(name: &str, bytes: &[u8], snapshot: &[u8], blobs: &[u8]) -> Result<Self, String> {
         check_name(name)?;
         let store = SharedBlobs::default();

@@ -1,0 +1,24 @@
+format: 1
+id: board.collab.live/repairs-where-they-arise
+feature: board.collab.live
+intent: >-
+  Each repair rule V1 to V9 is checked where its broken state can arise: a file written elsewhere
+  and opened (every rule), an agent's draft merged into a document edited meanwhile (V3 to V9,
+  repaired by the session, and a replica following the change log repairs nothing of its own), the
+  person's Undo of a page an agent drew on (V2) and its Redo; a draft moving an element the
+  document deleted is refused (so V1 comes only from files). One broken state reached by two edit
+  orders and by a merge repairs to one exact state (M4).
+layer: gate
+dimension: data-safety
+source:
+  kind: synthetic
+  from: crates/kdm/kdm-model/tests/repair.rs
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kdm, test: repair }
+  - cargo-test: { package: kition-board-kit, test: reread, filter: a_broken_file_written_outside_is_taken_in_repaired }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-25"

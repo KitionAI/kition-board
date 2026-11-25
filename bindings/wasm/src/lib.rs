@@ -507,6 +507,21 @@ impl KitSessionDocument for BoardDocument {
         Ok(damage)
     }
 
+    /// A draft taken in (one undo step of the person, KitModel M12a): the views (revision,
+    /// cached raster and frame, the page shown) follow it as they follow an import.
+    fn merge_changes(&mut self, bytes: &[u8], origin: &Origin) -> Result<Damage, String> {
+        let damage = self.session.merge_changes(bytes, origin)?;
+        self.changed(&damage);
+        Ok(damage)
+    }
+
+    /// An earlier state written over the board (one undo step of `origin`): the views follow it.
+    fn restore_state(&mut self, snapshot: &[u8], origin: &Origin) -> Result<Damage, String> {
+        let damage = self.session.restore_state(snapshot, origin)?;
+        self.changed(&damage);
+        Ok(damage)
+    }
+
     fn undo(&mut self) -> Result<(bool, Damage), String> {
         self.undo_in(UndoScope::Person)
     }

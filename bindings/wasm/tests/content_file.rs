@@ -3,7 +3,8 @@
 //! deleted or overwritten content, and no version or origin; an unchanged board saves to the same
 //! bytes; a file opened without a store is the same document and edits; undo after a save takes
 //! back the last edit; and a file opens on top of a stored replica, as it is when both hold the
-//! same state, else by the file's state written by object id.
+//! same state, else by the file's state written by object id, and goes on on the stored line of
+//! changes, whose log (the host's history) keeps what the file does not.
 //!
 //! The needles below are written once each and share no run of four characters with anything else
 //! in the board: every test checks the session's change log holds them (the control) before it
@@ -149,7 +150,7 @@ fn undo_after_a_save_takes_back_the_last_edit() {
 
 #[test]
 fn a_file_opens_on_the_stored_replica_that_holds_its_state() {
-    let (mut doc, _, _) = board_with_history();
+    let (mut doc, kept, made_at) = board_with_history();
     let bytes = host_save(&mut doc);
     doc.mark_saved();
     let stored = __snapshot(&doc).unwrap();
@@ -157,11 +158,34 @@ fn a_file_opens_on_the_stored_replica_that_holds_its_state() {
     assert_eq!(opened.version(), doc.version(), "the stored replica, as it was");
     assert_eq!(state(&opened), state(&doc));
     assert_eq!(host_save(&mut opened), bytes, "and saves the document it opened to the same bytes");
+    // The history stays the host's and goes on (what "the history keeps" checked when the file
+    // held one): the opened document continues the stored line of changes.
+    opened.execute("element.move", json!({ "ids": [kept], "delta": [5, 0] })).unwrap();
+    continues_the_stored_history(&mut doc, &opened, &made_at);
+}
+
+/// `opened` (a file opened on the replica `store` holds) continues `store`'s line of changes: its
+/// changes since `store`'s version are changes on that line, not a snapshot of a new one, and
+/// `store` (the host's history) takes them as its next ones, reaching `opened`'s version and
+/// state while its change log still holds what the board deleted and overwrote. The file holds
+/// none of it.
+fn continues_the_stored_history(store: &mut BoardDocument, opened: &BoardDocument, made_at: &Version) {
+    let next = __export_changes(opened, &store.version().encode()).unwrap();
+    let parsed: Value = serde_json::from_slice(&next).unwrap();
+    assert!(parsed["changes"].is_array(), "changes on the stored line, not a snapshot: {parsed}");
+    KitSessionDocument::import_changes(store, &next).unwrap();
+    assert_eq!(store.version(), opened.version(), "the store follows the opened document");
+    assert_eq!(state(store), state(opened));
+    let log = change_log(store, made_at);
+    for needle in NEEDLES {
+        assert!(contains(&log, needle), "the history keeps {needle}");
+        assert!(!file_holds(&opened.save(Some(FILE)).unwrap(), needle), "the file holds {needle}");
+    }
 }
 
 #[test]
 fn a_file_saved_elsewhere_opens_on_the_stored_replica_by_its_state() {
-    let (mut doc, kept, _) = board_with_history();
+    let (mut doc, kept, made_at) = board_with_history();
     let stored = __snapshot(&doc).unwrap();
     let stored_version = doc.version();
     let bytes = host_save(&mut doc);
@@ -177,4 +201,6 @@ fn a_file_saved_elsewhere_opens_on_the_stored_replica_by_its_state() {
     assert_eq!(element_ids(&opened), element_ids(&elsewhere));
     assert!(opened.version().includes(&stored_version), "on top of the stored replica, on its line of changes");
     assert_ne!(opened.version(), stored_version, "with the file's state as a change");
+    // The stored history (here `doc`, at the stored version) takes that change as its next one.
+    continues_the_stored_history(&mut doc, &opened, &made_at);
 }
