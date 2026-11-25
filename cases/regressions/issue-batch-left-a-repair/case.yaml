@@ -1,0 +1,23 @@
+format: 1
+id: regressions/issue-batch-left-a-repair
+feature: board.collab.live
+intent: >-
+  An object-model batch (an agent's board_batch) writes raw values, so it can write a state the
+  repair (rules V1 to V9) would change, here one key on two shapes and an anchor outside [0, 1].
+  The board repairs it at the end of the batch's transaction, inside the batch's own undo step:
+  nothing is left to repair, one Undo gives back the exact state and view before the batch, and
+  Redo the repaired state. Before, the batch left the broken state until the next undo, import or
+  reopen repaired it.
+layer: gate
+dimension: data-safety
+source:
+  kind: issue
+  from: schema-freeze review fixes (2026-11-25)
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: batch_repair }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-25"

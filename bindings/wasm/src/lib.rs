@@ -247,6 +247,13 @@ impl BoardDocument {
 }
 
 impl KitDocument for BoardDocument {
+    /// An object-model batch (an agent's `board_batch`) leaves a repaired board, as every command
+    /// does: the repair (rules V1 to V9, design note 1.5) runs at the end of each of the batch's
+    /// transactions, so it is part of the batch's own undo step.
+    fn batch_settler(&self) -> Option<kition_kit::BatchSettler> {
+        Some(Box::new(|tx| kition_board_kdm::validate::repair(tx).map(|_| ()).map_err(|error| error.to_string())))
+    }
+
     fn batch_applied(&mut self) {
         self.changed(&Damage::Full);
     }

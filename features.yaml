@@ -137,7 +137,7 @@ features:
     dimension: [collab, data-safety]
     priority: P1
     status: partial
-    paths: [crates/engine/model/src/lib.rs, crates/kdm/kdm-model/src/validate.rs, crates/kdm/kdm-model/tests/repair.rs, bindings/wasm/tests/nothing_to_repair.rs, web/src/board/sync.ts, web/src/canvas/BoardCanvas.tsx]
+    paths: [crates/engine/model/src/lib.rs, crates/kdm/kdm-model/src/validate.rs, crates/kdm/kdm-model/tests/repair.rs, bindings/wasm/tests/nothing_to_repair.rs, bindings/wasm/tests/batch_repair.rs, web/src/board/sync.ts, web/src/canvas/BoardCanvas.tsx]
     gap: >-
       Kition Desktop is for one person since the plain document model (kition-sdk 91cf510, plan
       2026-11-24): the KDM no longer merges concurrent edits, so the convergence suite and the
@@ -145,7 +145,7 @@ features:
       changes. What stays: every edit is a KDM change with stable ids, the page's replica follows
       the engine's changes in order, and a command leaves nothing for the repair to change. Not
       yet: presence, a server-ordered change stream, and a two-editor browser check.
-    cases: [regressions/issue-coedit-local-edit-left-a-repair, board.collab.live/nothing-to-repair, board.collab.live/repairs-where-they-arise]
+    cases: [regressions/issue-coedit-local-edit-left-a-repair, board.collab.live/nothing-to-repair, board.collab.live/repairs-where-they-arise, regressions/issue-batch-left-a-repair]
     since: "2026-11-17"
   - id: board.elements
     title: "Create, select, move, resize, rotate, style, group, stack and lock elements"
