@@ -35,16 +35,16 @@ Commands by namespace (the part of the id before the first dot):
 
 | Namespace | Commands | Change the document | Open to the agent | Examples |
 | --- | ---: | ---: | ---: | --- |
+| `arrange` | 2 | 2 | 2 | `arrange.group`, `arrange.ungroup` |
 | `card` | 2 | 2 | 2 | `card.add`, `card.setTarget` |
-| `clipboard` | 1 | 0 | 1 | `edit.copy` |
 | `connector` | 4 | 4 | 4 | `connector.add`, `connector.bind`, `connector.setLabel` |
-| `edit` | 2 | 2 | 2 | `edit.undo`, `edit.redo` |
-| `element` | 15 | 14 | 15 | `element.duplicate`, `element.delete`, `edit.paste` |
+| `edit` | 4 | 3 | 4 | `edit.undo`, `edit.redo`, `edit.copy` |
+| `element` | 12 | 11 | 12 | `element.duplicate`, `element.delete`, `element.add` |
 | `file` | 1 | 0 | 1 | `file.export` |
 | `frame` | 2 | 2 | 2 | `frame.add`, `frame.fit` |
 | `image` | 2 | 2 | 2 | `image.insert`, `image.setAlt` |
 | `layout` | 4 | 4 | 4 | `layout.align`, `layout.distribute`, `layout.stack` |
-| `links` | 1 | 1 | 1 | `link.retarget` |
+| `link` | 1 | 1 | 1 | `link.retarget` |
 | `mindmap` | 4 | 4 | 4 | `mindmap.addChild`, `mindmap.addSibling`, `mindmap.collapse` |
 | `page` | 6 | 5 | 6 | `page.add`, `page.rename`, `page.duplicate` |
 | `stroke` | 1 | 1 | 1 | `stroke.add` |
