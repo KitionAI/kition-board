@@ -650,7 +650,7 @@ dependencies = [
 [[package]]
 name = "kition-headless"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "kition-kit",
  "kition-kit-host",
@@ -663,7 +663,7 @@ dependencies = [
 [[package]]
 name = "kition-kdm"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "serde",
  "serde_json",
@@ -675,7 +675,7 @@ dependencies = [
 [[package]]
 name = "kition-kit"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "kition-kdm",
  "serde",
@@ -688,7 +688,7 @@ dependencies = [
 [[package]]
 name = "kition-kit-host"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "hex",
  "kition-kit-process-protocol",
@@ -705,7 +705,7 @@ dependencies = [
 [[package]]
 name = "kition-kit-process-protocol"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "serde",
  "serde_json",
@@ -716,7 +716,7 @@ dependencies = [
 [[package]]
 name = "kition-kit-server"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "kition-kdm",
  "kition-kit-process-protocol",
@@ -729,7 +729,7 @@ dependencies = [
 [[package]]
 name = "kition-kits"
 version = "0.1.0"
-source = "git+https://github.com/KitionAI/kition-sdk?rev=6a57d68f3555f24c14def0ac57d14646bf95aa01#6a57d68f3555f24c14def0ac57d14646bf95aa01"
+source = "git+https://github.com/KitionAI/kition-sdk?rev=d2b39aaf423d4082382781dd75a0e2a454a8d332#d2b39aaf423d4082382781dd75a0e2a454a8d332"
 dependencies = [
  "base64",
  "hex",
