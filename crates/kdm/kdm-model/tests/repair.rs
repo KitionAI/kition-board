@@ -686,3 +686,45 @@ fn v9_a_group_emptied_by_a_draft_and_the_person_is_deleted() {
     assert!(!a.replica().exists(&outer));
     assert_eq!(listed(&a, &page), vec![left, right]);
 }
+
+/// A draft's preview runs the board's repair (kition-sdk `KitSession::compare_changes`,
+/// `merged_state`; the engine's `compareChanges`), so it is what accepting the draft gives: the V9
+/// case above, a group the draft and the person each take one shape out of, previews with the
+/// emptied groups deleted. The preview changes nothing; the merge then gives exactly the
+/// previewed state and the compared changes, one Undo the exact state before and one Redo the
+/// repaired state (case regressions/issue-draft-preview-repaired).
+#[test]
+fn a_drafts_preview_is_the_repaired_merge() {
+    let mut a = board();
+    let page = first_page(&a);
+    let (outer, inner, left, right) = write(&mut a, |tx| {
+        let outer = add(tx, &page, json!({ "kind": "group" }));
+        let inner = add(tx, &page, json!({ "kind": "group", "parent": outer.as_str() }));
+        let mut left = shape(0.0, 0.0, 10.0, 10.0);
+        left["parent"] = json!(inner.as_str());
+        let mut right = shape(20.0, 0.0, 10.0, 10.0);
+        right["parent"] = json!(inner.as_str());
+        Ok((outer, inner, add(tx, &page, left), add(tx, &page, right)))
+    });
+    let (mut d, base) = draft(&a);
+    agent_write(&mut d, |tx| Ok(tx.set(&left, "parent", Value::Null)?));
+    write(&mut a, |tx| Ok(tx.set(&right, "parent", Value::Null)?));
+    let changes = d.export_changes(&base).unwrap();
+    let (before, version) = (a.state_hash().unwrap(), a.version());
+
+    let compared = a.compare_changes(&changes).unwrap().to_json();
+    let preview = a.merged_state(&changes).unwrap();
+    assert_eq!((a.state_hash().unwrap(), a.version()), (before.clone(), version.clone()), "a preview changes nothing");
+    let deleted: Vec<&Value> = compared["deleted"].as_array().unwrap().iter().map(|deleted| &deleted["id"]).collect();
+    assert!(deleted.contains(&&json!(inner.to_string())) && deleted.contains(&&json!(outer.to_string())), "the preview has the repair: {compared}");
+
+    a.merge_changes(&changes, &agent()).unwrap();
+    assert!(!a.replica().exists(&inner) && !a.replica().exists(&outer));
+    assert_eq!(state(&a), preview, "the preview is the merge");
+    assert_eq!(a.replica().diff_since(&version).unwrap().to_json(), compared, "the comparison is what the merge changed");
+    let repaired = a.state_hash().unwrap();
+    assert!(a.undo().unwrap().0);
+    assert_eq!(a.state_hash().unwrap(), before, "one undo: the exact state before the merge");
+    assert!(a.redo().unwrap().0);
+    assert_eq!(a.state_hash().unwrap(), repaired, "one redo: the exact repaired state");
+}
