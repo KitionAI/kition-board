@@ -1,0 +1,29 @@
+format: 1
+id: board.agent.draft/editor
+feature: board.agent.draft
+intent: >-
+  In the editor, through the development host (`?replica=1&checkpoints=1`, the sample board): the
+  person adds a page; an agent drafts a shape on the first page (`ai/run` on the draft); the
+  draft's comparison (`draft/compare`) lists the shape and the board does not hold it; the person
+  renames the new page meanwhile; the person accepts the draft (`draft/merge`, the agent's origin):
+  the canvas draws the shape and the tab keeps the new name. One click of Undo takes back the shape
+  only, Redo brings it back. A checkpoint recorded with a label at a save, a page added after it,
+  the checkpoint restored (`replica/restore`): the board has the checkpoint's pages, and one Undo
+  brings the later page back.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: web/tests/drafts.mjs
+  license: owned
+input: []
+steps:
+  - exec:
+      cmd: [node, web/tests/drafts.mjs, chromium]
+  - exec:
+      cmd: [node, web/tests/drafts.mjs, webkit]
+expected:
+  - { actual: "out:exec", compare: exit, value: 0 }
+since: "2026-11-26"
+timeout_s: 300
+requires: [chromium, webkit]

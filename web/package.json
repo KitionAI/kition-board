@@ -15,6 +15,7 @@
     "test:shapes": "node tests/shapes.mjs chromium && node tests/shapes.mjs webkit",
     "test:editing": "node tests/marks.mjs && node tests/editing.mjs chromium && node tests/editing.mjs webkit",
     "test:proof": "node tests/proof.mjs chromium && node tests/proof.mjs webkit",
+    "test:drafts": "node tests/drafts.mjs chromium && node tests/drafts.mjs webkit",
     "test:contract": "node ../../kition-sdk/tools/check-manifest.mjs ../kit.json --module public/engine"
   },
   "dependencies": {
