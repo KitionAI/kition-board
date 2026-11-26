@@ -35,7 +35,7 @@ features:
     status: has
     paths: [bindings/wasm/src/collab.rs, bindings/wasm/src/lib.rs, bindings/wasm/tests/drafts.rs]
     requirements: [AX13]
-    cases: [regressions/issue-draft-replica-blobs, regressions/issue-merge-stale-views]
+    cases: [regressions/issue-draft-replica-blobs, regressions/issue-merge-stale-views, regressions/issue-merge-cancelled-by-repair]
     since: "2026-11-17"
   - id: board.agent.preview
     title: "An agent's preview of a board is drawn by the engine with the fonts the kit ships (board_inspect preview: true)"

@@ -1,0 +1,23 @@
+format: 1
+id: regressions/issue-merge-cancelled-by-repair
+feature: board.agent.draft
+intent: >-
+  A draft the board's repair takes back whole records nothing: the agent's draft only puts a shape
+  into a frame the person deleted meanwhile, and the repair (V4) clears the dangling parent. The
+  merge answers no scope and no damage; the state, the version, the person's undo depth, the
+  revision and the view stay; the person's next Undo takes back their own deletion exactly, and
+  Redo deletes the frame again. Before (kition-sdk before 6a57d68), the merge recorded an undo step
+  that changed nothing.
+layer: gate
+dimension: collab
+source:
+  kind: issue
+  from: kition-sdk 6a57d68 alignment (schema-freeze, 2026-11-26)
+  license: owned
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: drafts, filter: a_merge_the_repair_takes_back_whole_records_nothing }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-26"

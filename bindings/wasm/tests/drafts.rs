@@ -140,3 +140,41 @@ fn a_restored_state_is_one_step_of_the_persons_undo_and_undoes_exactly() {
     assert_eq!(state(&doc), restored_state);
     assert_eq!(view(&doc), restored_view);
 }
+
+/// A draft the board's repair takes back whole records nothing (kition-sdk 6a57d68, data model
+/// 6.6 D9): the agent's draft only puts a shape into a frame the person deleted meanwhile, and the
+/// repair (V4) clears the dangling parent, so the merge leaves the board as it was: the state, the
+/// version, the person's undo depth, the revision and the view stay, the merge answers no scope
+/// and no damage, and the person's next Undo takes back their own deletion exactly. Before, the
+/// merge recorded a step that changed nothing, which the person's Undo passed over (case
+/// regressions/issue-merge-cancelled-by-repair).
+#[test]
+fn a_merge_the_repair_takes_back_whole_records_nothing() {
+    let mut doc = board();
+    let mine = shape(&mut doc, 10.0, 10.0, None);
+    let frame = doc.execute("frame.add", json!({ "box": [500, 0, 900, 300] })).unwrap()["frame"].as_str().unwrap().to_owned();
+    let (mut draft, base) = draft_of(&doc);
+    let agent = Origin::agent("agent:test");
+    draft.execute_as("element.set", json!({ "id": mine, "set": { "parent": frame } }), &agent).unwrap();
+    let changes = __export_changes(&draft, &base.encode()).unwrap();
+
+    let with_frame = state(&doc);
+    doc.execute("element.delete", json!({ "ids": [frame] })).unwrap();
+    assert!(!has(&doc, &frame));
+    let (deleted, deleted_view, version, revision) = (state(&doc), view(&doc), doc.version(), doc.revision());
+    let depth = doc.session().undo_depth(UndoScope::Person);
+
+    let answer: Value = serde_json::from_str(&__merge_changes(&mut doc, &changes, AGENT).unwrap()).unwrap();
+    assert_eq!(answer["scope"], Value::Null, "no step was recorded: {answer}");
+    assert_eq!(answer["damage"], json!({ "kind": "none" }), "{answer}");
+    assert_eq!(state(&doc), deleted, "the repair took the draft back whole: the merge changes nothing");
+    assert_eq!(doc.version(), version, "no change is logged");
+    assert_eq!(doc.session().undo_depth(UndoScope::Person), depth, "the merge records no step");
+    assert_eq!(doc.revision(), revision, "the views did not change");
+    assert_eq!(view(&doc), deleted_view);
+
+    assert!(done(doc.execute("edit.undo", json!({})).unwrap()), "the person's Undo takes back their deletion");
+    assert_eq!(state(&doc), with_frame, "exactly the state before the deletion");
+    assert!(done(doc.execute("edit.redo", json!({})).unwrap()));
+    assert_eq!(state(&doc), deleted, "Redo deletes the frame again");
+}
