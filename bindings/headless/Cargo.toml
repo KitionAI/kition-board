@@ -14,7 +14,7 @@ workspace = true
 kition-board-kit = { path = "../wasm" }
 kition-board-kdm = { workspace = true }
 kition-headless = { workspace = true }
-# The board container's replica (`BoardFiles`, document.identity): its schema and error type.
+# The board container's replica (`BoardFiles`, file.identity): its schema and error type.
 kition-kit = { workspace = true }
 kition-kit-server = { workspace = true }
 
@@ -27,7 +27,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 resvg = { workspace = true }
 # The agent's tools end to end (tests/premise.rs): kition-kits runs this executable.
 kition-kits = { workspace = true }
-# document.identity and document.fork through the real process (tests/identity.rs).
+# file.identity and file.fork through the real process (tests/identity.rs).
 kition-kit-host = { workspace = true }
 kition-board-kboard = { workspace = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

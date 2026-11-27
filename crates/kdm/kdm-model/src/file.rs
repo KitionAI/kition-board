@@ -94,7 +94,7 @@ pub fn open_file(bytes: &[u8], actor: ActorId) -> Result<OpenedFile> {
     Ok(OpenedFile { replica, base, blobs: parts.blobs, detached })
 }
 
-/// The replica a `.kboard` file embeds (`document.identity`, KitModel M7a): its content,
+/// The replica a `.kboard` file embeds (`file.identity`, KitModel M7a): its content,
 /// or `None` for an empty file (one made for the kit before it saved a board there). Answers
 /// `not-a-board: …`, `damaged: …` or `newer-version: …` for other bytes, as [`open_file`] does;
 /// never repairs, never writes.
@@ -106,7 +106,7 @@ pub fn embedded_replica(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
     Ok(Some(parts.content))
 }
 
-/// `bytes` (a `.kboard` file) holding the document `snapshot` instead of its own (`document.fork`,
+/// `bytes` (a `.kboard` file) holding the document `snapshot` instead of its own (`file.fork`,
 /// KitModel M7a): `content.json` is the snapshot's content, `meta.json`'s docId the snapshot's, and the blobs the ones its state
 /// references, so no earlier identity stays in the file. Entries this build does not know are kept.
 pub fn replace_replica(bytes: &[u8], snapshot: &[u8]) -> Result<Vec<u8>> {

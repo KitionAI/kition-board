@@ -1,4 +1,4 @@
-//! `document.identity` and `document.fork` (Kit Process Protocol section 5.6, KitModel M7a)
+//! `file.identity` and `file.fork` (Kit Process Protocol section 5.6, KitModel M7a)
 //! through the real `kition-board` process: a `.kboard` embeds its replica as the document's
 //! content (`content.json`, the document's state with no history, design note 2.1), so a byte copy of
 //! a file is the same document. A host reads the identity a file carries without parsing the
@@ -76,7 +76,7 @@ async fn objects(kit: &HeadlessKit, path: &str) -> Value {
     assert!(ids.len() >= 4, "the board, a page and two shapes: {inventory}");
     let load: Vec<Value> = ids.iter().map(|id| json!({ "target": id })).collect();
     let loaded = batch(json!({ "ops": [], "load": load })).await.unwrap();
-    kit.request("document.close", json!({ "documentId": document }), LIMIT).await.unwrap();
+    kit.request("file.close", json!({ "documentId": document }), LIMIT).await.unwrap();
     json!({ "objects": inventory["objects"], "loaded": loaded["loaded"] })
 }
 
@@ -94,7 +94,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     let dir = workspace("embedded");
     std::fs::write(dir.join("Plan.kboard"), board()).unwrap();
     let kit = launch(&dir).await;
-    assert!(kit.serves("document.identity"), "{}", kit.capabilities());
+    assert!(kit.serves("file.identity"), "{}", kit.capabilities());
 
     // The identity the file carries, read without opening it, and the same for a byte copy.
     let source_id = kit.identity("Plan.kboard", LIMIT).await.unwrap().doc_id.expect("a board file has an identity");
@@ -119,7 +119,7 @@ async fn a_board_tells_its_identity_and_forks_into_a_new_document_without_histor
     let exported = kit.request("model.export", json!({ "documentId": state["documentId"] }), LIMIT).await.unwrap();
     let draft = kit.request("model.open", json!({ "name": "Fork.kboard", "snapshot": exported["changes"] }), LIMIT).await.unwrap();
     assert_ne!(draft["documentId"], state["documentId"], "{draft}");
-    kit.request("document.close", json!({ "documentId": state["documentId"] }), LIMIT).await.unwrap();
+    kit.request("file.close", json!({ "documentId": state["documentId"] }), LIMIT).await.unwrap();
 
     // The fork's file: the new id in meta.json and in its content, everything else kept.
     let (source_bytes, fork_bytes) = (std::fs::read(dir.join("Plan.kboard")).unwrap(), std::fs::read(dir.join("Fork.kboard")).unwrap());

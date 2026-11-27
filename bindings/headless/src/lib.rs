@@ -10,7 +10,7 @@ pub fn add_shipped_fonts() -> usize {
     SHIPPED.iter().map(|bytes| kition_board_kit::add_font(bytes)).sum()
 }
 
-/// Where a `.kboard` file keeps the board's replica (`document.identity` and `document.fork`, Kit
+/// Where a `.kboard` file keeps the board's replica (`file.identity` and `file.fork`, Kit
 /// Process Protocol section 5.6): `content.json`, the document's content (design note 2.1).
 /// A fork's file holds the copy's content there, with `meta.json`'s copy of the docId the copy's
 /// (`kition_board_kdm::file::replace_replica`).

@@ -37,7 +37,7 @@ The difference column is the feature's recorded gap.
 | `board.platform.brand` The embedded editor uses the canonical kit palette | P1 | has | — | — |
 | `board.platform.color-scheme` The board follows the host's color scheme: in dark, the canvas, the default ink, the colour tokens, the selection handles, the cards (their bodies, preview stand-ins and badge glyphs) and the minimap are drawn for a dark surface, live, nothing moving; a file's own colours, exports, previews and thumbnails stay as they are | P1 | has | — | — |
 | `board.platform.display-modes` The editor in every display mode: Menus by default, Single line and Classic open on Edit, Focus shows only the board and leaves on Escape | P1 | has | — | — |
-| `board.platform.document-identity` A host reads the document id a .kboard carries and forks a copied board into a new document with no history (document.identity, document.fork; Kit Process Protocol 5.6) | P1 | has | — | — |
+| `board.platform.document-identity` A host reads the document id a .kboard carries and forks a copied board into a new document with no history (file.identity, file.fork; Kit Process Protocol 5.6) | P1 | has | — | — |
 | `board.templates` Insert a template | P2 | has | — | — |
 
 | Priority | has | partial | missing |

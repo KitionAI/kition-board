@@ -20,13 +20,13 @@ kition-board-scene = { path = "crates/render/scene" }
 kition-board-text = { path = "crates/render/text" }
 
 # kition-sdk, pinned by commit (one revision for every crate of it)
-kition-kit = { git = "https://github.com/KitionAI/kition-sdk", rev = "d2b39aaf423d4082382781dd75a0e2a454a8d332", features = ["session"] }
-kition-headless = { git = "https://github.com/KitionAI/kition-sdk", rev = "d2b39aaf423d4082382781dd75a0e2a454a8d332" }
-kition-kit-server = { git = "https://github.com/KitionAI/kition-sdk", rev = "d2b39aaf423d4082382781dd75a0e2a454a8d332" }
-# A host of kit processes (`HeadlessKit`), for the `document.identity` tests.
-kition-kit-host = { git = "https://github.com/KitionAI/kition-sdk", rev = "d2b39aaf423d4082382781dd75a0e2a454a8d332" }
+kition-kit = { git = "https://github.com/KitionAI/kition-sdk", rev = "94c488a33b2cabf255c67d2d63167cd85b37c835", features = ["session"] }
+kition-headless = { git = "https://github.com/KitionAI/kition-sdk", rev = "94c488a33b2cabf255c67d2d63167cd85b37c835" }
+kition-kit-server = { git = "https://github.com/KitionAI/kition-sdk", rev = "94c488a33b2cabf255c67d2d63167cd85b37c835" }
+# A host of kit processes (`HeadlessKit`), for the `file.identity` tests.
+kition-kit-host = { git = "https://github.com/KitionAI/kition-sdk", rev = "94c488a33b2cabf255c67d2d63167cd85b37c835" }
 # The kits' MCP tools (`kition-kits-mcp`'s library), for the end-to-end agent tests.
-kition-kits = { git = "https://github.com/KitionAI/kition-sdk", rev = "d2b39aaf423d4082382781dd75a0e2a454a8d332" }
+kition-kits = { git = "https://github.com/KitionAI/kition-sdk", rev = "94c488a33b2cabf255c67d2d63167cd85b37c835" }
 
 # foundation
 serde = { version = "1", features = ["derive"] }

@@ -2,8 +2,8 @@
 //! (`kition-board-kit`), served headless over the Kit Protocol by `kition-headless`, as the kit's
 //! `kit.json` declares it, with the object model (`model.describe`, `model.batch`) and the replica
 //! methods (`model.open`, `model.import`, `model.export`, `model.save`) over the document's change
-//! exchange (engine contract 2), and the identity a file carries (`document.identity`,
-//! `document.fork`: a `.kboard` embeds its replica, `kition_board::BoardFiles`).
+//! exchange (engine contract 2), and the identity a file carries (`file.identity`,
+//! `file.fork`: a `.kboard` embeds its replica, `kition_board::BoardFiles`).
 
 use std::sync::Arc;
 

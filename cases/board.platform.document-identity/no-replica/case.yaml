@@ -4,7 +4,7 @@ feature: board.platform.document-identity
 intent: >-
   Through the real kition-board process: an empty .kboard (made for the kit before it saved a
   board) carries no identity, and its fork is the same bytes with no docId; bytes that are not a
-  board are refused as unsupported_format by both document.identity and document.fork, never
+  board are refused as unsupported_format by both file.identity and file.fork, never
   answered with no identity, and the fork writes nothing.
 layer: gate
 source:
