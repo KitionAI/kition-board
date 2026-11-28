@@ -1,0 +1,27 @@
+format: 1
+id: regressions/issue-hand-f1-2
+feature: board.editor.focus
+intent: >-
+  Right after the board opens, with nothing clicked, R picks the shape tool. Before, the focus
+  stayed outside the editor (document.activeElement was the body, and in the development host the
+  top page held it), so the first tool letter did nothing until the person clicked the canvas. The
+  canvas now takes the keys when the board opens, and the frame's keyboardHome hands it any key
+  pressed while nothing holds the keyboard.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F1.2 (probe01.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: focus-open
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

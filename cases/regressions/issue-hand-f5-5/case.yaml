@@ -1,0 +1,27 @@
+format: 1
+id: regressions/issue-hand-f5-5
+feature: board.editor.type-to-edit
+intent: >-
+  With one sticky note selected, typing hello writes "hello" into it (tool letters included); with
+  one shape selected, typing Hello writes "Hello" and the tool stays Select; a digit starts the
+  text too, and Escape then keeps the old text; a lower-case tool letter with a shape selected
+  still picks its tool (web/tests/flow.mjs relies on it). Before, every letter was a tool key:
+  typing Hello on a selected shape ended on the highlighter and wrote nothing.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F5.5 (probe01.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: type-to-edit
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

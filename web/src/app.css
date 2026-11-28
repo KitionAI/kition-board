@@ -74,6 +74,12 @@
   pointer-events: none;
 }
 
+.board-hover {
+  fill: none;
+  stroke: var(--kit-primary, #966e00);
+  pointer-events: none;
+}
+
 .board-selection-box {
   fill: none;
   stroke: var(--kit-primary, #966e00);

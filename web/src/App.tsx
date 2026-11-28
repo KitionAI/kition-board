@@ -448,6 +448,9 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
   // The page tabs, kept while the pages' ids and names stay (the board's other changes do not draw them again).
   const pages = useStable(state?.pages ?? [])
   const focusCanvas = useCallback(() => canvasApi.current?.focus(), [])
+  // A key pressed while nothing holds the keyboard (a closed dialog, a panel control that let go of
+  // it) goes to the canvas, and so does the clipboard event of Cmd/Ctrl+C, X or V (rule 17).
+  const keyboardHome = useCallback(() => canvasApi.current?.element() ?? null, [])
 
   // The frame's rail, actions and panel, kept as the same elements between changes of the
   // board, so a commit does not render them again (the commit budget, S2-1).
@@ -492,6 +495,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       actions={actions}
       panels={panels}
       onKeyDown={(event) => canvasApi.current?.keyDown(event.nativeEvent) ?? false}
+      keyboardHome={keyboardHome}
       status={
         <span data-testid="board-status">
           {state ? summary(t, host.init.locale, state.elements, Math.max(1, state.pages.length)) : ''}

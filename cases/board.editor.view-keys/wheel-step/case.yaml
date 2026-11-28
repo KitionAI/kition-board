@@ -1,0 +1,25 @@
+format: 1
+id: board.editor.view-keys/wheel-step
+feature: board.editor.view-keys
+intent: >-
+  One Ctrl+wheel event zooms in by at most 10% (one mouse notch, deltaY 100, is x1.1; a larger
+  delta is no more) and out by at most 10% (x1/1.1), and the board point under the pointer stays
+  under it (rule 15 of the by-hand plan; finding F10.2: before, one notch was x1.65).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/canvas.mjs (plan: Board usable by hand, stage 0)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: zoom-wheel
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -13,7 +13,7 @@
  *
  * Ported from Kition's `packages/board-editor/src/components/WhiteboardTextEditor.tsx`.
  */
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ICON_STROKE, isMac } from '@kition/sdk/editor'
 import { BoldIcon, ItalicIcon, LinkIcon, type IconComponent } from '@kition/tessera/icons/react'
 import { composingEnter } from '../board/ime'
@@ -33,6 +33,11 @@ export type TextEditing = {
   align: 'left' | 'center'
   /** The marks the text has, when the box offers the marks bar; `null`: no bar (Markdown, titles, captions). */
   marks: readonly TextMark[] | null
+  /**
+   * Opened by a typed character (`value` is that character): the box takes the focus at once, so
+   * the characters typed after it land in it, with the caret after the text (no selection).
+   */
+  typed?: boolean
 }
 
 const ICONS: Record<MarkName, IconComponent> = { bold: BoldIcon, italic: ItalicIcon, link: LinkIcon }
@@ -70,7 +75,7 @@ export function TextEditor({
   const [ignored, setIgnored] = useState(0)
   // The stored marks and the waiting ones, both following the typing; the box's selection.
   const marks = useRef<{ stored: TextMark[]; pending: TextMark[] }>({ stored: [...(editing.marks ?? [])], pending: [] })
-  const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: editing.value.length })
+  const [selection, setSelection] = useState<{ start: number; end: number }>(editing.typed ? { start: editing.value.length, end: editing.value.length } : { start: 0, end: editing.value.length })
   const [linking, setLinking] = useState<{ start: number; end: number; text: string } | null>(null)
   const [, setTick] = useState(0)
   // The focus moving between the text box and the link field is not leaving the editor, whatever
@@ -83,13 +88,21 @@ export function TextEditor({
   // Focused once the pointer press that opened the box is over: the Text tool opens a new box on
   // the press, and the press's own default action then focuses the canvas; a box focused at once
   // would lose focus to it and close empty (leaving the box commits).
+  // A box opened by a key has no press to wait for: it takes the focus before the next key.
+  useLayoutEffect(() => {
+    if (!editing.typed) return
+    const box = field.current
+    box?.focus({ preventScroll: true })
+    box?.setSelectionRange(box.value.length, box.value.length)
+  }, [editing.typed])
   useEffect(() => {
+    if (editing.typed) return undefined
     const id = window.setTimeout(() => {
       field.current?.focus()
       field.current?.select()
     }, 0)
     return () => window.clearTimeout(id)
-  }, [])
+  }, [editing.typed])
 
   const finish = (commit: boolean) => {
     if (done.current) return

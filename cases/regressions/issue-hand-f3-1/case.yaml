@@ -1,0 +1,31 @@
+format: 1
+id: regressions/issue-hand-f3-1
+feature: board.editor.gestures
+intent: >-
+  While a shape is dragged, its selection box and handles are drawn where the shape is drawn
+  (kitBoard.overlay() against the shape's drawn box mid-drag), and on the moved shape after the
+  drop; while a corner handle is dragged, the selection box is the resized box. Before, the shape
+  followed the pointer but its selection box and the eight handles stayed where the drag began
+  until the release.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F3.1 (probe01.mjs, round1/11-move-mid.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: move-overlay
+      browsers: [chromium, webkit]
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: resize-overlay
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -1,0 +1,25 @@
+format: 1
+id: regressions/issue-hand-f1-3
+feature: board.editor.focus
+intent: >-
+  After an agent adds elements while nothing in the editor holds the keyboard, A picks the
+  connector tool without a click. Before, the key was lost and the person's next drag moved a
+  shape instead of connecting it.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F1.3 (probe01.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: focus-agent
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -1,6 +1,6 @@
 format: 1
 kit: board
-updated: "2026-11-22"
+updated: "2026-11-28"
 gate_budget_s: 600
 protected: ["conformance/expected/**"]
 features:
@@ -177,6 +177,61 @@ features:
     gap: "Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks. The box's marks follow the typing at its caret, but element.setText places a change of the stored text by comparing the old and new text from both ends (kition-sdk's diff_text), so an x typed inside a run of identical characters goes in at the run's end: a stored mark beside the run can take the typed character (marks made in the box are placed right)."
     cases: [board.editing/clipboard, board.editing/pictures, board.editing/change-shape, board.editing/marks, regressions/issue-mark-offsets, regressions/issue-link-scheme, regressions/issue-link-field-blur, regressions/issue-locked-cut-key, regressions/issue-file-drop]
     since: "2026-11-21"
+  - id: board.editor.gestures
+    title: "Pointer gestures by hand: a press becomes a drag after 4 screen pixels, Escape cancels any gesture (the start state back, the pointer let go), and the selection overlay follows a move, a resize and a rotation"
+    dimension: [function]
+    priority: P0
+    status: has
+    paths: [web/src/canvas/BoardCanvas.tsx, web/src/canvas/gestures/*.ts, web/src/board/layer.ts, web/tests/hand/harness.mjs, web/tests/hand/canvas.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.gestures/threshold-escape, regressions/issue-hand-f3-1, regressions/issue-hand-f3-10]
+    since: "2026-11-28"
+  - id: board.editor.focus
+    title: "The keys work without a click first: right after the board opens, after an agent's edit, after a ribbon tab, a panel button or a dialog"
+    dimension: [function, platform]
+    priority: P0
+    status: has
+    paths: [web/src/App.tsx, web/src/canvas/BoardCanvas.tsx, web/tests/hand/canvas.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.focus/panel-dialog, regressions/issue-hand-f1-2, regressions/issue-hand-f1-3]
+    since: "2026-11-28"
+  - id: board.editor.hover
+    title: "Hover and cursors: the element under the pointer is outlined and shows the move cursor; handles show their resize or rotate cursor; the hand tool and Space held show grab, grabbing while panning"
+    dimension: [function]
+    priority: P0
+    status: has
+    paths: [web/src/canvas/BoardCanvas.tsx, web/src/canvas/gestures/rotate.ts, web/src/app.css, web/tests/hand/canvas.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.hover/outline-cursors]
+    since: "2026-11-28"
+  - id: board.editor.type-to-edit
+    title: "Typing into the selection: a character typed with one sticky note, text, mind-map node or shape selected starts its text with that character; a double-click on the empty canvas makes a text there"
+    dimension: [function]
+    priority: P0
+    status: partial
+    paths: [web/src/canvas/BoardCanvas.tsx, web/src/canvas/TextEditor.tsx, web/tests/hand/canvas.mjs]
+    target: "Miro (web, 2026-11)"
+    gap: "With a plain shape selected, a lower-case tool letter (v h r n m t a p l e f) still picks its tool instead of starting the text, because web/tests/flow.mjs presses tool letters with a shape selected (plan section 5): typing \"hello\" into a selected shape starts with the hand tool, typing \"Hello\" or \"2 days\" writes. Sticky notes, texts and mind-map nodes take every letter. The first character typed through an input method (a composition) does not start the text."
+    cases: [board.editor.type-to-edit/double-click-text, regressions/issue-hand-f5-5]
+    since: "2026-11-28"
+  - id: board.editor.click-create
+    title: "A click with the shape, sticky note or frame tool makes the default size centred on the pointer"
+    dimension: [function]
+    priority: P0
+    status: has
+    paths: [web/src/canvas/gestures/draw.ts, web/tests/hand/canvas.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.click-create/centred]
+    since: "2026-11-28"
+  - id: board.editor.view-keys
+    title: "The view by hand: one Ctrl/Cmd+wheel event zooms 10% at most, about the pointer; Shift+0 is 100%, Shift+1 fits everything, Shift+2 shows the selection at 100% (fits it when already at 100%)"
+    dimension: [function]
+    priority: P0
+    status: has
+    paths: [web/src/canvas/BoardCanvas.tsx, web/tests/hand/canvas.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.view-keys/wheel-step, board.editor.view-keys/fit-keys]
+    since: "2026-11-28"
   - id: board.text
     title: "Text on the board: marks on a text run"
     dimension: [function]

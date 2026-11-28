@@ -1,6 +1,6 @@
 # Target-app parity
 
-> **Last updated:** 2026-11-22 · **Source:** `features.yaml` (updated 2026-11-22) and the engine's command list
+> **Last updated:** 2026-11-28 · **Source:** `features.yaml` (updated 2026-11-28) and the engine's command list
 
 Each feature in `features.yaml` records its status against what the feature promises and, where it
 has one, the target application it is compared with (Miro, web, 2026-11, for the editing features).
@@ -18,6 +18,13 @@ The difference column is the feature's recorded gap.
 | `board.connectors.ends` Nine arrowheads, and a bound end that meets its target's outline | P0 | has | Miro (web, 2026-11) | Ends meet the outline of the ellipses, the polygon shapes of outline.rs (the diamond, triangles, hexagon, parallelogram and the others in its table) and the curved document, delay, display and stored-data (each curve sampled as a polygon within 0.3% of the box); a star, cloud, heart, cylinder, pill, multi-document, note and the four single arrows, and the actor and the other open marks (line, check, the braces), still meet their box |
 | `board.drawing` Freehand strokes | P0 | has | — | — |
 | `board.editing` Copy, cut, paste, Alt-drag duplicate, the canvas menu, pasted and dropped pictures, changing a shape, bold/italic/link in a label | P0 | has | Miro (web, 2026-11) | Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks. The box's marks follow the typing at its caret, but element.setText places a change of the stored text by comparing the old and new text from both ends (kition-sdk's diff_text), so an x typed inside a run of identical characters goes in at the run's end: a stored mark beside the run can take the typed character (marks made in the box are placed right). |
+| `board.editor.gestures` Pointer gestures by hand: a press becomes a drag after 4 screen pixels, Escape cancels any gesture (the start state back, the pointer let go), and the selection overlay follows a move, a resize and a rotation | P0 | has | Miro (web, 2026-11) | — |
+| `board.editor.focus` The keys work without a click first: right after the board opens, after an agent's edit, after a ribbon tab, a panel button or a dialog | P0 | has | Miro (web, 2026-11) | — |
+| `board.editor.hover` Hover and cursors: the element under the pointer is outlined and shows the move cursor; handles show their resize or rotate cursor; the hand tool and Space held show grab, grabbing while panning | P0 | has | Miro (web, 2026-11) | — |
+| `board.editor.type-to-edit` Typing into the selection: a character typed with one sticky note, text, mind-map node or shape selected starts its text with that character; a double-click on the empty canvas makes a text there | P0 | partial | Miro (web, 2026-11) | With a plain shape selected, a lower-case tool letter (v h r n m t a p l e f) still picks its tool instead of starting the text, because web/tests/flow.mjs presses tool letters with a shape selected (plan section 5): typing "hello" into a selected shape starts with the hand tool, typing "Hello" or "2 days" writes. Sticky notes, texts and mind-map nodes take every letter. The first character typed through an input method (a composition) does not start the text. |
+| `board.editor.click-create` A click with the shape, sticky note or frame tool makes the default size centred on the pointer | P0 | has | Miro (web, 2026-11) | — |
+| `board.editor.view-keys` The view by hand: one Ctrl/Cmd+wheel event zooms 10% at most, about the pointer; Shift+0 is 100%, Shift+1 fits everything, Shift+2 shows the selection at 100% (fits it when already at 100%) | P0 | has | Miro (web, 2026-11) | — |
+| `board.file.content-only` A .kboard holds the board's content, not its history: content.json (the KDM content encoding, kition-sdk data model 7.4) and the blobs the state references, no change log, no deleted content, no version, no origins (kition-sdk rule M16b); it opens as the same document alone or on the host's stored replica | P0 | has | — | — |
 | `board.elements` Create, select, move, resize, rotate, style, group, stack and lock elements | P0 | has | Miro (web, 2026-11) | — |
 | `board.frames` Frames that hold and fit elements | P0 | has | — | — |
 | `board.images` Pictures on the board, with alternative text | P0 | has | Miro (web, 2026-11) | Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs. |
@@ -42,6 +49,6 @@ The difference column is the feature's recorded gap.
 
 | Priority | has | partial | missing |
 | --- | ---: | ---: | ---: |
-| P0 | 16 | 1 | 0 |
+| P0 | 22 | 2 | 0 |
 | P1 | 10 | 3 | 0 |
 | P2 | 1 | 0 | 0 |

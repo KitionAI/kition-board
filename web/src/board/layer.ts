@@ -16,9 +16,10 @@ export type Viewport = { x: number; y: number; zoom: number; width: number; heig
 
 /**
  * A gesture's preview of an element: moved, and for a resize scaled about its top-left corner (a
- * fragment in world coordinates: `x' = x·sx + dx`).
+ * fragment in world coordinates: `x' = x·sx + dx`). A rotation turns a boxed element about its own
+ * centre (after the move) and a fragment in world coordinates about `about`.
  */
-export type Override = { dx: number; dy: number; sx?: number; sy?: number; rotate?: number }
+export type Override = { dx: number; dy: number; sx?: number; sy?: number; rotate?: number; about?: { x: number; y: number } }
 
 export class ElementLayer {
   readonly index = new SpatialIndex()
@@ -263,6 +264,8 @@ export class ElementLayer {
         if (rotation) transform += ` rotate(${rotation} ${w / 2} ${h / 2})`
         if (override?.sx != null || override?.sy != null) transform += ` scale(${override.sx ?? 1} ${override.sy ?? 1})`
       }
+    } else if (override?.rotate && override.about) {
+      transform = `rotate(${override.rotate} ${override.about.x} ${override.about.y})`
     } else if (override) {
       transform = override.sx != null || override.sy != null ? `matrix(${override.sx ?? 1} 0 0 ${override.sy ?? 1} ${override.dx} ${override.dy})` : `translate(${override.dx} ${override.dy})`
     }

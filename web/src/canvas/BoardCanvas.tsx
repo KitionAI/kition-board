@@ -1,12 +1,16 @@
 /**
  * The board canvas (R2c, design note 4): the page view of the board drawn with the engine's SVG
- * fragments (`ElementLayer`), and the interaction on top of it: select, move (dropping into
- * frames), resize (one box, rotated or not, or a selection), rotate, marquee, draw shapes, frames,
- * text, strokes and highlights, erase, connect, re-attach connector ends, grow mind maps, pan and
- * zoom, and the text box. During a gesture only the editor's own view changes (transforms of cached
- * fragments, a live line for the connectors of moved shapes); when it ends, one engine command
- * makes the change, one undo step. The gesture's preview stays until that command's change has
- * arrived through the page replica, and goes in the same frame its result is shown (no flicker).
+ * fragments (`ElementLayer`), and the interaction on top of it. The pointer gestures (select and
+ * move, resize, scale, rotate, marquee, draw shapes, notes and frames, connect, re-attach connector
+ * ends, pen and highlighter, erase, pan) are one file each in `./gestures`; this component only
+ * dispatches the pointer to them (a press stays "pressed" until the pointer has moved 4 screen
+ * pixels, Escape cancels any of them) and draws the overlay: the hover outline, the selection with
+ * its handles (following a gesture's preview), the gesture's draft, snap guides and drop targets.
+ * It also keeps the keys (tools, typing into the selected element, the view keys), the text box,
+ * the clipboard, the canvas menu, pan and zoom. During a gesture only the editor's own view changes;
+ * when it ends, one engine command makes the change, one undo step. The gesture's preview stays
+ * until that command's change has arrived through the page replica, and goes in the same frame its
+ * result is shown (no flicker).
  *
  * Ported from Kition's `packages/board-editor/src/components/WhiteboardCanvas.tsx`,
  * `WhiteboardSelectionOverlay.tsx`, `hooks/useWhiteboardInteractionMachine.ts`,
@@ -18,21 +22,33 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
 import { FrameChrome, toast, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
 import * as clipboard from '../board/clipboard'
-import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rect, rotate, union, type Point, type Rect } from '../board/geometry'
+import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rotate, union, type Point, type Rect } from '../board/geometry'
 import { rayAnchor } from '../board/outline'
-import { ElementLayer, type Override, type Viewport } from '../board/layer'
+import { ElementLayer, type Viewport } from '../board/layer'
 import { controlLanes, graphOf, isMindNode } from '../board/mindmap'
 import { frameAt, isBoxed, type BoardElement } from '../board/model'
-import { resizeSnap, translationSnap, type Handle, type SnapGuide } from '../board/snap'
-import { simplifyStroke } from '../board/freehand'
+import type { Handle, SnapGuide } from '../board/snap'
 import type { BoardSync } from '../board/sync'
-import { handleCursor, handlePoint, resized, resizedRotated, scaleOverrides } from '../board/resize'
+import { handleCursor, handlePoint } from '../board/resize'
 import { styleFor, type Style } from '../board/style'
 import { TOOL_KEYS, type Tool } from '../tools'
 import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
 import { marksOf, sendMarks, type TextMark } from '../board/marks'
 import { TextEditor, type TextEditing } from './TextEditor'
+import { downBrush } from './gestures/brush'
+import { downConnect } from './gestures/connect'
+import { downDraw } from './gestures/draw'
+import { downErase } from './gestures/erase'
+import { downMove } from './gestures/move'
+import { downPan } from './gestures/pan'
+import { downPen } from './gestures/pen'
+import { placeMindMap, placeText } from './gestures/place'
+import { downResize } from './gestures/resize'
+import { downRotate, ROTATE_CURSOR } from './gestures/rotate'
+import { downScale } from './gestures/scale'
+import { downTerminal } from './gestures/terminal'
+import { createdOf, DRAG_THRESHOLD, type Draft, type EndTarget, type Gesture, type GestureContext, type PointerInput, type SelectionPreview } from './gestures/types'
 
 export type { Tool }
 
@@ -45,6 +61,8 @@ export type BoardCanvasApi = {
   edit: (id: string) => void
   /** Gives the keys back to the canvas (after a dialog or a panel placed something). */
   focus: () => void
+  /** The element that holds the keys when nothing else does (the frame's `keyboardHome`). */
+  element: () => HTMLElement | null
 }
 
 type Props = {
@@ -73,7 +91,8 @@ type Props = {
 
 const MIN_ZOOM = 0.05
 const MAX_ZOOM = 4
-const MIN_DRAW = 6
+/** How far one Ctrl/Cmd+wheel event zooms at most (rule 15): 10%. */
+const WHEEL_ZOOM_STEP = 0.1
 const HANDLES: readonly Handle[] = ['north-west', 'north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west']
 const CONNECTION_HANDLES: Array<{ side: string; anchor: [number, number]; normal: Point }> = [
   { side: 'north', anchor: [0.5, 0], normal: { x: 0, y: -1 } },
@@ -82,31 +101,11 @@ const CONNECTION_HANDLES: Array<{ side: string; anchor: [number, number]; normal
   { side: 'west', anchor: [0, 0.5], normal: { x: -1, y: 0 } },
 ]
 
-/** Where a connector end goes: an element (and where on it) or a free point. */
-type EndTarget = { element: string; anchor: [number, number] | null; point: Point } | { element: null; point: Point }
+/** The gesture under way: the pointer it holds, where it was pressed, and whether it has started to drag. */
+type Active = { gesture: Gesture; pointerId: number; start: Point; dragging: boolean; svg: Element }
 
-type Gesture =
-  | { type: 'pan'; start: Point; from: Viewport }
-  /**
-   * Alt pressed during the drag makes copies at the drop instead (one element.duplicate); Alt held
-   * from the press (`altAtStart`) moves without snapping, as before.
-   */
-  | { type: 'move'; start: Point; roots: string[]; moving: Set<string>; base: Rect; connectors: string[]; delta: Point; moved: boolean; frames: Array<{ id: string; box: Rect }>; centers: Point[]; altAtStart: boolean }
-  | { type: 'resize'; id: string; handle: Handle; box: Rect; rotation: number; current: Rect }
-  | { type: 'scale'; roots: string[]; moving: string[]; handle: Handle; box: Rect; current: Rect }
-  | { type: 'rotate'; ids: string[]; origin: Point; start: number; degrees: number }
-  | { type: 'brush'; start: Point; current: Point; additive: boolean; initial: string[] }
-  | { type: 'draw'; tool: Tool; start: Point; current: Point }
-  | { type: 'connect'; from: EndTarget; current: EndTarget; elbow: boolean }
-  | { type: 'terminal'; connector: string; terminal: 'start' | 'end'; current: EndTarget }
-  | { type: 'pen'; points: Point[]; highlight: boolean }
-  | { type: 'erase'; ids: Set<string> }
-
-/** What the overlay draws for the gesture under way. */
-type Draft =
-  | { type: 'rect'; box: Rect; dashed: boolean }
-  | { type: 'lines'; lines: Point[][]; target: string | null }
-  | { type: 'pen'; points: Point[]; highlight: boolean }
+/** Where the overlay draws the selection's frame and the hover outline (board coordinates), for the tests' `overlay()`. */
+type OverlayInfo = { selection: { box: Rect; rotation: number } | null; hover: { id: string; box: Rect } | null; handles: number }
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
@@ -129,15 +128,22 @@ function touchedBy(answer: Record<string, unknown> | null): string[] {
   })
 }
 
-/** The ids a command's answer names as made. */
-function createdOf(answer: Record<string, unknown> | null): string[] {
-  const ids = answer?.created
-  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
-}
-
 /** Whether `target` is a field that keeps its own clipboard. */
 function typingIn(target: EventTarget | null): boolean {
   return (target as Element | null)?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])') != null
+}
+
+/**
+ * Which way a typed character goes into the single selected element (rule 10): a sticky note, a
+ * text and a mind-map node take any printable character; a plain shape takes any but a lower-case
+ * tool letter, which still picks its tool (web/tests/flow.mjs presses tool letters with a shape
+ * selected; plan section 5). Null: the element takes no typing (a frame, a connector, a picture).
+ */
+function typingTarget(element: BoardElement | undefined): 'shape' | 'any' | null {
+  if (!element || element.locked) return null
+  if (element.kind === 'text') return 'any'
+  if (element.kind !== 'shape') return null
+  return element.shapeStyle === 'sticky' || element.shapeStyle === 'mind-node' ? 'any' : 'shape'
 }
 
 export function BoardCanvas(props: Props) {
@@ -153,9 +159,19 @@ export function BoardCanvas(props: Props) {
   const [guides, setGuides] = useState<SnapGuide[]>([])
   /** The frames a move under way drops its elements into. */
   const [drops, setDrops] = useState<string[]>([])
+  /** Where a gesture under way previews the selection (the overlay follows it). */
+  const [preview, setPreview] = useState<SelectionPreview | null>(null)
+  /** The element under the pointer with the select tool (rule 3). */
+  const [hover, setHover] = useState<string | null>(null)
+  const hoverNow = useRef(hover)
+  hoverNow.current = hover
+  /** The cursor of the gesture that is dragging (null: the tool's). */
+  const [gestureCursor, setGestureCursor] = useState<string | null>(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
   const [editing, setEditing] = useState<TextEditing | null>(null)
   const [tick, setTick] = useState(0)
-  const gesture = useRef<Gesture | null>(null)
+  const active = useRef<Active | null>(null)
+  const overlayInfo = useRef<OverlayInfo>({ selection: null, hover: null, handles: 0 })
   /** The last pointer events, for a failing flow test to show. */
   const trace = useRef<string[]>([])
   const note = (entry: string) => {
@@ -225,13 +241,15 @@ export function BoardCanvas(props: Props) {
     return out
   }, [sync])
 
+
+  /** Shows `area` whole in the view, zoomed in no further than `max`. */
   const show = useCallback(
-    (area: Rect) => {
+    (area: Rect, max = 1) => {
       const v = viewport.current
       if (!v.width || !v.height) return
       const w = Math.max(1, area.x1 - area.x0)
       const h = Math.max(1, area.y1 - area.y0)
-      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((v.width - 80) / w, (v.height - 80) / h, 1)))
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((v.width - 80) / w, (v.height - 80) / h, max)))
       applyView({ zoom: z, x: area.x0 + w / 2 - v.width / z / 2, y: area.y0 + h / 2 - v.height / z / 2 })
     },
     [applyView],
@@ -265,6 +283,12 @@ export function BoardCanvas(props: Props) {
     [applyView, contentBox, show, zoomAt],
   )
 
+  /** Gives the keys to the canvas when nothing in the editor holds them (rule 17). */
+  const takeKeys = useCallback(() => {
+    const focused = document.activeElement
+    if (!focused || focused === document.body || focused === document.documentElement) container.current?.focus({ preventScroll: true })
+  }, [])
+
   // The layer over the page replica; the engine's changes redraw what they touched.
   useEffect(() => {
     const root = elementsRoot.current
@@ -280,6 +304,8 @@ export function BoardCanvas(props: Props) {
     size()
     const first = contentBox()
     if (first) show(first)
+    // The board just opened: its keys work at once, nothing clicked first (rule 17).
+    box?.focus({ preventScroll: true })
     const observer = new ResizeObserver(size)
     if (box) observer.observe(box)
     const stop = sync.subscribe((changed) => {
@@ -288,6 +314,9 @@ export function BoardCanvas(props: Props) {
       const kept = latest.current.selection.filter((id) => sync.view.elements.has(id))
       if (kept.length !== latest.current.selection.length) latest.current.onSelection(kept)
       setTick((value) => value + 1)
+      // An agent's change (or an undo from a panel) may have taken away what held the keys: the
+      // canvas takes them, unless something outside the editor's page has them.
+      if (document.hasFocus() && !editingNow.current) takeKeys()
     })
     ;(window as BoardWindow).kitBoard = {
       viewport: () => ({ ...viewport.current }),
@@ -314,6 +343,9 @@ export function BoardCanvas(props: Props) {
       },
       paste: (files, text) => clip.current.paste({ files, text: text ?? null, stale: false }, null),
       drop: (files, clientX, clientY) => clip.current.drop(files, clientX, clientY),
+      hover: () => hoverNow.current,
+      gesture: () => (active.current ? { type: active.current.gesture.type, phase: active.current.dragging ? 'dragging' : 'pressed' } : null),
+      overlay: () => structuredClone(overlayInfo.current),
     }
     return () => {
       stop()
@@ -321,7 +353,7 @@ export function BoardCanvas(props: Props) {
       layerRef.current = null
       delete (window as BoardWindow).kitBoard
     }
-  }, [applyView, contentBox, show, sync])
+  }, [applyView, contentBox, show, sync, takeKeys])
 
   // Another page: the selection does not come along, and each page keeps its own view (where it
   // was left; a page not shown yet shows its content, and an empty one opens where the view is).
@@ -382,6 +414,7 @@ export function BoardCanvas(props: Props) {
     setDraft(null)
     setGuides([])
     setDrops([])
+    setPreview(null)
   }, [])
 
   /** The frame a new element at `p` goes into (the smallest one under it), if any. */
@@ -425,34 +458,16 @@ export function BoardCanvas(props: Props) {
     return { element: null, point: p }
   }
 
-  const endParams = (end: EndTarget) => (end.element ? (end.anchor ? { element: end.element, anchor: end.anchor } : { element: end.element }) : { point: [end.point.x, end.point.y] })
-
-  /** The live route of a connector whose bound targets are being moved by `delta`. */
-  const liveRoute = (id: string, moving: ReadonlySet<string>, delta: Point): Point[] => {
-    const element = sync.view.elements.get(id)
-    if (!element || element.kind !== 'connector') return []
-    const endOf = (end: BoardElement['start']) => {
-      if (!end) return null
-      const target = end.binding ? sync.view.elements.get(end.binding.target) : null
-      const box = target ? sync.view.rect(target) : null
-      if (end.binding && target && box) {
-        const moved = moving.has(target.id) ? offset(box, delta.x, delta.y) : box
-        return sync.view.boundPoint(target, moved, end.binding.anchor)
-      }
-      return moving.has(id) ? { x: end.point.x + delta.x, y: end.point.y + delta.y } : end.point
-    }
-    const shift = moving.has(id) ? delta : { x: 0, y: 0 }
-    return [endOf(element.start), ...element.waypoints.map((p) => ({ x: p.x + shift.x, y: p.y + shift.y })), endOf(element.end)].filter((p): p is Point => p != null)
-  }
-
   const openText = useCallback(
-    (id: string | null, at?: Point) => {
+    /** Opens the text box on `id` (or a new text at `at`); `typed` replaces its text with a typed character, the caret after it. */
+    (id: string | null, at?: Point, typed?: string) => {
       if (latest.current.readOnly) return
       const v = viewport.current
       if (!id) {
         if (!at) return
         const s = toScreen(at)
-        setEditing({ id: null, kind: 'new-text', value: '', left: s.x, top: s.y, width: Math.max(160, 240 * v.zoom), height: 34, fontSize: Math.max(12, 20 * v.zoom), align: 'left', marks: [] })
+        // The first line of the new text is centred on the pointer.
+        setEditing({ id: null, kind: 'new-text', value: '', left: s.x, top: s.y - 17, width: Math.max(160, 240 * v.zoom), height: 34, fontSize: Math.max(12, 20 * v.zoom), align: 'left', marks: [] })
         return
       }
       const element = sync.view.elements.get(id)
@@ -471,11 +486,15 @@ export function BoardCanvas(props: Props) {
       const h = (box.y1 - box.y0) * v.zoom
       const size = (element.fontSize ?? (element.kind === 'text' ? 20 : 16)) * v.zoom
       // A shape's label and a text take bold, italic and links; a Markdown one writes them as Markdown.
-      const marks = (element.kind === 'shape' || element.kind === 'text') && sync.textFormat(id) !== 'markdown' ? marksOf(sync.textRuns(id)) : null
-      if (element.kind === 'shape') setEditing({ id, kind: 'shape', value: element.text, left: s.x + 8, top: s.y + h / 2 - size, width: Math.max(80, w - 16), height: size * 2, fontSize: size, align: 'center', marks })
-      else if (element.kind === 'frame') setEditing({ id, kind: 'frame', value: element.text, left: s.x, top: s.y - 30, width: Math.max(160, w), height: 28, fontSize: 14 * v.zoom, align: 'left', marks: null })
-      else if (element.kind === 'card') setEditing({ id, kind: 'card', value: element.text, left: s.x, top: s.y + h + 4, width: Math.max(160, w), height: 28, fontSize: 13 * v.zoom, align: 'center', marks: null })
-      else setEditing({ id, kind: 'text', value: element.text, left: s.x, top: s.y, width: Math.max(160, w + 24), height: Math.max(34, h), fontSize: size, align: 'left', marks })
+      // A typed character replaces the text, so the stored marks have nothing left to stand on.
+      const rich = (element.kind === 'shape' || element.kind === 'text') && sync.textFormat(id) !== 'markdown'
+      const marks = rich ? (typed == null ? marksOf(sync.textRuns(id)) : []) : null
+      const value = typed ?? element.text
+      const start = typed != null
+      if (element.kind === 'shape') setEditing({ id, kind: 'shape', value, left: s.x + 8, top: s.y + h / 2 - size, width: Math.max(80, w - 16), height: size * 2, fontSize: size, align: 'center', marks, typed: start })
+      else if (element.kind === 'frame') setEditing({ id, kind: 'frame', value, left: s.x, top: s.y - 30, width: Math.max(160, w), height: 28, fontSize: 14 * v.zoom, align: 'left', marks: null, typed: start })
+      else if (element.kind === 'card') setEditing({ id, kind: 'card', value, left: s.x, top: s.y + h + 4, width: Math.max(160, w), height: 28, fontSize: 13 * v.zoom, align: 'center', marks: null, typed: start })
+      else setEditing({ id, kind: 'text', value, left: s.x, top: s.y, width: Math.max(160, w + 24), height: Math.max(34, h), fontSize: size, align: 'left', marks, typed: start })
     },
     [sync, toScreen],
   )
@@ -758,7 +777,7 @@ export function BoardCanvas(props: Props) {
 
   const onContextMenu = (event: React.MouseEvent<SVGSVGElement>) => {
     event.preventDefault()
-    if (editing || gesture.current) return
+    if (editing || active.current) return
     const at = { x: event.clientX, y: event.clientY }
     const world = toWorld(event.clientX, event.clientY)
     const hit = elementUnder(event.clientX, event.clientY, null)
@@ -771,7 +790,128 @@ export function BoardCanvas(props: Props) {
     } else if (!readOnly) setMenu({ at, world, ids: null })
   }
 
-  // Pointer handling.
+  // The gestures' view of the canvas (gestures/types.ts): reads go through refs, so one object serves every render.
+  const openTextRef = useRef(openText)
+  openTextRef.current = openText
+  const ctx = useMemo<GestureContext>(
+    () => ({
+      sync,
+      layer: () => layerRef.current,
+      view: () => viewport.current,
+      applyView,
+      readOnly: () => latest.current.readOnly,
+      selection: () => latest.current.selection,
+      select: (ids) => latest.current.onSelection(ids),
+      setTool: (next) => latest.current.onTool(next),
+      shapeType: () => latest.current.shapeType,
+      drawStyle: () => latest.current.drawStyle,
+      highlightStyle: () => latest.current.highlightStyle,
+      t: () => latest.current.t,
+      setDraft,
+      setGuides,
+      setDrops: (frames) => setDrops((now) => (now.length === frames.length && now.every((id, at) => id === frames[at]) ? now : frames)),
+      setPreview,
+      setOverrides: (overrides) => layerRef.current?.setOverrides(overrides),
+      setHidden: (ids) => layerRef.current?.setHidden(ids),
+      clearPreview,
+      commit: (command, params, done, refused) => commitRef.current(command, params, done, refused),
+      duplicate: (ids, by, done) => duplicateRef.current(ids, by, done),
+      openText: (id, at) => openTextRef.current(id, at),
+      selectionBox: (ids) => selectionBox(sync, layerRef.current, ids),
+      frameUnder: (p) => frameUnderRef.current(p),
+      elementUnder: (clientX, clientY, excluding) => elementUnderRef.current(clientX, clientY, excluding),
+      endAt: (p, input, excluding) => endAtRef.current(p, input, excluding),
+    }),
+    [applyView, clearPreview, sync],
+  )
+  const duplicateRef = useRef(duplicateIds)
+  duplicateRef.current = duplicateIds
+  const frameUnderRef = useRef(frameUnder)
+  frameUnderRef.current = frameUnder
+  const elementUnderRef = useRef(elementUnder)
+  elementUnderRef.current = elementUnder
+  const endAtRef = useRef(endAt)
+  endAtRef.current = endAt
+
+  const inputOf = (event: React.PointerEvent<SVGSVGElement>): PointerInput => ({
+    p: toWorld(event.clientX, event.clientY),
+    clientX: event.clientX,
+    clientY: event.clientY,
+    shift: event.shiftKey,
+    alt: event.altKey,
+    command: event.metaKey || event.ctrlKey,
+    native: event.nativeEvent,
+  })
+
+  /** Lets the gesture's pointer go and forgets the gesture. */
+  const release = () => {
+    const now = active.current
+    active.current = null
+    setGestureCursor(null)
+    if (now && now.svg.hasPointerCapture?.(now.pointerId)) now.svg.releasePointerCapture(now.pointerId)
+  }
+
+  /** Escape, or the browser taking the pointer: the gesture puts back what it changed, the preview goes, the pointer is let go (rule 1). */
+  const cancelGesture = () => {
+    const now = active.current
+    if (!now) return false
+    note(`cancel ${now.gesture.type}`)
+    release()
+    now.gesture.cancel(ctx)
+    clearPreview()
+    return true
+  }
+
+  /** The press: picks the gesture (the handle under it, else the tool and what it hit) and holds it. */
+  const startGesture = (event: React.PointerEvent<SVGSVGElement>, input: PointerInput): Gesture | null => {
+    const v = sync.view
+    if (event.button === 1 || tool === 'hand' || space.current) return downPan(ctx, input)
+    if (event.button !== 0) return null
+    const handle = (event.target as Element).closest?.('[data-handle]')?.getAttribute('data-handle') ?? null
+    if (handle && !readOnly) {
+      const [kind, value] = handle.split(':')
+      if (kind === 'resize') {
+        const element = selection.length === 1 ? v.elements.get(selection[0]) : null
+        const box = element && isBoxed(element.kind) ? v.rect(element) : null
+        if (element && box) return downResize(ctx, element.id, value as Handle, box, element.rotation)
+        // A selection (or a stroke or group) scales as a whole, by the bounds the engine maps from.
+        const roots = selection.filter((id) => v.elements.has(id))
+        const bounds = roots.reduce<Rect | null>((all, id) => {
+          const element = v.elements.get(id)
+          return element ? union(all, v.bounds(element)) : all
+        }, null)
+        return roots.length && bounds ? downScale(ctx, roots, [...new Set(roots.flatMap((id) => v.withDescendants(id)))], value as Handle, bounds) : null
+      }
+      if (kind === 'rotate') {
+        const box = selectionBox(sync, layerRef.current, selection)
+        return box ? downRotate(ctx, input, [...selection], center(box)) : null
+      }
+      if (kind === 'terminal') return selection[0] ? downTerminal(ctx, input, selection[0], value as 'start' | 'end') : null
+      if (kind === 'connect') {
+        const element = v.elements.get(selection[0])
+        const box = element ? v.rect(element) : null
+        const side = CONNECTION_HANDLES.find((item) => item.side === value)
+        if (!element || !box || !side) return null
+        return downConnect(ctx, { element: element.id, anchor: side.anchor, point: v.boundPoint(element, box, side.anchor) }, input.p, true)
+      }
+    }
+    const hit = elementAt(event.target)
+    if (tool === 'select') return hit ? downMove(ctx, input, hit) : downBrush(ctx, input)
+    if (readOnly) return null
+    if (tool === 'text') {
+      placeText(ctx, input.p, hit)
+      return null
+    }
+    if (tool === 'mindmap') {
+      placeMindMap(ctx, input.p)
+      return null
+    }
+    if (tool === 'connector') return downConnect(ctx, endAt(input.p, input, null), input.p, false)
+    if (tool === 'pen' || tool === 'highlight') return downPen(ctx, input, tool === 'highlight')
+    if (tool === 'eraser') return downErase(ctx, input)
+    return downDraw(ctx, input, tool)
+  }
+
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     note(`down ${tool}${editing ? ' editing' : ''} ${event.button}`)
     pointer.current = { x: event.clientX, y: event.clientY }
@@ -782,402 +922,66 @@ export function BoardCanvas(props: Props) {
     }
     // The canvas takes the keys (tool letters, Delete, Undo) once it is used.
     container.current?.focus({ preventScroll: true })
-    const p = toWorld(event.clientX, event.clientY)
-    const screen = { x: event.clientX, y: event.clientY }
-    const handle = (event.target as Element).closest?.('[data-handle]')?.getAttribute('data-handle') ?? null
+    // A press while another is held (a second button) ends the first.
+    if (active.current) cancelGesture()
+    setHover(null)
+    const gesture = startGesture(event, inputOf(event))
+    if (!gesture) return
     const svg = event.currentTarget
-    const capture = () => svg.setPointerCapture?.(event.pointerId)
-    if (event.button === 1 || tool === 'hand' || space.current) {
-      gesture.current = { type: 'pan', start: screen, from: { ...viewport.current } }
-      capture()
-      return
-    }
-    if (event.button !== 0) return
-    const v = sync.view
-    if (handle && !readOnly) {
-      const [kind, value] = handle.split(':')
-      if (kind === 'resize') {
-        const element = selection.length === 1 ? v.elements.get(selection[0]) : null
-        const box = element && isBoxed(element.kind) ? v.rect(element) : null
-        if (element && box) {
-          gesture.current = { type: 'resize', id: element.id, handle: value as Handle, box, rotation: element.rotation, current: box }
-          capture()
-          return
-        }
-        // A selection (or a stroke or group) scales as a whole, by the bounds the engine maps from.
-        const roots = selection.filter((id) => v.elements.has(id))
-        const bounds = roots.reduce<Rect | null>((all, id) => union(all, v.bounds(v.elements.get(id)!)), null)
-        if (roots.length && bounds) {
-          gesture.current = { type: 'scale', roots, moving: [...new Set(roots.flatMap((id) => v.withDescendants(id)))], handle: value as Handle, box: bounds, current: bounds }
-          capture()
-        }
-        return
-      }
-      if (kind === 'rotate') {
-        const box = selectionBox(sync, layerRef.current, selection)
-        if (box) {
-          const origin = center(box)
-          gesture.current = { type: 'rotate', ids: [...selection], origin, start: Math.atan2(p.y - origin.y, p.x - origin.x), degrees: 0 }
-          capture()
-        }
-        return
-      }
-      if (kind === 'terminal') {
-        const id = selection[0]
-        gesture.current = { type: 'terminal', connector: id, terminal: value as 'start' | 'end', current: { element: null, point: p } }
-        layerRef.current?.setHidden([id])
-        capture()
-        return
-      }
-      if (kind === 'connect') {
-        const element = v.elements.get(selection[0])
-        const box = element ? v.rect(element) : null
-        const side = CONNECTION_HANDLES.find((item) => item.side === value)
-        if (element && box && side) {
-          const from: EndTarget = { element: element.id, anchor: side.anchor, point: v.boundPoint(element, box, side.anchor) }
-          gesture.current = { type: 'connect', from, current: { element: null, point: p }, elbow: true }
-          capture()
-        }
-        return
-      }
-    }
-    const hit = elementAt(event.target)
-    if (tool === 'select') {
-      if (hit) {
-        const id = v.selectable(hit)
-        const additive = event.shiftKey || event.metaKey || event.ctrlKey
-        let next: string[]
-        if (additive) next = selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id]
-        else next = selection.includes(id) ? [...selection] : [id]
-        onSelection(next)
-        if (readOnly || (additive && !next.includes(id))) return
-        const roots = next.filter((item) => !v.elements.get(item)?.locked)
-        if (!roots.length) return
-        const moving = new Set(roots.flatMap((root) => v.withDescendants(root)))
-        const base = selectionBox(sync, layerRef.current, [...moving])
-        if (!base) return
-        const shownPage = v.page(layerRef.current?.pageId ?? v.pages[0]?.id)
-        // Where each root's centre is, for the frame a drop lands it in (the engine's rule).
-        const frames = shownPage ? v.framesOn(shownPage, moving) : []
-        const centers = frames.length ? roots.flatMap((id) => {
-          const box = v.bounds(v.elements.get(id)!)
-          return box ? [center(box)] : []
-        }) : []
-        gesture.current = { type: 'move', start: p, roots, moving, base, connectors: v.connectorsOf(moving).filter((item) => !moving.has(item)), delta: { x: 0, y: 0 }, moved: false, frames, centers, altAtStart: event.altKey }
-        capture()
-        return
-      }
-      const additive = event.shiftKey || event.metaKey || event.ctrlKey
-      if (!additive) onSelection([])
-      gesture.current = { type: 'brush', start: p, current: p, additive, initial: additive ? [...selection] : [] }
-      capture()
-      return
-    }
-    if (readOnly) return
-    if (tool === 'text') {
-      if (hit && v.elements.get(hit)?.kind === 'text') openText(hit)
-      else openText(null, p)
-      if (!latest.current.readOnly) onTool('select')
-      return
-    }
-    if (tool === 'mindmap') {
-      // A new mind map: its root where the pointer is, ready to type into.
-      const root: Record<string, unknown> = { kind: 'shape', shapeStyle: 'mind-node', mindMapDirection: 'right', position: [p.x - 80, p.y - 30], size: [160, 60] }
-      const parent = frameUnder(p)
-      if (parent) root.parent = parent
-      void commit('element.add', { elements: [root] }).then((answer) => {
-        const created = (answer?.created as string[] | undefined) ?? []
-        onTool('select')
-        if (!created.length) return
-        onSelection(created)
-        window.setTimeout(() => openText(created[0]), 0)
-      })
-      return
-    }
-    if (tool === 'connector') {
-      gesture.current = { type: 'connect', from: endAt(p, event, null), current: { element: null, point: p }, elbow: false }
-      capture()
-      return
-    }
-    if (tool === 'pen' || tool === 'highlight') {
-      gesture.current = { type: 'pen', points: [p], highlight: tool === 'highlight' }
-      capture()
-      return
-    }
-    if (tool === 'eraser') {
-      const erase: Gesture = { type: 'erase', ids: new Set() }
-      gesture.current = erase
-      eraseAt(erase, event.clientX, event.clientY)
-      capture()
-      return
-    }
-    gesture.current = { type: 'draw', tool, start: p, current: p }
-    capture()
+    svg.setPointerCapture?.(event.pointerId)
+    active.current = { gesture, pointerId: event.pointerId, start: { x: event.clientX, y: event.clientY }, dragging: !gesture.threshold, svg }
+    if (!gesture.threshold) setGestureCursor(gesture.cursor)
+  }
+
+  /** The element the pointer is over, for the hover outline (select tool, no gesture). */
+  const hoverAt = (target: EventTarget | null): string | null => {
+    if (tool !== 'select' || editing) return null
+    const hit = elementAt(target)
+    return hit ? sync.view.selectable(hit) : null
   }
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     pointer.current = { x: event.clientX, y: event.clientY }
-    const g = gesture.current
-    if (!g) return
-    const p = toWorld(event.clientX, event.clientY)
-    const z = viewport.current.zoom
-    switch (g.type) {
-      case 'pan':
-        applyView({ x: g.from.x - (event.clientX - g.start.x) / z, y: g.from.y - (event.clientY - g.start.y) / z })
-        break
-      case 'move': {
-        let delta = { x: p.x - g.start.x, y: p.y - g.start.y }
-        g.moved = g.moved || Math.abs(delta.x) * z > 2 || Math.abs(delta.y) * z > 2
-        if (!g.moved) break
-        let snapGuides: SnapGuide[] = []
-        if (!event.altKey) {
-          const moved = offset(g.base, delta.x, delta.y)
-          const margin = Math.max(128, 512 / z)
-          const near = layerRef.current?.query({ x0: moved.x0 - margin, y0: moved.y0 - margin, x1: moved.x1 + margin, y1: moved.y1 + margin }) ?? []
-          const targets = near.filter((id) => !g.moving.has(id) && ['shape', 'text', 'image', 'card', 'frame'].includes(sync.view.elements.get(id)?.kind ?? '')).flatMap((id) => layerRef.current?.worldBox(id) ?? [])
-          const snap = translationSnap(moved, targets, 6 / z)
-          delta = { x: delta.x + snap.adjustment.x, y: delta.y + snap.adjustment.y }
-          snapGuides = snap.guides
-        }
-        g.delta = delta
-        if (!g.altAtStart && event.altKey) {
-          // The originals stay where they are; a dashed box shows where the copies land.
-          layerRef.current?.setOverrides(new Map())
-          layerRef.current?.setHidden([])
-          setDraft({ type: 'rect', box: offset(g.base, delta.x, delta.y), dashed: true })
-          setGuides(snapGuides)
-          setDrops((now) => (now.length ? [] : now))
-          break
-        }
-        const overrides = new Map<string, Override>()
-        for (const id of g.moving) overrides.set(id, { dx: delta.x, dy: delta.y })
-        layerRef.current?.setOverrides(overrides)
-        layerRef.current?.setHidden(g.connectors)
-        setDraft({ type: 'lines', lines: g.connectors.map((id) => liveRoute(id, g.moving, delta)), target: null })
-        setGuides(snapGuides)
-        const into = [...new Set(g.centers.flatMap((c) => frameAt(g.frames, { x: c.x + delta.x, y: c.y + delta.y })?.id ?? []))]
-        setDrops((now) => (now.length === into.length && now.every((id, at) => id === into[at]) ? now : into))
-        break
-      }
-      case 'resize': {
-        // A rotated box resizes in its own frame (no snapping to the page's axes).
-        const snapped = event.altKey || g.rotation ? { point: p, guides: [] } : resizeSnap(g.handle, p, g.box, (layerRef.current?.query(g.box) ?? []).filter((id) => id !== g.id).flatMap((id) => layerRef.current?.worldBox(id) ?? []), 6 / z)
-        g.current = resizedRotated(g.box, g.rotation, g.handle, snapped.point, event.shiftKey)
-        const sx = (g.current.x1 - g.current.x0) / Math.max(1e-6, g.box.x1 - g.box.x0)
-        const sy = (g.current.y1 - g.current.y0) / Math.max(1e-6, g.box.y1 - g.box.y0)
-        layerRef.current?.setOverrides(new Map([[g.id, { dx: g.current.x0 - g.box.x0, dy: g.current.y0 - g.box.y0, sx, sy }]]))
-        const connectors = sync.view.connectorsOf(new Set([g.id]))
-        layerRef.current?.setHidden(connectors)
-        if (!g.rotation) setDraft({ type: 'rect', box: g.current, dashed: false })
-        setGuides(snapped.guides)
-        break
-      }
-      case 'scale': {
-        g.current = resized(g.box, g.handle, p, event.shiftKey)
-        layerRef.current?.setOverrides(scaleOverrides(sync.view, g.moving, g.box, g.current))
-        // Connectors from outside the selection are drawn again once their targets have moved.
-        const inside = new Set(g.moving)
-        layerRef.current?.setHidden(sync.view.connectorsOf(inside).filter((id) => !inside.has(id)))
-        setDraft({ type: 'rect', box: g.current, dashed: true })
-        break
-      }
-      case 'rotate': {
-        let degrees = ((Math.atan2(p.y - g.origin.y, p.x - g.origin.x) - g.start) * 180) / Math.PI
-        if (event.shiftKey) degrees = Math.round(degrees / 15) * 15
-        g.degrees = degrees
-        const overrides = new Map<string, Override>()
-        for (const id of g.ids) overrides.set(id, { dx: 0, dy: 0, rotate: degrees })
-        layerRef.current?.setOverrides(overrides)
-        layerRef.current?.setHidden(sync.view.connectorsOf(new Set(g.ids)))
-        break
-      }
-      case 'brush':
-        g.current = p
-        setDraft({ type: 'rect', box: rect(g.start.x, g.start.y, p.x, p.y), dashed: true })
-        break
-      case 'draw':
-        g.current = p
-        setDraft({ type: 'rect', box: rect(g.start.x, g.start.y, p.x, p.y), dashed: false })
-        break
-      case 'connect':
-        g.current = endAt(p, event, g.from.element)
-        setDraft({ type: 'lines', lines: [elbowOr(g.from.point, g.current.point, g.elbow)], target: g.current.element })
-        break
-      case 'terminal': {
-        const connector = sync.view.elements.get(g.connector)
-        g.current = endAt(p, event, g.connector)
-        if (connector) {
-          const route = sync.view.route(connector)
-          const other = g.terminal === 'start' ? route[route.length - 1] : route[0]
-          setDraft({ type: 'lines', lines: [g.terminal === 'start' ? [g.current.point, other] : [other, g.current.point]], target: g.current.element })
-        }
-        break
-      }
-      case 'pen': {
-        const last = g.points[g.points.length - 1]
-        if (!last || distance(last, p) >= 1.5 / z) {
-          g.points.push(p)
-          setDraft({ type: 'pen', points: [...g.points], highlight: g.highlight })
-        }
-        break
-      }
-      case 'erase':
-        // Every coalesced point, so a quick stroke does not skip a thin line.
-        for (const sample of event.nativeEvent.getCoalescedEvents?.() ?? [event.nativeEvent]) eraseAt(g, sample.clientX, sample.clientY)
-        break
+    const now = active.current
+    if (!now || now.pointerId !== event.pointerId) {
+      const over = hoverAt(event.target)
+      if (over !== hoverNow.current) setHover(over)
+      return
     }
-  }
-
-  /** The eraser passing a client point: the unlocked element painted there goes (hidden until the delete arrives). */
-  const eraseAt = (g: Extract<Gesture, { type: 'erase' }>, clientX: number, clientY: number) => {
-    const hit = elementUnder(clientX, clientY, null)
-    const element = hit ? sync.view.elements.get(hit) : null
-    if (!element || element.locked || g.ids.has(element.id)) return
-    g.ids.add(element.id)
-    layerRef.current?.setHidden([...g.ids])
+    if (!now.dragging) {
+      if (distance(now.start, { x: event.clientX, y: event.clientY }) < DRAG_THRESHOLD) return
+      now.dragging = true
+      setGestureCursor(now.gesture.cursor)
+    }
+    now.gesture.move(ctx, inputOf(event))
   }
 
   const onPointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
-    const g = gesture.current
-    note(`${event.type} ${g?.type ?? 'none'}${g?.type === 'pen' ? ` ${g.points.length}` : ''}`)
-    gesture.current = null
-    if (!g) return
-    const p = toWorld(event.clientX, event.clientY)
-    const z = viewport.current.zoom
-    switch (g.type) {
-      case 'pan':
-        break
-      case 'move':
-        setGuides([])
-        setDrops([])
-        if (!g.moved) {
-          clearPreview()
-          break
-        }
-        if (!g.altAtStart && event.altKey) {
-          // Copies at the drop, the originals untouched: one element.duplicate, one undo step.
-          duplicateIds(g.roots, g.delta, clearPreview)
-          break
-        }
-        // A drop into a frame makes the frame the parent, a drop out of one frees it: same command.
-        void commit('element.move', { ids: g.roots, delta: [g.delta.x, g.delta.y], reparent: true }, clearPreview)
-        break
-      case 'resize': {
-        const box = g.current
-        if (box.x1 - box.x0 < 1 || box.y1 - box.y0 < 1) {
-          clearPreview()
-          break
-        }
-        void commit('element.resize', { id: g.id, box: [box.x0, box.y0, box.x1, box.y1] }, clearPreview)
-        break
-      }
-      case 'scale': {
-        const box = g.current
-        const same = Math.abs(box.x0 - g.box.x0) + Math.abs(box.y0 - g.box.y0) + Math.abs(box.x1 - g.box.x1) + Math.abs(box.y1 - g.box.y1) < 0.5
-        if (same) {
-          clearPreview()
-          break
-        }
-        void commit('element.resize', { ids: g.roots, box: [box.x0, box.y0, box.x1, box.y1] }, clearPreview)
-        break
-      }
-      case 'rotate':
-        if (Math.abs(g.degrees) < 0.5) {
-          clearPreview()
-          break
-        }
-        void commit('element.rotate', { ids: g.ids, degrees: g.degrees, about: g.ids.length > 1 ? 'selection' : 'each' }, clearPreview)
-        break
-      case 'brush': {
-        setDraft(null)
-        const box = rect(g.start.x, g.start.y, p.x, p.y)
-        if ((box.x1 - box.x0) * z < 3 && (box.y1 - box.y0) * z < 3) {
-          // A click on a frame's empty inside selects the frame (a drag there still draws a marquee).
-          const shownPage = sync.view.page(layerRef.current?.pageId ?? sync.view.pages[0]?.id)
-          const frame = shownPage && !g.additive ? frameAt(sync.view.framesOn(shownPage, sync.view.hidden), p) : null
-          if (frame) onSelection([frame.id])
-          break
-        }
-        const hits = (layerRef.current?.query(box) ?? []).filter((id) => !sync.view.hidden.has(id)).map((id) => sync.view.selectable(id))
-        onSelection([...new Set([...g.initial, ...hits])])
-        break
-      }
-      case 'draw': {
-        setDraft(null)
-        let box = rect(g.start.x, g.start.y, p.x, p.y)
-        const small = (box.x1 - box.x0) * z < MIN_DRAW || (box.y1 - box.y0) * z < MIN_DRAW
-        const size = g.tool === 'note' ? [180, 140] : g.tool === 'frame' ? [640, 400] : [160, 100]
-        if (small) box = { x0: g.start.x, y0: g.start.y, x1: g.start.x + size[0], y1: g.start.y + size[1] }
-        const done = (answer: Record<string, unknown> | null) => {
-          const created = (answer?.created as string[] | undefined) ?? (answer?.frame ? [answer.frame as string] : [])
-          if (created.length) onSelection(created)
-          onTool('select')
-          if (g.tool === 'note' && created[0]) window.setTimeout(() => openText(created[0]), 0)
-        }
-        if (g.tool === 'frame') void commit('frame.add', { box: [box.x0, box.y0, box.x1, box.y1] }).then(done)
-        else {
-          const element: Record<string, unknown> = { kind: 'shape', position: [box.x0, box.y0], size: [box.x1 - box.x0, box.y1 - box.y0], ...styleFor('shape', latest.current.drawStyle) }
-          const parent = frameUnder(center(box))
-          if (parent) element.parent = parent
-          if (g.tool === 'note') element.shapeStyle = 'sticky'
-          else element.shapeType = shapeType
-          void commit('element.add', { elements: [element] }).then(done)
-        }
-        break
-      }
-      case 'connect': {
-        setDraft(null)
-        const end = g.current
-        if (distance(g.from.point, end.point) * z < MIN_DRAW) break
-        const params: Record<string, unknown> = { from: endParams(g.from), to: endParams(end) }
-        const style = styleFor('connector', latest.current.drawStyle)
-        // A connector drawn from a shape's handle is an elbow whatever the default route.
-        if (g.elbow) {
-          delete style.connectorType
-          params.type = 'elbow'
-        }
-        if (Object.keys(style).length) params.style = style
-        void commit('connector.add', params).then((answer) => {
-          const created = (answer?.created as string[] | undefined) ?? []
-          if (created.length) onSelection(created)
-          onTool('select')
-        })
-        break
-      }
-      case 'terminal':
-        void commit('connector.bind', { id: g.connector, terminal: g.terminal, to: endParams(g.current) }, clearPreview)
-        break
-      case 'pen': {
-        setDraft(null)
-        if (g.points.length < 2) break
-        const points = simplifyStroke(g.points, Math.max(0.5, 1.25 / z)).map((q) => [q.x, q.y])
-        const params: Record<string, unknown> = { points }
-        const style = styleFor('stroke', g.highlight ? latest.current.highlightStyle : latest.current.drawStyle)
-        if (Object.keys(style).length) params.style = style
-        void commit('stroke.add', params, () => setDraft(null))
-        break
-      }
-      case 'erase':
-        if (!g.ids.size) break
-        latest.current.onSelection(latest.current.selection.filter((id) => !g.ids.has(id)))
-        // One delete for the whole pass: one undo step.
-        void commit('element.delete', { ids: [...g.ids] }, clearPreview)
-        break
-    }
+    const now = active.current
+    note(`${event.type} ${now?.gesture.type ?? 'none'}`)
+    if (!now || now.pointerId !== event.pointerId) return
+    release()
+    now.gesture.up(ctx, inputOf(event), now.dragging)
   }
 
   const onDoubleClick = (event: React.MouseEvent<SVGSVGElement>) => {
     // A captured pointer's clicks target the canvas: find what is under it.
     const hit = elementUnder(event.clientX, event.clientY, null)
     if (hit) openText(hit)
+    // On the empty canvas, a new text there (rule 10).
+    else if (tool === 'select' && !readOnly) openText(null, toWorld(event.clientX, event.clientY))
   }
 
   const onWheel = useCallback(
     (event: WheelEvent) => {
       event.preventDefault()
       const box = container.current?.getBoundingClientRect()
-      if (event.ctrlKey || event.metaKey) zoomAt(Math.exp(-event.deltaY / 200), { x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0) })
-      else {
+      if (event.ctrlKey || event.metaKey) {
+        // At most 10% per event, however large its delta (a mouse notch, a trackpad pinch).
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1
+        const step = Math.max(-WHEEL_ZOOM_STEP, Math.min(WHEEL_ZOOM_STEP, (event.deltaY * unit) / 100))
+        zoomAt(step < 0 ? 1 - step : 1 / (1 + step), { x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0) })
+      } else {
         const v = viewport.current
         applyView({ x: v.x + event.deltaX / v.zoom, y: v.y + event.deltaY / v.zoom })
       }
@@ -1192,6 +996,17 @@ export function BoardCanvas(props: Props) {
     return () => box.removeEventListener('wheel', onWheel)
   }, [onWheel])
 
+  /** Shift+2: the selection at 100%, centred; already at 100%, the selection fitted. */
+  const showSelection = () => {
+    const box = selectionBox(sync, layerRef.current, latest.current.selection)
+    if (!box) return
+    const v = viewport.current
+    if (v.zoom !== 1) {
+      const c = center(box)
+      applyView({ zoom: 1, x: c.x - v.width / 2, y: c.y - v.height / 2 })
+    } else show(box, MAX_ZOOM)
+  }
+
   // The editor's keys (the frame runs the engine's own shortcuts, such as Undo).
   useImperativeHandle(
     props.api,
@@ -1199,6 +1014,7 @@ export function BoardCanvas(props: Props) {
       grow: (node: string, sibling: boolean) => growMap(node, sibling),
       edit: (id: string) => openText(id),
       focus: () => container.current?.focus({ preventScroll: true }),
+      element: () => container.current,
       keyDown: (event: KeyboardEvent) => {
         // The canvas menu's rows keep their keys (the arrows, Delete), and so does the text box.
         if (editing || (event.target as Element | null)?.closest?.('[data-testid="board-canvas-menu"]')) return false
@@ -1214,17 +1030,25 @@ export function BoardCanvas(props: Props) {
         }
         if (event.key === ' ' && !command) {
           space.current = true
+          setSpaceHeld(true)
           return true
         }
         // Escape cancels the gesture, else clears the selection, else returns to Select; with
         // nothing of these it is not taken, so in Focus it leaves Focus (KitPointer 4.4).
         if (event.key === 'Escape') {
-          if (gesture.current) {
-            gesture.current = null
-            clearPreview()
-          } else if (latest.current.selection.length) latest.current.onSelection([])
+          if (cancelGesture()) return true
+          if (latest.current.selection.length) latest.current.onSelection([])
           else if (latest.current.tool !== 'select') onTool('select')
           else return false
+          return true
+        }
+        // The view (rule 15): Shift+0 100%, Shift+1 everything, Shift+2 the selection.
+        if (event.shiftKey && !command && !event.altKey && (event.code === 'Digit0' || event.code === 'Digit1' || event.code === 'Digit2')) {
+          if (event.code === 'Digit0') zoomAt(1 / viewport.current.zoom)
+          else if (event.code === 'Digit1') {
+            const box = contentBox()
+            if (box) show(box)
+          } else showSelection()
           return true
         }
         if (command && key === 'a') {
@@ -1282,6 +1106,14 @@ export function BoardCanvas(props: Props) {
           return true
         }
         if (command || event.altKey) return false
+        // A character typed with one element selected that takes text starts its text with it (rule 10).
+        if (latest.current.tool === 'select' && [...event.key].length === 1 && event.key !== ' ' && !event.isComposing && ids.length === 1) {
+          const target = typingTarget(sync.view.elements.get(ids[0]))
+          if (target === 'any' || (target === 'shape' && !TOOL_KEYS[event.key])) {
+            openText(ids[0], undefined, event.key)
+            return true
+          }
+        }
         const next = TOOL_KEYS[event.key.toLowerCase()]
         if (next) {
           onTool(next)
@@ -1295,13 +1127,24 @@ export function BoardCanvas(props: Props) {
 
   useEffect(() => {
     const up = (event: KeyboardEvent) => {
-      if (event.key === ' ') space.current = false
+      if (event.key !== ' ') return
+      space.current = false
+      setSpaceHeld(false)
+    }
+    // A Space released while the page had no focus never comes back as a keyup.
+    const lost = () => {
+      space.current = false
+      setSpaceHeld(false)
     }
     window.addEventListener('keyup', up)
-    return () => window.removeEventListener('keyup', up)
+    window.addEventListener('blur', lost)
+    return () => {
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', lost)
+    }
   }, [])
 
-  // The overlay: selection, handles, the gesture's draft, snap guides.
+  // The overlay: hover, selection, handles, the gesture's draft, snap guides.
   void tick
   const view = sync.view
   const selected = selection.flatMap((id) => view.elements.get(id) ?? [])
@@ -1314,11 +1157,47 @@ export function BoardCanvas(props: Props) {
   const scalable = !readOnly && !resizable && selected.length > 0 && !selected.some((element) => element.locked) && !(single?.kind === 'connector')
   const scaleBox = scalable ? selected.reduce<Rect | null>((all, element) => union(all, view.bounds(element)), null) : null
   const connector = !readOnly && single?.kind === 'connector' && !single.locked ? view.route(single) : null
-  const connectable = !readOnly && single?.kind === 'shape' && singleBox && !single.locked && tool === 'select'
+  // While a gesture drags, the handles that start other gestures (connect, mind-map controls) wait.
+  const dragging = gestureCursor != null || preview != null
+  const connectable = !readOnly && single?.kind === 'shape' && singleBox && !single.locked && tool === 'select' && !dragging
   // A selected mind-map node's quick controls (v1's `WhiteboardMindMapQuickControls`).
   const mindGraph = useMemo(() => (single && isMindNode(single) && !single.locked ? graphOf(view, single.id) : null), [single, view, tick])
-  const lanes = !readOnly && tool === 'select' && single && singleBox && mindGraph ? controlLanes(view, mindGraph, single.id, singleBox, zoom) : []
-  const cursor = tool === 'hand' ? 'grab' : tool === 'select' ? 'default' : tool === 'eraser' ? 'cell' : 'crosshair'
+  const lanes = !readOnly && tool === 'select' && single && singleBox && mindGraph && !dragging ? controlLanes(view, mindGraph, single.id, singleBox, zoom) : []
+  // The selection as the gesture previews it (rule 4): moved, resized, scaled or turned with it.
+  const shownSingle = preview?.type === 'resize' ? preview.box : singleBox
+  const shownScale = preview?.type === 'scale' ? preview.box : scaleBox
+  const selectionTransform = preview?.type === 'move' ? `translate(${preview.dx} ${preview.dy})` : preview?.type === 'rotate' ? `rotate(${preview.degrees} ${preview.origin.x} ${preview.origin.y})` : undefined
+  const turned = preview?.type === 'rotate' ? preview.degrees : 0
+  const shift = preview?.type === 'move' ? { x: preview.dx, y: preview.dy } : { x: 0, y: 0 }
+  // The rotate handle: outside the selection's top-right corner, clear of the connection handle above the top edge.
+  const rotateAt = (() => {
+    if (readOnly || !selBox || !selected.some((element) => isBoxed(element.kind) && !element.locked)) return null
+    if (resizable && single && shownSingle) {
+      const corner = anchorPoint(shownSingle, single.rotation, [1, 0])
+      const out = rotate({ x: 16 * px, y: -16 * px }, { x: 0, y: 0 }, single.rotation)
+      return { x: corner.x + out.x, y: corner.y + out.y }
+    }
+    const box = shownScale ?? selBox
+    return { x: box.x1 + 16 * px, y: box.y0 - 16 * px }
+  })()
+  const hovered = hover && tool === 'select' && !dragging && !selection.includes(hover) ? view.elements.get(hover) : undefined
+  const hoverBox = hovered ? layerRef.current?.worldBox(hovered.id) ?? null : null
+  const hoverMovable = hover != null && tool === 'select' && !readOnly && !view.elements.get(hover)?.locked
+  const cursor = gestureCursor ?? (tool === 'hand' || spaceHeld ? 'grab' : tool === 'select' ? (hoverMovable ? 'move' : 'default') : tool === 'eraser' ? 'cell' : 'crosshair')
+  // What the tests read (`kitBoard.overlay()`): the selection's frame and the hover outline as drawn.
+  const frameOf = (): OverlayInfo['selection'] => {
+    if (single && resizable && shownSingle) {
+      const box = single.rotation || preview?.type === 'resize' ? shownSingle : (layerRef.current?.worldBox(single.id) ?? shownSingle)
+      return { box: offset(box, shift.x, shift.y), rotation: single.rotation + turned }
+    }
+    const box = shownScale ?? selBox
+    return box ? { box: offset(box, shift.x, shift.y), rotation: turned } : null
+  }
+  overlayInfo.current = {
+    selection: selected.length ? frameOf() : null,
+    hover: hovered && hoverBox ? { id: hovered.id, box: hoverBox } : null,
+    handles: resizable || shownScale ? HANDLES.length : 0,
+  }
   // What the canvas menu's rows can do, from the elements it opened on (and what is inside them).
   const menuState = useMemo<CanvasMenuState | null>(() => {
     if (!menu) return null
@@ -1345,9 +1224,12 @@ export function BoardCanvas(props: Props) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerCancel={() => {
+          cancelGesture()
+        }}
         onPointerLeave={() => {
           pointer.current = null
+          if (!active.current) setHover(null)
         }}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
@@ -1355,39 +1237,55 @@ export function BoardCanvas(props: Props) {
         <g ref={world}>
           <g ref={elementsRoot} data-testid="board-elements" />
           <g className="board-overlay" data-testid="board-overlay">
-            {selected.map((element) => {
-              // One rotated box is outlined in its own frame.
-              const own = single && single.rotation && singleBox ? singleBox : null
-              const box = own ?? layerRef.current?.worldBox(element.id)
-              if (!box) return null
-              const c = center(box)
-              return <rect key={element.id} className="board-selected" x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={1.5 * px} data-selected={element.id} transform={own ? `rotate(${single!.rotation} ${c.x} ${c.y})` : undefined} />
-            })}
-            {selBox && selected.length > 1 ? (() => {
-              const box = scaleBox ?? selBox
-              return <rect className="board-selection-box" x={box.x0 - 6 * px} y={box.y0 - 6 * px} width={box.x1 - box.x0 + 12 * px} height={box.y1 - box.y0 + 12 * px} strokeWidth={px} />
-            })() : null}
-            {resizable && single && singleBox
-              ? HANDLES.map((handle) => {
-                  const point = handlePoint(singleBox, single.rotation, handle)
-                  return <rect key={handle} className="board-handle" data-handle={`resize:${handle}`} data-testid={`board-handle-${handle}`} x={point.x - 4 * px} y={point.y - 4 * px} width={8 * px} height={8 * px} strokeWidth={1.5 * px} transform={single.rotation ? `rotate(${single.rotation} ${point.x} ${point.y})` : undefined} style={{ cursor: handleCursor(handle, single.rotation) }} />
-                })
-              : null}
-            {scaleBox
-              ? HANDLES.map((handle) => {
-                  const point = handlePoint(scaleBox, 0, handle)
-                  return <rect key={handle} className="board-handle" data-handle={`resize:${handle}`} data-testid={`board-handle-${handle}`} x={point.x - 4 * px} y={point.y - 4 * px} width={8 * px} height={8 * px} strokeWidth={1.5 * px} style={{ cursor: handleCursor(handle, 0) }} />
-                })
-              : null}
-            {!readOnly && selBox && selected.some((element) => isBoxed(element.kind) && !element.locked) ? (
-              <circle className="board-handle" data-handle="rotate:0" data-testid="board-handle-rotate" cx={(selBox.x0 + selBox.x1) / 2} cy={selBox.y0 - 24 * px} r={5 * px} strokeWidth={1.5 * px} style={{ cursor: 'grab' }} />
+            {hovered && hoverBox ? (
+              <g data-testid="board-hover" data-hover={hovered.id}>
+                {hovered.kind === 'connector' ? (
+                  <polyline className="board-hover" points={view.route(hovered).map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={1.5 * px} />
+                ) : hovered.kind === 'stroke' && hovered.points.length > 1 ? (
+                  <polyline className="board-hover" points={hovered.points.map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={1.5 * px} />
+                ) : (() => {
+                  const own = isBoxed(hovered.kind) && hovered.rotation ? view.rect(hovered) : null
+                  const box = own ?? hoverBox
+                  const c = center(box)
+                  return <rect className="board-hover" x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={1.5 * px} transform={own ? `rotate(${hovered.rotation} ${c.x} ${c.y})` : undefined} />
+                })()}
+              </g>
             ) : null}
-            {connector && connector.length >= 2
-              ? (['start', 'end'] as const).map((terminal) => {
-                  const point = terminal === 'start' ? connector[0] : connector[connector.length - 1]
-                  return <circle key={terminal} className="board-handle" data-handle={`terminal:${terminal}`} data-testid={`board-connector-${terminal}`} cx={point.x} cy={point.y} r={6 * px} strokeWidth={1.5 * px} style={{ cursor: 'crosshair' }} />
-                })
-              : null}
+            <g data-testid="board-selection" transform={selectionTransform}>
+              {preview?.type === 'scale'
+                ? null
+                : selected.map((element) => {
+                    // One rotated box is outlined in its own frame (and a resize on its new box).
+                    const own = single && (single.rotation || preview?.type === 'resize') && shownSingle ? shownSingle : null
+                    const box = own ?? layerRef.current?.worldBox(element.id)
+                    if (!box) return null
+                    const c = center(box)
+                    return <rect key={element.id} className="board-selected" x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={1.5 * px} data-selected={element.id} data-testid="board-selection-frame" transform={own && single!.rotation ? `rotate(${single!.rotation} ${c.x} ${c.y})` : undefined} />
+                  })}
+              {selBox && selected.length > 1 ? (() => {
+                const box = shownScale ?? selBox
+                return <rect className="board-selection-box" data-testid="board-selection-box" x={box.x0 - 6 * px} y={box.y0 - 6 * px} width={box.x1 - box.x0 + 12 * px} height={box.y1 - box.y0 + 12 * px} strokeWidth={px} />
+              })() : null}
+              {resizable && single && shownSingle
+                ? HANDLES.map((handle) => {
+                    const point = handlePoint(shownSingle, single.rotation, handle)
+                    return <rect key={handle} className="board-handle" data-handle={`resize:${handle}`} data-testid={`board-handle-${handle}`} x={point.x - 4 * px} y={point.y - 4 * px} width={8 * px} height={8 * px} strokeWidth={1.5 * px} transform={single.rotation ? `rotate(${single.rotation} ${point.x} ${point.y})` : undefined} style={{ cursor: handleCursor(handle, single.rotation) }} />
+                  })
+                : null}
+              {shownScale
+                ? HANDLES.map((handle) => {
+                    const point = handlePoint(shownScale, 0, handle)
+                    return <rect key={handle} className="board-handle" data-handle={`resize:${handle}`} data-testid={`board-handle-${handle}`} x={point.x - 4 * px} y={point.y - 4 * px} width={8 * px} height={8 * px} strokeWidth={1.5 * px} style={{ cursor: handleCursor(handle, 0) }} />
+                  })
+                : null}
+              {rotateAt ? <circle className="board-handle" data-handle="rotate:0" data-testid="board-handle-rotate" cx={rotateAt.x} cy={rotateAt.y} r={5 * px} strokeWidth={1.5 * px} style={{ cursor: ROTATE_CURSOR }} /> : null}
+              {connector && connector.length >= 2
+                ? (['start', 'end'] as const).map((terminal) => {
+                    const point = terminal === 'start' ? connector[0] : connector[connector.length - 1]
+                    return <circle key={terminal} className="board-handle" data-handle={`terminal:${terminal}`} data-testid={`board-connector-${terminal}`} cx={point.x} cy={point.y} r={6 * px} strokeWidth={1.5 * px} style={{ cursor: 'crosshair' }} />
+                  })
+                : null}
+            </g>
             {connectable && single && singleBox
               ? CONNECTION_HANDLES.map((item) => {
                   const at = anchorPoint(singleBox, single.rotation, item.anchor)
@@ -1473,13 +1371,6 @@ function toWorldFromScreen(left: number, top: number, v: Viewport): Point {
   return { x: v.x + left / v.zoom, y: v.y + top / v.zoom }
 }
 
-/** A polyline for a connector being drawn: straight, or the elbow the engine routes. */
-function elbowOr(from: Point, to: Point, elbow: boolean): Point[] {
-  if (!elbow) return [from, to]
-  const middle = (from.x + to.x) / 2
-  return [from, { x: middle, y: from.y }, { x: middle, y: to.y }, to]
-}
-
 /** What the flow tests and a maintainer's desktop check read from the page. */
 type BoardWindow = Window & {
   kitBoard?: {
@@ -1504,5 +1395,11 @@ type BoardWindow = Window & {
     paste: (files: File[], text?: string | null) => void
     /** What a drop of `files` at a client point of the frame does (likewise for a DragEvent). */
     drop: (files: File[], clientX: number, clientY: number) => void
+    /** The element under the pointer that the hover outline marks (select tool), or null. */
+    hover: () => string | null
+    /** The gesture under way: its kind, and whether it is still a press or already a drag. */
+    gesture: () => { type: string; phase: 'pressed' | 'dragging' } | null
+    /** Where the overlay draws the selection's frame (board coordinates, unrotated box and its rotation) and the hover outline. */
+    overlay: () => OverlayInfo
   }
 }

@@ -1,0 +1,25 @@
+format: 1
+id: board.editor.view-keys/fit-keys
+feature: board.editor.view-keys
+intent: >-
+  Shift+0 zooms to 100%; Shift+1 fits every element in view; Shift+2 shows the selection at 100%
+  centred, and pressed again at 100% fits the selection (rule 15 of the by-hand plan; finding
+  F10.5).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/canvas.mjs (plan: Board usable by hand, stage 0)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: zoom-keys
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

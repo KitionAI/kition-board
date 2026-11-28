@@ -1,6 +1,6 @@
 # Gaps
 
-> **Last updated:** 2026-11-22 · **Source:** `features.yaml` (updated 2026-11-22) and the engine's command list
+> **Last updated:** 2026-11-28 · **Source:** `features.yaml` (updated 2026-11-28) and the engine's command list
 
 Every known shortfall of Kition Board, from the feature catalogue: features that are not yet `has`,
 then the differences recorded on features that work. Update the feature in `features.yaml` when you
@@ -11,6 +11,7 @@ land work, then this list. The comparison with the target application is in
 
 - `board.agent.guard` (P0, partial): Independent file writers preserve per-call premises. Measured on kition-sdk 2ce294a1 (the kit pins f5ea478): the SDK permits stale numeric/implicit page destinations and deleted page gaps; raw z-index writes and deletion coverage hold (their waiting_for_sdk tests pass). Scoped hierarchy facts and z-order windows give false refusals; removed/moved derived dependencies can report changed instead of deleted/relocated. waiting_for_sdk tests keep their necessity expectations. Undo and redo hold the objects and fields of the step they take back or put back. All 83 independent reading rows run on flat and nested boards. A bound end on a shape meets its outline, so a connector's route and an anchored connector.add end hold the shape's shapeType (regressions/issue-outline-end-premises); connector.bind without an anchor also reads the other end's target shapeType (the new end faces that end's outline point) and does not hold it: the two connector.bind rows of bindings/wasm/tests/declarations_independent.rs (every_write_rests_on_what_its_handler_reads, nested_write_rows_match_the_second_independent_reading) pin that target's premise as rotation and ~bounds, and changing them needs a maintainer.
 - `board.agent.environment` (P1, partial): Offline environment tasks use board words and valid model values. Seed 7 gives 100 verified tasks but no creates. Element.kind is a creation-only register a raw batch create gives (limits12); whether Page replay comparison treats fresh UUIDs as the same objects on the pinned kition-sdk is not measured. Rich-text scalars and derived fields replay.
+- `board.editor.type-to-edit` (P0, partial): Typing into the selection: a character typed with one sticky note, text, mind-map node or shape selected starts its text with that character; a double-click on the empty canvas makes a text there. With a plain shape selected, a lower-case tool letter (v h r n m t a p l e f) still picks its tool instead of starting the text, because web/tests/flow.mjs presses tool letters with a shape selected (plan section 5): typing "hello" into a selected shape starts with the hand tool, typing "Hello" or "2 days" writes. Sticky notes, texts and mind-map nodes take every letter. The first character typed through an input method (a composition) does not start the text.
 - `board.cards` (P1, partial): Cards that link to a file or a web page, and links retargeted when files move. Link cards (card.add with `url`) survive save and reopen (bindings/wasm/tests/round_trip.rs); file cards need a lent file and are covered by the command tests only, not by a round trip.
 - `board.collab.live` (P1, partial): People co-edit a board live. Kition Desktop is for one person since the plain document model (kition-sdk 91cf510): the KDM no longer merges concurrent edits and the convergence suite is gone; co-editing comes back with Kition One's server-ordered changes.
 
@@ -22,4 +23,4 @@ land work, then this list. The comparison with the target application is in
 
 ## Catalogue
 
-The catalogue has 31 features: 27 `has`, 4 not yet (4 `partial`).
+The catalogue has 38 features: 33 `has`, 5 not yet (5 `partial`).

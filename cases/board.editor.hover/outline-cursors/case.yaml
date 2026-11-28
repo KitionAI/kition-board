@@ -1,0 +1,27 @@
+format: 1
+id: board.editor.hover/outline-cursors
+feature: board.editor.hover
+intent: >-
+  With the select tool, the element under the pointer gets a hover outline (kitBoard.hover() names
+  it, kitBoard.overlay() gives its box) and the move cursor; off it, no outline and the default
+  cursor. A corner handle shows its resize cursor and the rotate handle a rotate cursor. Space
+  held shows grab and grabbing while it pans; the hand tool shows grab (rule 3 of the by-hand
+  plan; findings F2.1 and F10.4).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/canvas.mjs (plan: Board usable by hand, stage 0)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: hover
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

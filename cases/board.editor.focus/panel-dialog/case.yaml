@@ -1,0 +1,25 @@
+format: 1
+id: board.editor.focus/panel-dialog
+feature: board.editor.focus
+intent: >-
+  After a ribbon tab is clicked, a tool letter still picks its tool; after a dialog (the template
+  gallery) closes, the keys go to the canvas again (the frame's keyboardHome is the canvas),
+  without a click on the canvas first (rule 17 of the by-hand plan).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/canvas.mjs (plan: Board usable by hand, stage 0)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: focus-panel
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

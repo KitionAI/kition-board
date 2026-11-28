@@ -1,0 +1,27 @@
+format: 1
+id: regressions/issue-hand-f3-10
+feature: board.editor.gestures
+intent: >-
+  Dragging the rotate handle turns the shape as the pointer goes and turns the selection overlay
+  with it, and the release lands one element.rotate. Before, the north connection handle (24 px
+  above the top edge) lay over the rotate handle (also 24 px above the top edge's middle), so a
+  press there started a connector from the shape instead: the shape did not turn and a live line
+  appeared. The rotate handle is now outside the selection's top-right corner.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F3.10 (probe02.mjs, round2/11-rotate-mid.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: rotate
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]
