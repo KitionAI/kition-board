@@ -617,7 +617,8 @@ export function BoardCanvas(props: Props) {
    * pointer it goes there (a shape with an outline of its own, a diamond or an ellipse, is pinned on
    * the ray from its centre through the pointer, design note 1.4; a box keeps the nearest edge);
    * deep inside an element it binds to the centre, and the engine faces it toward the other end (no
-   * anchor); elsewhere it is free.
+   * anchor); elsewhere it is free. Over an element only that element counts; the elements near the
+   * pointer count when it is over none (just outside a shape's edge) or over a frame.
    */
   const endAt = (p: Point, client: { clientX: number; clientY: number }, excluding: readonly string[]): EndTarget => {
     const view = sync.view
@@ -634,7 +635,9 @@ export function BoardCanvas(props: Props) {
       const element = view.elements.get(id)
       return element && !excluding.includes(id) && isBindable(element.kind) ? [element] : []
     })
-    const candidates = [...new Set([...(hit ? [hit] : []), ...near])].flatMap((element) => {
+    // Over an element, only that one: an edge of one under it never takes the end from it. A frame
+    // holds shapes, so over a frame the shapes near the pointer count too.
+    const candidates = [...new Set(hit && hit.kind !== 'frame' ? [hit] : [...(hit ? [hit] : []), ...near])].flatMap((element) => {
       const box = view.rect(element)
       return box ? [{ element, box }] : []
     })
@@ -663,16 +666,18 @@ export function BoardCanvas(props: Props) {
   /**
    * The shape whose side midpoints the select tool shows (rule 11): an unlocked shape whose edge the
    * pointer is within 12 screen pixels of, inside or out (not a mind-map node, and not the one
-   * selected shape, whose connection handles and resize handles are there already); `side` is the
-   * midpoint under the pointer.
+   * selected shape, whose connection handles and resize handles are there already); over a shape,
+   * only that shape; `side` is the midpoint under the pointer.
    */
-  const pointsNear = (p: Point): ConnectHint | null => {
+  const pointsNear = (p: Point, over: string | null): ConnectHint | null => {
     const view = sync.view
     const zoom = viewport.current.zoom
     const reach = EDGE_REACH / zoom
     const selected = latest.current.selection
     let best: { element: BoardElement; box: Rect; d: number } | null = null
-    for (const id of layerRef.current?.query({ x0: p.x - reach, y0: p.y - reach, x1: p.x + reach, y1: p.y + reach }) ?? []) {
+    // Over an element, only that one (a shape under it does not show its points through it).
+    const ids = over ? [over] : (layerRef.current?.query({ x0: p.x - reach, y0: p.y - reach, x1: p.x + reach, y1: p.y + reach }) ?? [])
+    for (const id of ids) {
       const element = view.elements.get(id)
       if (!element || element.kind !== 'shape' || element.locked || element.shapeStyle === 'mind-node' || (selected.length === 1 && selected[0] === id)) continue
       const box = view.rect(element)
@@ -1239,7 +1244,10 @@ export function BoardCanvas(props: Props) {
       if (editing || readOnly) setConnectHint(null)
       else if (tool === 'connector') setConnectHint(targetHint(endAt(p, event, [])))
       // Over a handle (a selected connector's end on a shape's midpoint, say) the handle is what a press takes.
-      else if (tool === 'select') setConnectHint((event.target as Element).closest?.('[data-handle]:not([data-handle^="point:"])') ? null : pointsNear(p))
+      else if (tool === 'select') setConnectHint((event.target as Element).closest?.('[data-handle]:not([data-handle^="point:"])') ? null : pointsNear(p, (() => {
+            const id = elementAt(event.target)
+            return id && sync.view.elements.get(id)?.kind === 'shape' ? id : null
+          })()))
       else setConnectHint(null)
       return
     }

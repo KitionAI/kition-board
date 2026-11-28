@@ -354,6 +354,15 @@ await h.run([
     step('within 16 px of a side midpoint the end snaps to it', held.hint?.element === b && held.hint?.side === 'west' && stored?.end?.binding?.target === b && JSON.stringify(stored?.end?.binding?.anchor) === '[0,0.5]', `${JSON.stringify(held.hint)} ${JSON.stringify(stored?.end)}`)
     step('the snapped midpoint is marked while the pointer is there', held.draft?.[0]?.end?.target === b && near(held.draft?.[0]?.end?.point?.x, 600, 0.01) && near(held.draft?.[0]?.end?.point?.y, 250, 0.01), JSON.stringify(held.draft?.[0]?.end))
     await page.keyboard.press('Escape')
+    // Pressed deep inside a shape that lies over another, near that one's edge: the end is the top shape's.
+    const [under, top, far] = await fresh([{ ...RECT, position: { x: 100, y: 200 } }, { ...RECT, position: { x: 140, y: 240 } }, { ...RECT, position: { x: 600, y: 200 } }])
+    await page.keyboard.press('a')
+    const others = await h.shown()
+    await drag(await screen(220, 292), await centre(far))
+    const over = await newConnector(others)
+    const overStored = over ? await storedOne(over) : null
+    step('over a shape, an edge of one under it does not take the end', overStored?.start?.binding?.target === top && overStored?.start?.binding?.target !== under, JSON.stringify(overStored?.start))
+    await page.keyboard.press('Escape')
   }],
   // F6.3, F3.2: the line being drawn is the engine's connector, with its arrowhead and the target
   // outlined, and it is the route the release commits. A connector from a shape's handle takes the
