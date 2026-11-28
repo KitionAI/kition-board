@@ -22,7 +22,7 @@ use kition_kit::session::Result;
 use serde_json::Value;
 
 use crate::element::{Element, End, Kind};
-use crate::geometry::{Point, Rect, Size, anchor_side, auto_text_size, styled_text_size};
+use crate::geometry::{Point, Rect, Size, anchor_side, text_size};
 use crate::outline::outline_point;
 use crate::{PAGE, root_id};
 
@@ -277,17 +277,16 @@ impl BoardModel {
         out
     }
 
-    /// The unrotated box of a boxed element; a `text` element without a stored size is measured
-    /// with the registered fonts.
+    /// The unrotated box of a boxed element; a `text` element is measured with the registered
+    /// fonts ([`text_size`]: auto width without a stored size, else its fixed width and at least
+    /// its lines' height).
     pub fn rect(&self, element: &Element) -> Option<Rect> {
-        if element.kind == Kind::Text && element.size.is_none() {
+        if element.kind == Kind::Text {
             let position = element.position?;
             let font_size = element.register("fontSize").and_then(Value::as_f64);
             let family = element.register("fontFamily").and_then(Value::as_str);
-            let size = match element.styled_text() {
-                Some(paragraphs) => styled_text_size(&paragraphs, font_size, family),
-                None => auto_text_size(&element.text, font_size, family),
-            };
+            let styled = element.styled_text();
+            let size = text_size(&element.text, styled.as_deref(), element.size, font_size, family);
             return Some(Rect::new(position.x, position.y, position.x + size.w, position.y + size.h));
         }
         element.rect()

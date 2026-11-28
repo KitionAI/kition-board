@@ -1,0 +1,22 @@
+format: 1
+id: board.text/fixed-width
+feature: board.text
+intent: >-
+  A text with a stored size wraps at its width and its box is the stored height or its lines'
+  height, whichever is taller; a text without one is one line per paragraph; a connector bound to a
+  fixed-width text follows its box as a longer text makes it taller (stored point and derived point
+  alike).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "bindings/wasm/tests/text_width.rs"
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: text_width, filter: a_fixed_width_text_wraps_and_its_box_holds_its_lines }
+  - cargo-test: { package: kition-board-kit, test: text_width, filter: a_bound_end_follows_a_fixed_width_text_as_it_grows }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-28"

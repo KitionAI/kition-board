@@ -176,11 +176,10 @@ pub fn instantiate(
         parents.insert(id.clone(), parent.clone());
         tx.set(id, "parent", json!(parent.as_str()))?;
     }
-    // A text without a stored size is measured from the copy's text (the transaction cannot read
-    // it back).
+    // A text's box is measured from the copy's text (the transaction cannot read it back).
     let fresh: edit::Fresh = made
         .iter()
-        .filter(|(_, item, kind)| *kind == Kind::Text && item.get("size").is_none_or(Value::is_null))
+        .filter(|(_, _, kind)| *kind == Kind::Text)
         .map(|(id, item, _)| {
             let text = item.get("text").and_then(Value::as_str).unwrap_or_default().to_owned();
             let runs = item.get("runs").cloned().and_then(|runs| serde_json::from_value(runs).ok()).unwrap_or_default();

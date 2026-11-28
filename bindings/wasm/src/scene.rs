@@ -105,8 +105,9 @@ impl BoardDocument {
     }
 
     /// `textMetrics({ texts: [{ text, size?, weight?, family?, maxWidth? }] })` →
-    /// `{ results: [{ lines: [{ text, width }], width, height }], fontEpoch }`: the engine's layout,
-    /// in board units.
+    /// `{ results: [{ lines: [{ text, width }], width, height, lineHeight, css }], fontEpoch }`: the
+    /// engine's layout, in board units; `css` is the `font-family` list the engine's SVG names for
+    /// that family (the editor's box for a new text uses it).
     pub fn text_metrics(&self, request: &str) -> Result<String, String> {
         let request: Value = serde_json::from_str(request).map_err(|error| format!("invalid-params: the request is not JSON: {error}"))?;
         let texts = request.get("texts").and_then(Value::as_array).ok_or("invalid-params: `texts` must be a list")?;
@@ -128,6 +129,8 @@ impl BoardDocument {
                 "lines": lines.iter().map(|line| json!({ "text": line.text, "width": line.width })).collect::<Vec<_>>(),
                 "width": width,
                 "height": lines.len().max(1) as f64 * style.line_height(),
+                "lineHeight": style.line_height(),
+                "css": kition_board_text::css_family(style.family),
             }));
         }
         Ok(json!({ "results": results, "fontEpoch": kition_board_text::font_epoch() }).to_string())

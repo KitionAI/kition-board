@@ -30,6 +30,8 @@ export class ElementLayer {
   private page: string | null = null
   private lod: Lod = 'full'
   private viewport: Viewport | null = null
+  /** The element whose text box is open: drawn at full detail with its own text hidden (its background stays). */
+  private editing: string | null = null
   /** The view's `layout` the index was ordered by. */
   private layout = -1
   /** Element mounts and removals since the counter was reset (the pan budget check reads it). */
@@ -195,6 +197,20 @@ export class ElementLayer {
     if (this.viewport) this.render(this.viewport)
   }
 
+  /**
+   * The element whose text is being edited (null: none). Its text is hidden while the box shows
+   * it (`.board-editing` in app.css), its outline and fill stay; at low detail it is drawn at full
+   * detail, whose text is glyphs the rule can hide, not bars.
+   */
+  setEditing(id: string | null) {
+    const before = this.editing
+    this.editing = id
+    for (const which of new Set([before, id])) {
+      const node = which ? this.nodes.get(which) : undefined
+      if (which && node) this.fill(which, node)
+    }
+  }
+
   /** The ids whose boxes meet `area`. */
   query(area: Rect) {
     return this.index.query(area)
@@ -206,8 +222,12 @@ export class ElementLayer {
     return box ? intersects(box, area) : false
   }
 
+  private lodOf(id: string): Lod {
+    return id === this.editing ? 'full' : this.lod
+  }
+
   private fragment(id: string): Fragment | null {
-    return (this.lod === 'low' ? this.sync.fragments.low.get(id) : null) ?? this.sync.fragments.full.get(id) ?? null
+    return (this.lodOf(id) === 'low' ? this.sync.fragments.low.get(id) : null) ?? this.sync.fragments.full.get(id) ?? null
   }
 
   private make(id: string) {
@@ -223,11 +243,13 @@ export class ElementLayer {
   private fill(id: string, node: SVGGElement) {
     const fragment = this.fragment(id)
     const svg = fragment?.svg ?? ''
-    if (node.dataset.svg !== String(fragment?.rev ?? 0) + this.lod) {
+    const drawn = String(fragment?.rev ?? 0) + this.lodOf(id)
+    if (node.dataset.svg !== drawn) {
       node.innerHTML = svg
-      node.dataset.svg = String(fragment?.rev ?? 0) + this.lod
+      node.dataset.svg = drawn
       for (const image of node.querySelectorAll('image[data-blob]')) this.picture(image as SVGImageElement)
     }
+    node.classList.toggle('board-editing', id === this.editing)
     this.place(id, node)
   }
 

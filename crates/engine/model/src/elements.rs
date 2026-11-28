@@ -448,10 +448,11 @@ pub fn style(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<Valu
             updated.push(element.id.clone());
         }
     }
-    // A text without a stored size is measured from its letters: ends bound to it follow.
+    // A text's box is measured from its letters (its height too when it has a fixed width): ends
+    // bound to it follow.
     let measured: BTreeSet<ObjectId> = updated
         .iter()
-        .filter(|id| model.element(id).is_some_and(|element| element.kind == Kind::Text && element.size.is_none()))
+        .filter(|id| model.element(id).is_some_and(|element| element.kind == Kind::Text))
         .filter(|_| style.keys().any(|field| field == "fontSize" || field == "fontFamily"))
         .cloned()
         .collect();
@@ -481,10 +482,11 @@ pub fn set_text(model: &BoardModel, tx: &mut Tx<'_>, params: &Value) -> Result<V
     Ok(json!({ "updated": [id.as_str()] }))
 }
 
-/// After a change of a text's characters or marks: the ends bound to a text without a stored
-/// size follow its measured box, which `fresh` gives (the transaction cannot read a text back).
+/// After a change of a text's characters or marks: the ends bound to a text follow its measured
+/// box (its width without a stored size, its height with a fixed width), which `fresh` gives (the
+/// transaction cannot read a text back).
 fn refresh_measured(model: &BoardModel, tx: &mut Tx<'_>, element: &Element, fresh: impl FnOnce() -> Element) -> Result<()> {
-    if element.kind != Kind::Text || element.size.is_some() || model.connectors_bound_to(&element.id).is_empty() {
+    if element.kind != Kind::Text || model.connectors_bound_to(&element.id).is_empty() {
         return Ok(());
     }
     let Some(page) = model.page_of(&element.id) else { return Ok(()) };

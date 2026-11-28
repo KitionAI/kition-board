@@ -252,21 +252,31 @@ pub fn nearest_edge_anchor(rect: Rect, rotation: f64, point: Point) -> ([f64; 2]
 /// The size a `text` element's letters have when it sets none.
 pub const DEFAULT_TEXT_SIZE: f64 = kition_board_text::TEXT_SIZE;
 
-/// The size of a `text` element without a stored size: its lines measured with the registered
-/// fonts (`kition-board-text`), unwrapped, at `font_size` (the text default when absent).
-pub fn auto_text_size(text: &str, font_size: Option<f64>, family: Option<&str>) -> Size {
-    use kition_board_text::{Family, REGULAR, Style, TEXT_SIZE, block};
+/// The box size of a `text` element, its lines measured with the registered fonts
+/// (`kition-board-text`) at `font_size` (the text default when absent); `styled` holds its runs
+/// when it has marks or is Markdown.
+///
+/// - Without a stored size the text sizes itself: one line per paragraph, unwrapped (auto width).
+/// - With one it has a fixed width: its lines wrap at the stored width, and its box is the stored
+///   height or its lines' height, whichever is taller, so the box always holds its text.
+pub fn text_size(
+    text: &str,
+    styled: Option<&[kition_board_text::Paragraph]>,
+    stored: Option<Size>,
+    font_size: Option<f64>,
+    family: Option<&str>,
+) -> Size {
+    use kition_board_text::{Family, REGULAR, Style, TEXT_SIZE, block, rich_block};
     let style = Style::new(font_size.unwrap_or(TEXT_SIZE), REGULAR, Family::parse(family));
-    let (w, h) = block(text, style, None);
-    Size { w, h }
-}
-
-/// [`auto_text_size`] for styled text (marks, Markdown): its runs laid out unwrapped.
-pub fn styled_text_size(paragraphs: &[kition_board_text::Paragraph], font_size: Option<f64>, family: Option<&str>) -> Size {
-    use kition_board_text::{Family, REGULAR, Style, TEXT_SIZE, rich_block};
-    let style = Style::new(font_size.unwrap_or(TEXT_SIZE), REGULAR, Family::parse(family));
-    let (w, h) = rich_block(paragraphs, style, None);
-    Size { w, h }
+    let wrap = stored.map(|size| size.w).filter(|w| w.is_finite() && *w > 0.0);
+    let (w, h) = match styled {
+        Some(paragraphs) => rich_block(paragraphs, style, wrap),
+        None => block(text, style, wrap),
+    };
+    match stored {
+        Some(stored) => Size { w: stored.w, h: if h.is_finite() { stored.h.max(h) } else { stored.h } },
+        None => Size { w, h },
+    }
 }
 
 #[cfg(test)]

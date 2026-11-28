@@ -1,0 +1,31 @@
+format: 1
+id: regressions/issue-hand-f5-4
+feature: board.editor.text-tool
+intent: >-
+  A click with the text tool makes an auto-width text that stays one line however long it is
+  (Shift+Enter makes a new line) and is committed with no stored size and the same lines; a drag
+  across makes a text as wide as the drag that wraps while it is typed and is committed with that
+  width, wrapped at the same places, its box as tall as its lines. Before, the box wrapped at about
+  240 pixels while typing and the committed text was one long line running off the screen.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F5.4 (probe01.mjs, round1/19-text-editing-2.png and 22-mindmap-arrow.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/text.mjs
+      scenario: text-tool-click
+      browsers: [chromium, webkit]
+  - flow:
+      spec: web/tests/hand/text.mjs
+      scenario: text-tool-drag
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

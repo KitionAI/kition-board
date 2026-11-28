@@ -21,7 +21,7 @@ pub mod style;
 pub mod svg;
 
 pub use cache::Revisions;
-pub use fragment::{Fragment, Lod, Options, Pictures, fragment};
+pub use fragment::{Fragment, Lod, Options, Pictures, TextFrame, fragment};
 pub use raster::{Area, Raster, area, picture};
 pub use style::Colors;
 

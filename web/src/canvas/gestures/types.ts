@@ -81,6 +81,10 @@ export type GestureContext = {
   /** element.duplicate of `ids` by `offset`, selecting the copies. */
   duplicate: (ids: readonly string[], offset: Point, done: () => void) => void
   openText: (id: string | null, at?: Point) => void
+  /** Opens a new text starting at `x` with its first line centred on `y`: auto width, or `width` wide (it wraps). */
+  openNewText: (x: number, y: number, width: number | null) => void
+  /** The line height of a new text (the drawing style's size, the engine's line height). */
+  textLineHeight: () => number
   /** The bounds of `ids` as drawn (the fragments' boxes). */
   selectionBox: (ids: readonly string[]) => Rect | null
   /** The frame a new element at `p` goes into, if any. */
@@ -91,7 +95,7 @@ export type GestureContext = {
   endAt: (p: Point, input: { clientX: number; clientY: number }, excluding: string | null) => EndTarget
 }
 
-export type GestureType = 'pan' | 'move' | 'resize' | 'scale' | 'rotate' | 'brush' | 'draw' | 'connect' | 'terminal' | 'pen' | 'erase'
+export type GestureType = 'pan' | 'move' | 'resize' | 'scale' | 'rotate' | 'brush' | 'draw' | 'connect' | 'terminal' | 'pen' | 'erase' | 'text'
 
 export interface Gesture {
   readonly type: GestureType

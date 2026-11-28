@@ -64,6 +64,8 @@ Commands by namespace (the part of the id before the first dot):
 - **Sticky notes, flow-chart nodes and mind-map nodes are shapes** with a `shapeStyle`: `sticky`,
   `flow-node`, `mind-node`. There is no element kind `sticky`.
 - A shape belongs to a frame through `parent` (the frame's id). Moving the frame moves it.
+- A `text` without `size` is one line per paragraph, as wide as its longest line; with `size` its
+  lines wrap at the width and its box grows downward to hold them (the height given is the least).
 
 ## Text writing format
 

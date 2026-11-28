@@ -28,14 +28,14 @@ import { ElementLayer, type Viewport } from '../board/layer'
 import { controlLanes, graphOf, isMindNode } from '../board/mindmap'
 import { frameAt, isBoxed, type BoardElement } from '../board/model'
 import type { Handle, SnapGuide } from '../board/snap'
-import type { BoardSync } from '../board/sync'
+import type { BoardSync, TextFrame } from '../board/sync'
 import { handleCursor, handlePoint } from '../board/resize'
-import { styleFor, type Style } from '../board/style'
+import { styleFor, type Style, type StyleAnswer, type Swatch } from '../board/style'
 import { TOOL_KEYS, type Tool } from '../tools'
 import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
 import { marksOf, sendMarks, type TextMark } from '../board/marks'
-import { TextEditor, type TextEditing } from './TextEditor'
+import { strokeCss, TextEditor, type EditFrame, type TextEditing, type TextStyleBar } from './TextEditor'
 import { downBrush } from './gestures/brush'
 import { downConnect } from './gestures/connect'
 import { downDraw } from './gestures/draw'
@@ -43,7 +43,7 @@ import { downErase } from './gestures/erase'
 import { downMove } from './gestures/move'
 import { downPan } from './gestures/pan'
 import { downPen } from './gestures/pen'
-import { placeMindMap, placeText } from './gestures/place'
+import { downText, placeMindMap } from './gestures/place'
 import { downResize } from './gestures/resize'
 import { downRotate, ROTATE_CURSOR } from './gestures/rotate'
 import { downScale } from './gestures/scale'
@@ -169,6 +169,16 @@ export function BoardCanvas(props: Props) {
   const [gestureCursor, setGestureCursor] = useState<string | null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [editing, setEditing] = useState<TextEditing | null>(null)
+  /** The text box's sessions so far (each box opened is a new one). */
+  const sessions = useRef(0)
+  /**
+   * What a new text is made with before it exists: the engine's default text size, line height per
+   * unit of size and CSS family (`textMetrics`), the text colour and the palette (`element.getStyle`
+   * of a text). Asked for once; the values here only stand in until the answers come.
+   */
+  const textDefaults = useRef<{ fontSize: number; ratio: number; css: string; color: string; palette: Swatch[] }>({ fontSize: 20, ratio: 1.25, css: 'sans-serif', color: 'ink', palette: [] })
+  /** The edited element's text colour as the engine answers it (`element.getStyle`), for the bar. */
+  const [editStyle, setEditStyle] = useState<{ id: string; color: string | null } | null>(null)
   const [tick, setTick] = useState(0)
   const active = useRef<Active | null>(null)
   const overlayInfo = useRef<OverlayInfo>({ selection: null, hover: null, handles: 0 })
@@ -362,6 +372,55 @@ export function BoardCanvas(props: Props) {
     }
   }, [applyView, contentBox, show, sync, takeKeys])
 
+  // What a new text is made with: the engine's text size, line height and family, the palette.
+  useEffect(() => {
+    let current = true
+    void (async () => {
+      const answer = (await latest.current.query('element.getStyle', { kind: 'text' }).catch(() => null)) as StyleAnswer | null
+      const fontSize = Number(answer?.style.fontSize ?? textDefaults.current.fontSize)
+      const metrics = JSON.parse(await sync.textMetrics(JSON.stringify({ texts: [{ text: '', size: fontSize }] }))) as { results: Array<{ lineHeight: number; css: string }> }
+      const result = metrics.results[0]
+      if (!current) return
+      textDefaults.current = {
+        fontSize,
+        ratio: result ? result.lineHeight / fontSize : textDefaults.current.ratio,
+        css: result?.css ?? textDefaults.current.css,
+        color: typeof answer?.style.strokeColor === 'string' ? answer.style.strokeColor : textDefaults.current.color,
+        palette: answer?.palette ?? [],
+      }
+    })().catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [sync])
+
+  // The element whose text box is open is drawn without its text (the box shows it).
+  const editingId = editing?.id ?? null
+  useEffect(() => {
+    layerRef.current?.setEditing(editingId)
+    return () => layerRef.current?.setEditing(null)
+  }, [editingId])
+
+  // A box whose element went (another writer deleted it) closes without committing.
+  useEffect(() => {
+    if (editing?.id != null && !sync.view.elements.has(editing.id)) setEditing(null)
+  }, [editing, sync, tick])
+
+  // The edited element's text colour for the bar, again after each change of the board.
+  useEffect(() => {
+    if (!editingId) return undefined
+    let current = true
+    void Promise.resolve(latest.current.query('element.getStyle', { ids: [editingId] }))
+      .then((answer) => {
+        const style = (answer as StyleAnswer | null)?.style
+        if (current) setEditStyle({ id: editingId, color: typeof style?.strokeColor === 'string' ? style.strokeColor : null })
+      })
+      .catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [editingId, tick])
+
   // Another selection ends the "just edited" state of the element whose text box closed.
   useEffect(() => {
     if (afterEdit.current && !(selection.length === 1 && selection[0] === afterEdit.current)) afterEdit.current = null
@@ -470,45 +529,40 @@ export function BoardCanvas(props: Props) {
     return { element: null, point: p }
   }
 
+  /**
+   * Opens a new text whose first line is centred on `y`, starting at `x`: auto width (`width` null)
+   * or a fixed width that wraps (the text tool dragged across).
+   */
+  const openNewText = useCallback((x: number, y: number, width: number | null) => {
+    if (latest.current.readOnly) return
+    const defaults = textDefaults.current
+    const style = styleFor('text', latest.current.drawStyle)
+    const lineHeight = Number(style.fontSize ?? defaults.fontSize) * defaults.ratio
+    sessions.current += 1
+    setEditing({ session: sessions.current, id: null, kind: 'new-text', value: '', marks: [], at: { x, y: y - lineHeight / 2 }, width, style })
+  }, [])
+
   const openText = useCallback(
     /** Opens the text box on `id` (or a new text at `at`); `typed` replaces its text with a typed character, the caret after it. */
     (id: string | null, at?: Point, typed?: string) => {
       if (latest.current.readOnly) return
-      const v = viewport.current
       if (!id) {
-        if (!at) return
-        const s = toScreen(at)
-        // The first line of the new text is centred on the pointer.
-        setEditing({ id: null, kind: 'new-text', value: '', left: s.x, top: s.y - 17, width: Math.max(160, 240 * v.zoom), height: 34, fontSize: Math.max(12, 20 * v.zoom), align: 'left', marks: [] })
+        if (at) openNewText(at.x, at.y, null)
         return
       }
       const element = sync.view.elements.get(id)
       if (!element || element.locked) return
-      if (element.kind === 'connector') {
-        const route = sync.view.route(element)
-        const middle = route.length ? route[Math.floor(route.length / 2) - (route.length % 2 ? 0 : 1)] : { x: 0, y: 0 }
-        const s = toScreen(middle)
-        setEditing({ id, kind: 'connector', value: element.text, left: s.x - 90, top: s.y - 17, width: 180, height: 34, fontSize: Math.max(12, 14 * v.zoom), align: 'center', marks: null })
-        return
-      }
-      const box = sync.view.rect(element)
-      if (!box || !['shape', 'text', 'frame', 'card'].includes(element.kind)) return
-      const s = toScreen({ x: box.x0, y: box.y0 })
-      const w = (box.x1 - box.x0) * v.zoom
-      const h = (box.y1 - box.y0) * v.zoom
-      const size = (element.fontSize ?? (element.kind === 'text' ? 20 : 16)) * v.zoom
+      if (element.kind !== 'connector' && (!['shape', 'text', 'frame', 'card'].includes(element.kind) || !sync.view.rect(element))) return
+      // The box goes where the engine lays the text out; a shape that takes no label has no place for it.
+      if (!sync.fragments.full.get(id)?.text) return
       // A shape's label and a text take bold, italic and links; a Markdown one writes them as Markdown.
       // A typed character replaces the text, so the stored marks have nothing left to stand on.
       const rich = (element.kind === 'shape' || element.kind === 'text') && sync.textFormat(id) !== 'markdown'
       const marks = rich ? (typed == null ? marksOf(sync.textRuns(id)) : []) : null
-      const value = typed ?? element.text
-      const start = typed != null
-      if (element.kind === 'shape') setEditing({ id, kind: 'shape', value, left: s.x + 8, top: s.y + h / 2 - size, width: Math.max(80, w - 16), height: size * 2, fontSize: size, align: 'center', marks, typed: start })
-      else if (element.kind === 'frame') setEditing({ id, kind: 'frame', value, left: s.x, top: s.y - 30, width: Math.max(160, w), height: 28, fontSize: 14 * v.zoom, align: 'left', marks: null, typed: start })
-      else if (element.kind === 'card') setEditing({ id, kind: 'card', value, left: s.x, top: s.y + h + 4, width: Math.max(160, w), height: 28, fontSize: 13 * v.zoom, align: 'center', marks: null, typed: start })
-      else setEditing({ id, kind: 'text', value, left: s.x, top: s.y, width: Math.max(160, w + 24), height: Math.max(34, h), fontSize: size, align: 'left', marks, typed: start })
+      sessions.current += 1
+      setEditing({ session: sessions.current, id, kind: element.kind as TextEditing['kind'], value: typed ?? element.text, marks, typed: typed != null })
     },
-    [sync, toScreen],
+    [openNewText, sync],
   )
 
   /**
@@ -541,9 +595,13 @@ export function BoardCanvas(props: Props) {
       if (!current) return
       if (current.id == null) {
         if (!value.trim()) return
-        const at = toWorldFromScreen(current.left, current.top, viewport.current)
+        const at = current.at ?? { x: 0, y: 0 }
         const parent = frameUnder(at)
-        void commit('element.add', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...styleFor('text', latest.current.drawStyle), ...(parent ? { parent } : {}) }] }).then(async (answer) => {
+        const style = current.style ?? {}
+        // A fixed-width text stores its width and one line's height: its box grows with its lines.
+        const lineHeight = Number(style.fontSize ?? textDefaults.current.fontSize) * textDefaults.current.ratio
+        const size = current.width != null ? { size: [current.width, lineHeight] } : {}
+        void commit('element.add', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...style, ...size, ...(parent ? { parent } : {}) }] }).then(async (answer) => {
           const created = (answer?.created as string[] | undefined) ?? []
           if (created.length === 1) afterEdit.current = created[0]
           if (created.length) latest.current.onSelection(created)
@@ -807,6 +865,8 @@ export function BoardCanvas(props: Props) {
   // The gestures' view of the canvas (gestures/types.ts): reads go through refs, so one object serves every render.
   const openTextRef = useRef(openText)
   openTextRef.current = openText
+  const openNewTextRef = useRef(openNewText)
+  openNewTextRef.current = openNewText
   const ctx = useMemo<GestureContext>(
     () => ({
       sync,
@@ -831,6 +891,8 @@ export function BoardCanvas(props: Props) {
       commit: (command, params, done, refused) => commitRef.current(command, params, done, refused),
       duplicate: (ids, by, done) => duplicateRef.current(ids, by, done),
       openText: (id, at) => openTextRef.current(id, at),
+      openNewText: (x, y, width) => openNewTextRef.current(x, y, width),
+      textLineHeight: () => Number(styleFor('text', latest.current.drawStyle).fontSize ?? textDefaults.current.fontSize) * textDefaults.current.ratio,
       selectionBox: (ids) => selectionBox(sync, layerRef.current, ids),
       frameUnder: (p) => frameUnderRef.current(p),
       elementUnder: (clientX, clientY, excluding) => elementUnderRef.current(clientX, clientY, excluding),
@@ -887,7 +949,12 @@ export function BoardCanvas(props: Props) {
       if (kind === 'resize') {
         const element = selection.length === 1 ? v.elements.get(selection[0]) : null
         const box = element && isBoxed(element.kind) ? v.rect(element) : null
-        if (element && box) return downResize(ctx, element.id, value as Handle, box, element.rotation)
+        if (element && box) {
+          // A text's side handle sets its width; it keeps its stored height (one line when it had none).
+          const side = element.kind === 'text' && (value === 'east' || value === 'west')
+          const line = sync.fragments.full.get(element.id)?.text?.lineHeight ?? box.y1 - box.y0
+          return downResize(ctx, element.id, value as Handle, box, element.rotation, side ? { height: element.size?.h ?? line } : undefined)
+        }
         // A selection (or a stroke or group) scales as a whole, by the bounds the engine maps from.
         const roots = selection.filter((id) => v.elements.has(id))
         const bounds = roots.reduce<Rect | null>((all, id) => {
@@ -912,10 +979,7 @@ export function BoardCanvas(props: Props) {
     const hit = elementAt(event.target)
     if (tool === 'select') return hit ? downMove(ctx, input, hit) : downBrush(ctx, input)
     if (readOnly) return null
-    if (tool === 'text') {
-      placeText(ctx, input.p, hit)
-      return null
-    }
+    if (tool === 'text') return downText(ctx, input, hit)
     if (tool === 'mindmap') {
       placeMindMap(ctx, input.p)
       return null
@@ -931,7 +995,9 @@ export function BoardCanvas(props: Props) {
     pointer.current = { x: event.clientX, y: event.clientY }
     // A press on the canvas closes the text box, committing it (whatever has the focus).
     if (editing) {
-      commitEditor.current?.()
+      // A box that could not be shown (its element has no text frame) just closes.
+      if (commitEditor.current) commitEditor.current()
+      else setEditing(null)
       return
     }
     // The canvas takes the keys (tool letters, Delete, Undo) once it is used.
@@ -1167,17 +1233,19 @@ export function BoardCanvas(props: Props) {
   const px = 1 / zoom
   const single = selected.length === 1 ? selected[0] : null
   const singleBox = single ? view.rect(single) : null
-  const resizable = !readOnly && single && singleBox && !single.locked && isBoxed(single.kind)
+  // While a text box is open the selection is only outlined: no handles beside the box and its bar.
+  const handlesShown = !readOnly && !editing
+  const resizable = handlesShown && single && singleBox && !single.locked && isBoxed(single.kind)
   // A selection of several, or one stroke or group, scales by its bounds.
-  const scalable = !readOnly && !resizable && selected.length > 0 && !selected.some((element) => element.locked) && !(single?.kind === 'connector')
+  const scalable = handlesShown && !resizable && selected.length > 0 && !selected.some((element) => element.locked) && !(single?.kind === 'connector')
   const scaleBox = scalable ? selected.reduce<Rect | null>((all, element) => union(all, view.bounds(element)), null) : null
-  const connector = !readOnly && single?.kind === 'connector' && !single.locked ? view.route(single) : null
+  const connector = handlesShown && single?.kind === 'connector' && !single.locked ? view.route(single) : null
   // While a gesture drags, the handles that start other gestures (connect, mind-map controls) wait.
   const dragging = gestureCursor != null || preview != null
-  const connectable = !readOnly && single?.kind === 'shape' && singleBox && !single.locked && tool === 'select' && !dragging
+  const connectable = handlesShown && single?.kind === 'shape' && singleBox && !single.locked && tool === 'select' && !dragging
   // A selected mind-map node's quick controls (v1's `WhiteboardMindMapQuickControls`).
   const mindGraph = useMemo(() => (single && isMindNode(single) && !single.locked ? graphOf(view, single.id) : null), [single, view, tick])
-  const lanes = !readOnly && tool === 'select' && single && singleBox && mindGraph && !dragging ? controlLanes(view, mindGraph, single.id, singleBox, zoom) : []
+  const lanes = handlesShown && tool === 'select' && single && singleBox && mindGraph && !dragging ? controlLanes(view, mindGraph, single.id, singleBox, zoom) : []
   // The selection as the gesture previews it (rule 4): moved, resized, scaled or turned with it.
   const shownSingle = preview?.type === 'resize' ? preview.box : singleBox
   const shownScale = preview?.type === 'scale' ? preview.box : scaleBox
@@ -1186,7 +1254,7 @@ export function BoardCanvas(props: Props) {
   const shift = preview?.type === 'move' ? { x: preview.dx, y: preview.dy } : { x: 0, y: 0 }
   // The rotate handle: outside the selection's top-right corner, clear of the connection handle above the top edge.
   const rotateAt = (() => {
-    if (readOnly || !selBox || !selected.some((element) => isBoxed(element.kind) && !element.locked)) return null
+    if (!handlesShown || !selBox || !selected.some((element) => isBoxed(element.kind) && !element.locked)) return null
     if (resizable && single && shownSingle) {
       const corner = anchorPoint(shownSingle, single.rotation, [1, 0])
       const out = rotate({ x: 16 * px, y: -16 * px }, { x: 0, y: 0 }, single.rotation)
@@ -1229,7 +1297,47 @@ export function BoardCanvas(props: Props) {
       groups: elements.some((element) => element.kind === 'group'),
     }
   }, [menu, readOnly, view, tick])
-  const markLabels = useMemo(() => ({ bar: t('marks'), bold: t('markBold'), italic: t('markItalic'), link: t('markLink'), address: t('markLinkAddress') }), [t])
+  const markLabels = useMemo(
+    () => ({ bar: t('marks'), bold: t('markBold'), italic: t('markItalic'), link: t('markLink'), address: t('markLinkAddress'), size: t('textSize'), smaller: t('textSmaller'), larger: t('textLarger'), color: t('textColor'), lineColor: t('textLineColor'), swatch: (token: string) => t(`color.${token}`) }),
+    [t],
+  )
+  // Where the text box goes: the element's box and the engine's text frame (a new text: the
+  // defaults at the place the tool chose).
+  const editFrame = ((): EditFrame | null => {
+    if (!editing) return null
+    const defaults = textDefaults.current
+    if (editing.id == null) {
+      const style = editing.style ?? {}
+      const size = Number(style.fontSize ?? defaults.fontSize)
+      const lineHeight = size * defaults.ratio
+      const width = editing.width ?? 0
+      const at = editing.at ?? { x: 0, y: 0 }
+      const frame: TextFrame = { area: { x0: 0, y0: 0, x1: width, y1: lineHeight }, size, weight: 400, family: defaults.css, lineHeight, align: style.textAlign === 'center' || style.textAlign === 'right' ? style.textAlign : 'left', valign: 'top', wrap: editing.width != null, color: strokeCss(String(style.strokeColor ?? defaults.color), defaults.palette) }
+      return { box: { x0: at.x, y0: at.y, x1: at.x + width, y1: at.y + lineHeight }, rotation: 0, text: frame }
+    }
+    const element = view.elements.get(editing.id)
+    const text = sync.fragments.full.get(editing.id)?.text
+    if (!element || !text) return null
+    if (element.kind === 'connector') {
+      // A connector's frame is in world coordinates: the box is the frame's own area.
+      const { area } = text
+      return { box: area, rotation: 0, text: { ...text, area: { x0: 0, y0: 0, x1: area.x1 - area.x0, y1: area.y1 - area.y0 } } }
+    }
+    const box = view.rect(element)
+    return box ? { box, rotation: element.rotation, text } : null
+  })()
+  // The text size and colour in the bar: a shape's or a text's (a new text's, before it exists).
+  const styleBar = ((): TextStyleBar | null => {
+    if (!editing || !editFrame || !(editing.kind === 'shape' || editing.kind === 'text' || editing.kind === 'new-text')) return null
+    const color = editing.id == null ? String(editing.style?.strokeColor ?? textDefaults.current.color) : editStyle?.id === editing.id ? editStyle.color : null
+    return { fontSize: editFrame.text.size, color, palette: textDefaults.current.palette, colorIsLine: editing.kind === 'shape' }
+  })()
+  /** A size or colour picked in the bar: on the element at once (one `element.style`), or kept for a new text. */
+  const styleEdited = (style: Style) => {
+    if (!editing) return
+    if (editing.id == null) setEditing({ ...editing, style: { ...editing.style, ...style } })
+    else void commit('element.style', { ids: [editing.id], style })
+  }
 
   return (
     <div ref={container} className="board-canvas" tabIndex={0} data-testid="board-canvas" data-tool={tool} style={{ cursor }}>
@@ -1369,11 +1477,25 @@ export function BoardCanvas(props: Props) {
           </g>
         </g>
       </svg>
-      {editing ? <TextEditor key={`${editing.id}:${editing.left}:${editing.top}`} editing={editing} placeholder={t('textPlaceholder')} labels={markLabels} commitRef={commitEditor} onCommit={commitText} onCancel={() => {
+      {editing && editFrame ? (
+        <TextEditor
+          key={editing.session}
+          editing={editing}
+          frame={editFrame}
+          viewport={store}
+          placeholder={t('textPlaceholder')}
+          labels={markLabels}
+          styleBar={styleBar}
+          onStyle={styleEdited}
+          commitRef={commitEditor}
+          onCommit={commitText}
+          onCancel={() => {
             afterEdit.current = editing.id
             setEditing(null)
             container.current?.focus({ preventScroll: true })
-          }} /> : null}
+          }}
+        />
+      ) : null}
       <CanvasMenu menu={menuState} t={t} onAction={onMenu} onClose={() => setMenu(null)} />
       {/* The overview is the frame's chrome: Focus shows only the board. */}
       <FrameChrome>
@@ -1381,10 +1503,6 @@ export function BoardCanvas(props: Props) {
       </FrameChrome>
     </div>
   )
-}
-
-function toWorldFromScreen(left: number, top: number, v: Viewport): Point {
-  return { x: v.x + left / v.zoom, y: v.y + top / v.zoom }
 }
 
 /** What the flow tests and a maintainer's desktop check read from the page. */

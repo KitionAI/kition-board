@@ -53,9 +53,57 @@ pub struct Fragment {
     pub local: bool,
     /// Where the editor puts a host preview (table and board cards), in the local frame.
     pub slot: Option<Rect>,
-    /// The element's box size for local fragments (a `text` element without a stored size is
-    /// measured here, so the editor needs this to select and bind it).
+    /// The element's box size for local fragments (a `text` element is measured here, so the
+    /// editor needs this to select and bind it).
     pub size: Option<(f64, f64)>,
+    /// Where the element's text is laid out (a shape that takes a label, a text, a frame's title, a
+    /// card's caption in the local frame; a connector's label in world coordinates), so the
+    /// editor's text box sits exactly where the lines are drawn and wraps where they wrap.
+    pub text: Option<TextFrame>,
+}
+
+/// How and where an element's text is laid out, in the fragment's local frame.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextFrame {
+    /// The lines wrap at `x1 - x0` when `wrap` (left-aligned lines start at `x0`, right-aligned
+    /// ones end at `x1`, centred ones are centred between them). They are placed from `y0`, or
+    /// centred between `y0` and `y1` when `middle`.
+    pub area: Rect,
+    pub style: Style,
+    /// `left`, `center` or `right`.
+    pub align: String,
+    pub middle: bool,
+    /// Whether the lines wrap at the area's width (else one line per paragraph).
+    pub wrap: bool,
+    /// The text's colour, as the SVG paints it.
+    pub color: String,
+}
+
+impl TextFrame {
+    /// As the editor reads it: `{ area, size, weight, family, lineHeight, align, valign, wrap, color }`,
+    /// `family` the CSS `font-family` list the SVG names.
+    pub fn to_json(&self) -> Value {
+        serde_json::json!({
+            "area": [self.area.x0, self.area.y0, self.area.x1, self.area.y1],
+            "size": self.style.size,
+            "weight": self.style.weight,
+            "family": kition_board_text::css_family(self.style.family),
+            "lineHeight": self.style.line_height(),
+            "align": self.align,
+            "valign": if self.middle { "middle" } else { "top" },
+            "wrap": self.wrap,
+            "color": self.color,
+        })
+    }
+}
+
+/// `textAlign` as the layout reads it: `left`, `right`, anything else `center`, `fallback` when unset.
+fn align_of(element: &Element, fallback: &str) -> String {
+    match text_of(element, "textAlign").unwrap_or(fallback) {
+        "left" => "left".to_owned(),
+        "right" => "right".to_owned(),
+        _ => "center".to_owned(),
+    }
 }
 
 fn text_of<'a>(element: &'a Element, field: &str) -> Option<&'a str> {
@@ -165,13 +213,15 @@ pub fn fragment(model: &BoardModel, element: &Element, options: &Options<'_>) ->
         Kind::Shape | Kind::Text | Kind::Image | Kind::Card | Kind::Frame => boxed(model, element, options),
         Kind::Stroke => stroke(element, options),
         Kind::Connector => connector(model, element, options),
-        Kind::Group => Fragment { svg: String::new(), bounds: model.bounds(element).unwrap_or_default(), local: false, slot: None, size: None },
+        Kind::Group => {
+            Fragment { svg: String::new(), bounds: model.bounds(element).unwrap_or_default(), local: false, slot: None, size: None, text: None }
+        }
     }
 }
 
 fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragment {
     let Some(rect) = model.rect(element) else {
-        return Fragment { svg: String::new(), bounds: Rect::default(), local: true, slot: None, size: None };
+        return Fragment { svg: String::new(), bounds: Rect::default(), local: true, slot: None, size: None, text: None };
     };
     let (w, h) = (rect.width(), rect.height());
     let look = style::look(element, options.colors);
@@ -179,6 +229,7 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
     let mut out = String::new();
     let mut local = Rect::new(0.0, 0.0, w, h);
     let mut slot = None;
+    let mut text = None;
     match element.kind {
         Kind::Shape => {
             let shape = text_of(element, "shapeType").unwrap_or("rectangle");
@@ -201,6 +252,19 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
             // The label is laid out in the part of the box its outline leaves free, centred there.
             let area = shapes::label_box(shape, w, h);
             let (lw, lh) = (area.width(), area.height());
+            if shapes::supports_label(shape) {
+                let style = font(element, LABEL_SIZE, label_weight(element));
+                let pad = label_pad(lw);
+                let x0 = area.x0 + pad;
+                text = Some(TextFrame {
+                    area: Rect::new(x0, area.y0, x0 + (lw - 2.0 * pad).max(style.size), area.y1),
+                    style,
+                    align: align_of(element, "center"),
+                    middle: true,
+                    wrap: true,
+                    color: look.text.clone(),
+                });
+            }
             if shapes::supports_label(shape)
                 && !element.text.is_empty()
                 && let Some(paragraphs) = element.styled_text()
@@ -233,6 +297,14 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
             }
         }
         Kind::Text => {
+            text = Some(TextFrame {
+                area: Rect::new(0.0, 0.0, w, h),
+                style: font(element, TEXT_SIZE, REGULAR),
+                align: align_of(element, "left"),
+                middle: false,
+                wrap: element.size.is_some(),
+                color: look.stroke.clone(),
+            });
             // The whole box takes clicks, not only the glyphs.
             out.push_str(&format!(r#"<rect width="{}" height="{}" fill="transparent"/>"#, num(w), num(h)));
             if let Some(paragraphs) = element.styled_text() {
@@ -249,8 +321,16 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
         Kind::Image => image(&mut out, element, w, h, &look, options),
         Kind::Card => {
             slot = card(&mut out, element, w, h, &look, options);
+            let style = font(element, 13.0, REGULAR);
+            text = Some(TextFrame {
+                area: Rect::new(0.0, h + 6.0, w.max(style.size), h + 6.0 + style.line_height()),
+                style,
+                align: "center".to_owned(),
+                middle: false,
+                wrap: true,
+                color: style::named(MUTED, options.colors),
+            });
             if !element.text.is_empty() {
-                let style = font(element, 13.0, REGULAR);
                 let lines = layout(&element.text, style, Some(w.max(style.size)));
                 let placed = place(&lines, style, w, 0.0, h + 6.0, "center");
                 local = local.union(Rect::new(0.0, h, w, h + 6.0 + lines.len() as f64 * style.line_height()));
@@ -260,8 +340,16 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
         Kind::Frame => {
             let paint = paint_attrs(&look, look.fill.as_deref(), 1.0);
             out.push_str(&format!(r#"<rect width="{}" height="{}" rx="6" {paint}/>"#, num(w), num(h)));
+            let style = font(element, 14.0, 500);
+            text = Some(TextFrame {
+                area: Rect::new(0.0, -style.line_height() - 4.0, w.max(style.size), -4.0),
+                style,
+                align: "left".to_owned(),
+                middle: false,
+                wrap: false,
+                color: style::named(MUTED, options.colors),
+            });
             if !element.text.is_empty() {
-                let style = font(element, 14.0, 500);
                 let line = ellipsized(element.text.lines().next().unwrap_or_default(), style, w.max(style.size));
                 let top = -style.line_height() - 4.0;
                 let lines = [line];
@@ -274,7 +362,7 @@ fn boxed(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragme
     }
     let pad = look.width / 2.0;
     let local = Rect::new(local.x0 - pad, local.y0 - pad, local.x1 + pad, local.y1 + pad);
-    Fragment { svg: wrap_opacity(out, look.opacity), bounds: local, local: true, slot, size: Some((w, h)) }
+    Fragment { svg: wrap_opacity(out, look.opacity), bounds: local, local: true, slot, size: Some((w, h)), text }
 }
 
 /// The mind-map root marker (v1 `MindMapRootMarker`).
@@ -448,7 +536,7 @@ fn look_text(options: &Options<'_>) -> String {
 fn stroke(element: &Element, options: &Options<'_>) -> Fragment {
     let look = style::look(element, options.colors);
     let Some(path) = route::smooth(&element.points) else {
-        return Fragment { svg: String::new(), bounds: Rect::default(), local: false, slot: None, size: None };
+        return Fragment { svg: String::new(), bounds: Rect::default(), local: false, slot: None, size: None, text: None };
     };
     let d = path.d();
     let mut out = format!(
@@ -457,7 +545,7 @@ fn stroke(element: &Element, options: &Options<'_>) -> Fragment {
     );
     out.push_str(&format!(r#"<path d="{d}" fill="none"{}/>"#, stroke_attrs(&look)));
     let bounds = grow(Rect::of_points(&path.hull()).unwrap_or_default(), look.width.max(14.0) / 2.0);
-    Fragment { svg: wrap_opacity(out, look.opacity), bounds, local: false, slot: None, size: None }
+    Fragment { svg: wrap_opacity(out, look.opacity), bounds, local: false, slot: None, size: None, text: None }
 }
 
 fn grow(rect: Rect, by: f64) -> Rect {
@@ -598,7 +686,14 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
         sides,
     );
     let Some(path) = path else {
-        return Fragment { svg: String::new(), bounds: Rect::of_points(&route_points).unwrap_or_default(), local: false, slot: None, size: None };
+        return Fragment {
+            svg: String::new(),
+            bounds: Rect::of_points(&route_points).unwrap_or_default(),
+            local: false,
+            slot: None,
+            size: None,
+            text: None,
+        };
     };
     let start_head = text_of(element, "startArrowhead").unwrap_or("none");
     let end_head = text_of(element, "endArrowhead").unwrap_or("arrow");
@@ -619,11 +714,20 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
     }
     let reach = head_reach(start_head, look.width).max(head_reach(end_head, look.width));
     let mut bounds = grow(Rect::of_points(&path.hull()).unwrap_or_default(), reach.max(7.0));
+    // The label: centred on its place along the route, wrapped at 200 units (world coordinates).
+    let polyline: Vec<Point> = std::iter::once(path.start).chain(path.segs.iter().map(route::Seg::end)).collect();
+    let at = route::along(&polyline, number_of(element, "labelPosition").unwrap_or(0.5)).unwrap_or(path.start);
+    let style = font(element, 14.0, 500);
+    let text = TextFrame {
+        area: Rect::new(at.x - LABEL_WRAP / 2.0, at.y - style.line_height() / 2.0, at.x + LABEL_WRAP / 2.0, at.y + style.line_height() / 2.0),
+        style,
+        align: "center".to_owned(),
+        middle: true,
+        wrap: true,
+        color: look.stroke.clone(),
+    };
     if !element.text.is_empty() {
-        let polyline: Vec<Point> = std::iter::once(path.start).chain(path.segs.iter().map(route::Seg::end)).collect();
-        let at = route::along(&polyline, number_of(element, "labelPosition").unwrap_or(0.5)).unwrap_or(path.start);
-        let style = font(element, 14.0, 500);
-        let lines = layout(&element.text, style, Some(200.0));
+        let lines = layout(&element.text, style, Some(LABEL_WRAP));
         let widest = lines.iter().map(|line| line.width).fold(0.0, f64::max);
         let height = lines.len() as f64 * style.line_height();
         let rect = Rect::new(at.x - widest / 2.0 - 6.0, at.y - height / 2.0 - 3.0, at.x + widest / 2.0 + 6.0, at.y + height / 2.0 + 3.0);
@@ -645,5 +749,8 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
         text_block(&mut out, &shifted, style, &look.stroke, options.lod == Lod::Low);
         bounds = bounds.union(rect);
     }
-    Fragment { svg: wrap_opacity(out, look.opacity), bounds, local: false, slot: None, size: None }
+    Fragment { svg: wrap_opacity(out, look.opacity), bounds, local: false, slot: None, size: None, text: Some(text) }
 }
+
+/// Where a connector's label wraps.
+const LABEL_WRAP: f64 = 200.0;

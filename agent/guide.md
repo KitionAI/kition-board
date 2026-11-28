@@ -33,6 +33,10 @@ name it.
 
 - Coordinates are **board units**, with `x` growing right and `y` growing **down**. An element's
   `position` is its top-left corner, and `size` is `[width, height]` in board units.
+- A `text` without `size` sizes itself: one line per paragraph (`\n` breaks a line), as wide as
+  its longest line. Give it a `size` to fix its width: its lines wrap at that width, and its box
+  grows downward to hold them (the height you give is the least it has), so a fixed-width text
+  never overflows its box.
 - A board made at a size (`board_create`, 1920 × 1080 by default) is that **document** from
   (0, 0): previews and thumbnails show exactly it while everything stays inside, and grow only on a
   side something goes past. `board_inspect`'s `area` is what they show.

@@ -18,9 +18,11 @@ land work, then this list. The comparison with the target application is in
 ## Differences on working features
 
 - `board.editing`: Alt duplicates when pressed during a drag, not at the press, because Alt held from the press still moves without snapping (web/tests/flow.mjs). Changing the type of several shapes at once is one undo step per shape, and a label edit with marks is one undo step for the text and one per mark: the engine has no command that sets shapeType on several elements (element.style refuses it) or writes a text with its marks. The box's marks follow the typing at its caret, but element.setText places a change of the stored text by comparing the old and new text from both ends (kition-sdk's diff_text), so an x typed inside a run of identical characters goes in at the run's end: a stored mark beside the run can take the typed character (marks made in the box are placed right).
+- `board.editor.text-box`: Bold, italic and links show in the box only after the commit (the box is a plain text box, so a label with bold words may wrap a little differently while it is edited); a shape's text colour is its line colour (strokeColor), so the bar's colour also colours the shape's outline; a label longer than its shape grows the box downward while the committed label stays centred on the shape, as the engine draws it.
+- `board.editor.text-tool`: The text is not re-wrapped while a side handle is dragged (only the new box shows); it wraps on release.
 - `board.connectors.ends`: Ends meet the outline of the ellipses, the polygon shapes of outline.rs (the diamond, triangles, hexagon, parallelogram and the others in its table) and the curved document, delay, display and stored-data (each curve sampled as a polygon within 0.3% of the box); a star, cloud, heart, cylinder, pill, multi-document, note and the four single arrows, and the actor and the other open marks (line, check, the braces), still meet their box.
 - `board.images`: Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs.
 
 ## Catalogue
 
-The catalogue has 38 features: 33 `has`, 5 not yet (5 `partial`).
+The catalogue has 40 features: 35 `has`, 5 not yet (5 `partial`).

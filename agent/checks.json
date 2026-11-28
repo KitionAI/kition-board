@@ -26,7 +26,7 @@
   {
     "code": "board.label-overflow",
     "severity": "warning",
-    "summary": "A shape's label or a sized text box does not fit its box with the engine's fonts.",
+    "summary": "A shape's label does not fit the part of its shape a label may use, with the engine's fonts.",
     "fixture": "check-label-overflow.kboard",
     "overflow": "text"
   },

@@ -127,21 +127,47 @@
   pointer-events: none;
 }
 
+.board-text-box {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* The text box takes the engine's geometry (TextEditor): no padding, border or background of its
+   own, the advances the engine measured (no kerning, no ligatures), long words broken as the engine
+   breaks them. */
 .board-text-editor {
   position: absolute;
-  z-index: 2;
-  box-sizing: border-box;
+  box-sizing: content-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
   resize: none;
   overflow: hidden;
-  padding: 4px 6px;
-  border: 1px solid var(--kit-primary, #966e00);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--kb-paper, #ffffff) 96%, transparent);
-  color: var(--kb-stroke-ink, #1e1e1e);
-  font-family: 'Inter', 'Droid Sans Fallback', sans-serif;
-  line-height: 1.25;
+  background: transparent;
   outline: none;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-optical-sizing: none;
+  overflow-wrap: break-word;
+  pointer-events: auto;
+}
+
+.board-text-editor::placeholder {
+  color: var(--kb-muted, #8a8a8a);
+}
+
+/* A new text has no element under it yet: a dashed line shows where it goes. */
+.board-text-new .board-text-editor {
+  outline: 1px dashed var(--kit-primary, #966e00);
+  outline-offset: 2px;
+}
+
+/* The element whose text is being edited: its text is hidden while the box shows it. */
+.board-editing text {
+  visibility: hidden;
 }
 
 /* Bold, italic and link over the text box's selection (TextEditor's marks bar). */
@@ -179,6 +205,40 @@
 .board-text-mark[aria-pressed='true'] {
   background: var(--kit-primary, #966e00);
   color: var(--kit-primary-text, #ffffff);
+}
+
+.board-text-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: var(--kit-border, #e5e3df);
+}
+
+.board-text-size {
+  min-width: 24px;
+  color: var(--kit-text, #1e1e1e);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.board-text-mark[data-testid='board-text-color'] {
+  position: relative;
+}
+
+.board-text-color-bar {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+.board-text-colors {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 2px;
 }
 
 .board-text-link-field {

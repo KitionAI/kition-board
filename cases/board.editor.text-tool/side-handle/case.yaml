@@ -1,0 +1,24 @@
+format: 1
+id: board.editor.text-tool/side-handle
+feature: board.editor.text-tool
+intent: >-
+  Dragging the right handle of an auto-width text gives it a fixed width there: it wraps at that
+  width, its box is as tall as its lines, and its text box wraps the same way when it is opened.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/text.mjs (plan: Board usable by hand, stage 1)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/text.mjs
+      scenario: text-handle
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

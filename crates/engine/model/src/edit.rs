@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use kition_board_kdm::geometry::{auto_text_size, styled_text_size};
+use kition_board_kdm::geometry::text_size;
 use kition_board_kdm::outline::{outline_point, outline_shape_in};
 use kition_board_kdm::{BoardModel, Element, End, Kind, PageView, Point, Rect, Size};
 use kition_kit::kdm::{ObjectId, Tx};
@@ -97,8 +97,8 @@ pub fn check_unlocked(model: &BoardModel, ids: &[ObjectId]) -> Result<()> {
     }
 }
 
-/// Elements whose text the transaction wrote, as it wrote them: a text without a stored size is
-/// measured from these, not from the view (which shows the board before the command, and has no
+/// Elements whose text the transaction wrote, as it wrote them: a text's box is measured from
+/// these, not from the view (which shows the board before the command, and has no
 /// element the command created). The transaction cannot read a text back.
 pub type Fresh = HashMap<ObjectId, Element>;
 
@@ -178,19 +178,16 @@ pub fn geometry_in(model: &BoardModel, tx: &Tx<'_>, id: &ObjectId, fresh: &Fresh
         return None;
     }
     let position = Point::parse_object(&tx.get(id, "position").ok()?)?;
-    let size = match Size::parse(&tx.get(id, "size").ok()?) {
-        Some(size) => size,
-        None if kind == Kind::Text => {
-            let element = fresh.get(id).or_else(|| model.element(id));
-            let font = tx.get(id, "fontSize").ok().and_then(|value| value.as_f64());
-            let family = tx.get(id, "fontFamily").ok();
-            let family = family.as_ref().and_then(|value| value.as_str());
-            match element.and_then(Element::styled_text) {
-                Some(paragraphs) => styled_text_size(&paragraphs, font, family),
-                None => auto_text_size(element.map_or("", |element| element.text.as_str()), font, family),
-            }
-        }
-        None => Size::default(),
+    let stored = Size::parse(&tx.get(id, "size").ok()?);
+    let size = if kind == Kind::Text {
+        let element = fresh.get(id).or_else(|| model.element(id));
+        let font = tx.get(id, "fontSize").ok().and_then(|value| value.as_f64());
+        let family = tx.get(id, "fontFamily").ok();
+        let family = family.as_ref().and_then(|value| value.as_str());
+        let styled = element.and_then(Element::styled_text);
+        text_size(element.map_or("", |element| element.text.as_str()), styled.as_deref(), stored, font, family)
+    } else {
+        stored.unwrap_or_default()
     };
     let rotation = tx.get(id, "rotation").ok().and_then(|value| value.as_f64()).filter(|r| r.is_finite()).unwrap_or(0.0);
     Some((Rect::new(position.x, position.y, position.x + size.w, position.y + size.h), rotation))

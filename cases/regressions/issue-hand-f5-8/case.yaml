@@ -1,0 +1,30 @@
+format: 1
+id: regressions/issue-hand-f5-8
+feature: board.editor.text-box
+intent: >-
+  At 50% and at 200% the text box of a long label is the shape's box on screen, wraps at the
+  engine's label width in board units (half and twice as many pixels) where the engine wraps, and
+  shows the whole text; on a shape turned 30 degrees the box turns with it, its line is centred on
+  the shape and the bar keeps off it. Before, the box's height was two lines at every zoom.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F5.8 (reading of TextEditor.tsx and BoardCanvas.tsx openText)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/text.mjs
+      scenario: zoom
+      browsers: [chromium, webkit]
+  - flow:
+      spec: web/tests/hand/text.mjs
+      scenario: rotated
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

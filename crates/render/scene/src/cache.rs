@@ -34,6 +34,11 @@ fn digest(fragment: &Fragment) -> u64 {
         w.to_bits().hash(&mut hasher);
         h.to_bits().hash(&mut hasher);
     }
+    // The text frame moves with the element's font and box even where the drawing does not (an
+    // empty label).
+    if let Some(text) = &fragment.text {
+        text.to_json().to_string().hash(&mut hasher);
+    }
     for rect in std::iter::once(&fragment.bounds).chain(fragment.slot.as_ref()) {
         for value in [rect.x0, rect.y0, rect.x1, rect.y1] {
             value.to_bits().hash(&mut hasher);
@@ -62,9 +67,10 @@ impl Revisions {
 
     /// Answers `elementSvg(request)`:
     /// `{ ids: [...], lod?: "full" | "low", known?: { id: rev } }` →
-    /// `{ fragments: [{ id, rev, svg, box, frame, size?, slot? }], unchanged: [...], missing: [...], fontEpoch }`.
-    /// `frame` is `local` (place it at the element's position and rotation; `box` and `slot` are in
-    /// that unrotated local frame) or `world` (`box` in world coordinates).
+    /// `{ fragments: [{ id, rev, svg, box, frame, size?, slot?, text? }], unchanged: [...], missing: [...], fontEpoch }`.
+    /// `frame` is `local` (place it at the element's position and rotation; `box`, `slot` and
+    /// `text` are in that unrotated local frame) or `world` (`box` in world coordinates). `text`
+    /// is where the element's text is laid out ([`crate::fragment::TextFrame::to_json`]).
     pub fn answer(&mut self, model: &BoardModel, request: &Value, blobs: &dyn BlobSource) -> Result<Value, String> {
         let ids = request.get("ids").and_then(Value::as_array).ok_or("invalid-params: `ids` must be a list of element ids")?;
         if ids.len() > MAX_IDS {
@@ -98,6 +104,9 @@ impl Revisions {
                 }
                 if let Some((w, h)) = piece.size {
                     object.insert("size".into(), json!([w, h]));
+                }
+                if let Some(text) = &piece.text {
+                    object.insert("text".into(), text.to_json());
                 }
             }
             fragments.push(entry);

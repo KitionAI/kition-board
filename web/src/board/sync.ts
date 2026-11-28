@@ -29,6 +29,26 @@ export type BoardEngine = {
 
 export type Lod = 'full' | 'low'
 
+/**
+ * Where the engine lays out an element's text, in the fragment's local frame (`TextFrame` in
+ * `crates/render/scene/src/fragment.rs`): the lines wrap at the area's width when `wrap`, and are
+ * placed from its top, or centred in it top to bottom (`middle`). The text box takes its geometry
+ * from here.
+ */
+export type TextFrame = {
+  area: Rect
+  size: number
+  weight: number
+  /** The CSS `font-family` list the engine's SVG names. */
+  family: string
+  lineHeight: number
+  align: 'left' | 'center' | 'right'
+  valign: 'top' | 'middle'
+  wrap: boolean
+  /** The colour the SVG paints the text in. */
+  color: string
+}
+
 /** One element's fragment as the engine drew it. */
 export type Fragment = {
   rev: number
@@ -38,10 +58,13 @@ export type Fragment = {
   local: boolean
   size: { w: number; h: number } | null
   slot: Rect | null
+  text: TextFrame | null
 }
 
+type TextAnswer = Omit<TextFrame, 'area'> & { area: [number, number, number, number] }
+
 type Answer = {
-  fragments: Array<{ id: string; rev: number; svg: string; box: [number, number, number, number]; frame: 'local' | 'world'; size?: [number, number]; slot?: [number, number, number, number] }>
+  fragments: Array<{ id: string; rev: number; svg: string; box: [number, number, number, number]; frame: 'local' | 'world'; size?: [number, number]; slot?: [number, number, number, number]; text?: TextAnswer }>
   unchanged: string[]
   missing: string[]
   fontEpoch: number
@@ -85,6 +108,7 @@ export class FragmentStore {
           local: item.frame === 'local',
           size: item.size ? { w: item.size[0], h: item.size[1] } : null,
           slot: item.slot ? box(item.slot) : null,
+          text: item.text ? { ...item.text, area: box(item.text.area) } : null,
         })
         changed.add(item.id)
       }

@@ -1,0 +1,23 @@
+format: 1
+id: board.text/text-frame
+feature: board.text
+intent: >-
+  Every fragment that holds text says where its text is laid out (area, size, weight, CSS family,
+  line height, alignment, top or middle, wrap, colour): a shape's label inside its padding and
+  centred, an empty sticky note too, a text from its top, a frame's title above it, a connector's
+  label on its route; a new font size moves the revision even with nothing drawn; textMetrics names
+  the line height and family. The editor's text box takes its geometry from these.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "bindings/wasm/tests/text_width.rs"
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: text_width, filter: fragments_say_where_their_text_is_laid_out }
+  - cargo-test: { package: kition-board-kit, test: text_width, filter: text_metrics_name_the_family_and_line_height }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-28"

@@ -33,7 +33,7 @@
 use std::collections::{HashMap, HashSet};
 
 use kition_board_kdm::{BoardModel, DanglingEnd, Element, Kind, PageView, Point, Rect};
-use kition_board_scene::fragment::{label_pad, shape_label, text_lines};
+use kition_board_scene::fragment::{label_pad, shape_label};
 use kition_board_scene::shapes::label_box;
 use kition_kit::diagnostics::{Diagnostic, Fix, Severity, Target};
 use kition_kit::kdm::ObjectId;
@@ -260,8 +260,8 @@ fn target_changed(element: &Element, card: &Value, path: &str, size: u64, index:
     }
 }
 
-/// A label taller or wider than the part of its shape a label may use, or a sized text box its
-/// lines overflow.
+/// A label taller or wider than the part of its shape a label may use. (A text's box always holds
+/// its lines: a fixed-width text is as tall as they are.)
 fn label_overflow(model: &BoardModel, element: &Element, index: usize, out: &mut Vec<Diagnostic>) {
     let Some(rect) = model.rect(element) else { return };
     let (w, h) = (rect.width(), rect.height());
@@ -274,10 +274,6 @@ fn label_overflow(model: &BoardModel, element: &Element, index: usize, out: &mut
             let height = lines.len() as f64 * style.line_height();
             let widest = lines.iter().map(|line| line.width).fold(0.0, f64::max);
             (height - lh).max(widest - (lw - 2.0 * label_pad(lw)).max(style.size))
-        }
-        Kind::Text if element.size.is_some() && !element.text.is_empty() => {
-            let (style, lines) = text_lines(element);
-            lines.len() as f64 * style.line_height() - h
         }
         _ => return,
     };

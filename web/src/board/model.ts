@@ -148,7 +148,7 @@ function targetsOf(element: BoardElement): string[] {
   return out
 }
 
-/** The materialised page view. `measured` answers the engine's size of a `text` element without one. */
+/** The materialised page view. `measured` answers the engine's size of a `text` element (its box as the engine measures it). */
 export class BoardView {
   title = ''
   pages: PageView[] = []
@@ -300,7 +300,8 @@ export class BoardView {
   /** The unrotated box of a boxed element. */
   rect(element: BoardElement): Rect | null {
     if (!isBoxed(element.kind) || !element.position) return null
-    const size = element.size ?? (element.kind === 'text' ? this.measured(element.id) : null) ?? { w: 0, h: 0 }
+    // A text's box is the engine's measure: auto width, or its fixed width at least as tall as its lines.
+    const size = (element.kind === 'text' ? this.measured(element.id) : null) ?? element.size ?? { w: 0, h: 0 }
     return rect(element.position.x, element.position.y, element.position.x + size.w, element.position.y + size.h)
   }
 
