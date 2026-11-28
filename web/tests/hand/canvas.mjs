@@ -712,13 +712,19 @@ await h.run([
     const placeholder = drawnAt ? { x: frameAt.x + drawnAt.x, y: frameAt.y + drawnAt.y } : null
     const above = await screen(760, 300)
     step('an untitled frame says where its title goes (above its top left corner)', placeholder != null && placeholder.y < above.y && placeholder.x > above.x && (await kit.getByTestId('board-frame-placeholder').count()) === 1, JSON.stringify(placeholder))
-    if (placeholder) await page.mouse.dblclick(placeholder.x, placeholder.y)
-    const naming = await until(async () => (await editorOpen()) && (await kit.getByTestId('board-text-editor').inputValue()) === '', 20)
+    // On the start of its title line (board units, whatever the font draws the placeholder with).
+    const titleLine = await screen(800, 287)
+    await page.mouse.move(titleLine.x - 20, titleLine.y - 20)
+    await page.mouse.move(titleLine.x, titleLine.y, { steps: 3 })
+    const hoverThere = await board(() => window.kitBoard.hover())
+    await page.mouse.dblclick(titleLine.x, titleLine.y)
+    const naming = await until(async () => (await editorOpen()) && (await kit.getByTestId('board-text-editor').inputValue()) === '', 40)
+    const seen = { hover: hoverThere, editor: await editorOpen(), value: (await editorOpen()) ? await kit.getByTestId('board-text-editor').inputValue() : null, selection: await selection(), trace: await board(() => window.kitBoard.trace()) }
     if (naming) {
       await page.keyboard.type('Ideas')
       await page.keyboard.press('Enter')
     }
-    step('a double-click there names it', naming && (await until(async () => (await storedOne(untitled))?.text === 'Ideas', 40)), JSON.stringify((await storedOne(untitled))?.text))
+    step('a double-click there names it', naming && (await until(async () => (await storedOne(untitled))?.text === 'Ideas', 40)), `${JSON.stringify((await storedOne(untitled))?.text)} ${JSON.stringify(seen)} frame ${untitled}`)
     await page.keyboard.press('Escape')
   }],
 ])
