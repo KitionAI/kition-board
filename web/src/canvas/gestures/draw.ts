@@ -2,7 +2,7 @@
  * Draw a shape, a sticky note or a frame: past the threshold the dragged box is previewed and made
  * on release; a click (or a box smaller than `MIN_DRAW` screen pixels on a side) makes the default
  * size centred on the press (rule 9). One `element.add` (`frame.add` for a frame); the new element
- * is selected, the tool goes back to Select, and a sticky note opens its text.
+ * is selected, the tool goes back to Select (unless tool lock is on), and a sticky note opens its text.
  */
 import { center, rect, type Point, type Rect } from '../../board/geometry'
 import { styleFor } from '../../board/style'
@@ -38,7 +38,7 @@ export function downDraw(_ctx: GestureContext, input: PointerInput, tool: Tool):
       const done = (answer: Record<string, unknown> | null) => {
         const created = (answer?.created as string[] | undefined) ?? (answer?.frame ? [answer.frame as string] : [])
         if (created.length) ctx.select(created)
-        ctx.setTool('select')
+        ctx.toolDone()
         if (tool === 'note' && created[0]) window.setTimeout(() => ctx.openText(created[0]), 0)
       }
       if (tool === 'frame') {

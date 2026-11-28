@@ -211,7 +211,7 @@ features:
     status: partial
     paths: [web/src/canvas/BoardCanvas.tsx, web/src/canvas/TextEditor.tsx, web/tests/hand/canvas.mjs]
     target: "Miro (web, 2026-11)"
-    gap: "With a plain shape selected, a lower-case tool letter (v h r n m t a p l e f) still picks its tool instead of starting the text, because web/tests/flow.mjs presses tool letters with a shape selected (plan section 5): typing \"hello\" into a selected shape starts with the hand tool, typing \"Hello\" or \"2 days\" writes. Sticky notes, texts and mind-map nodes take every letter. The first character typed through an input method (a composition) does not start the text."
+    gap: "With a plain shape selected, a lower-case tool letter (v h r n m t a p l e f, and q for tool lock) still picks its tool or turns tool lock on or off instead of starting the text, because web/tests/flow.mjs presses tool letters with a shape selected (plan section 5): typing \"hello\" into a selected shape starts with the hand tool, typing \"Hello\" or \"2 days\" writes. Sticky notes, texts and mind-map nodes take every letter. The first character typed through an input method (a composition) does not start the text."
     cases: [board.editor.type-to-edit/double-click-text, regressions/issue-hand-f5-5]
     since: "2026-11-28"
   - id: board.editor.text-box
@@ -253,6 +253,64 @@ features:
     paths: [web/src/canvas/BoardCanvas.tsx, web/tests/hand/canvas.mjs]
     target: "Miro (web, 2026-11)"
     cases: [board.editor.view-keys/wheel-step, board.editor.view-keys/fit-keys]
+    since: "2026-11-28"
+  - id: board.editor.selection-bar
+    title: "The selection bar: next to the selection (above it, below it when there is no room or above would cover a neighbour), clear of its handles, hidden while a gesture drags or a text box is open; fill, line or text colour and dashes, text size, a connector's route and arrowheads, align and distribute for several, and a menu with Duplicate, Lock, the stacking order and Delete, each one engine command"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [element.style, layout.align, layout.distribute, element.duplicate, element.lock, element.reorder, element.delete]
+    paths: [web/src/canvas/SelectionBar.tsx, web/src/canvas/BoardCanvas.tsx, web/src/app.css, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    gap: "A shape's text colour is its line colour (strokeColor), so the bar offers one text and line colour for a shape; the bar has no stroke weight, opacity, typeface or alignment (the side panel has them), and no link button."
+    cases: [board.editor.selection-bar/shape, board.editor.selection-bar/neighbour, board.editor.selection-bar/fill-undo, board.editor.selection-bar/hidden, regressions/issue-hand-f11-5, regressions/issue-hand-f6-11]
+    since: "2026-11-28"
+  - id: board.editor.panel-order
+    title: "The side panel makes way: with something selected or a drawing tool in hand the style sections come first and the shape library folds to one row (its header opens it whole); with nothing to style the library is open on top"
+    dimension: [function]
+    priority: P0
+    status: has
+    paths: [web/src/App.tsx, web/src/panels/ShapeLibrary.tsx, web/src/panels/StylePanel.tsx, web/src/app.css, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [regressions/issue-hand-f11-1, regressions/issue-hand-f11-2]
+    since: "2026-11-28"
+  - id: board.editor.library-drag
+    title: "A shape library cell dragged onto the canvas makes that shape where it is let go (previewed while dragged), one element.add"
+    dimension: [function]
+    priority: P1
+    status: has
+    commands: [element.add]
+    paths: [web/src/panels/ShapeLibrary.tsx, web/src/canvas/BoardCanvas.tsx, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.library-drag/drop, regressions/issue-hand-f4-7]
+    since: "2026-11-28"
+  - id: board.editor.empty-hint
+    title: "An empty page shows three short sentences (the tools and their letters, dragging from the library, ? for the shortcuts) that presses go through; they go once the page holds an element"
+    dimension: [function]
+    priority: P1
+    status: has
+    paths: [web/src/canvas/BoardCanvas.tsx, web/src/strings.ts, web/tests/hand/diagram.mjs]
+    target: "Drawnix (2026-11)"
+    cases: [board.editor.empty-hint/three-sentences]
+    since: "2026-11-28"
+  - id: board.editor.shortcuts
+    title: "The keyboard shortcuts at a glance: the ? key or the header's Keyboard shortcuts button"
+    dimension: [function]
+    priority: P1
+    status: has
+    paths: [web/src/panels/Shortcuts.tsx, web/src/App.tsx, web/src/canvas/BoardCanvas.tsx, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.editor.shortcuts/overview]
+    since: "2026-11-28"
+  - id: board.editor.tool-lock
+    title: "Tool lock (Q): while it is on, a drawing tool stays after it made something; a pill on the canvas says so and turns it off"
+    dimension: [function]
+    priority: P1
+    status: has
+    paths: [web/src/canvas/gestures/*.ts, web/src/canvas/BoardCanvas.tsx, web/src/App.tsx, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    gap: "Lower-case q with a plain shape selected turns tool lock on or off, as the other tool letters pick tools (plan section 5, item 7); a double-click on a rail tool does not lock it."
+    cases: [board.editor.tool-lock/q]
     since: "2026-11-28"
   - id: board.text
     title: "Text on the board: marks on a text run; auto-width text, and fixed-width text that wraps and is as tall as its lines; where each element's text is laid out, for the editor"

@@ -1,0 +1,26 @@
+format: 1
+id: regressions/issue-hand-f11-1
+feature: board.editor.panel-order
+intent: >-
+  With a shape selected, the side panel shows the style sections first and its fill swatches are
+  on the first screen without scrolling; with a drawing tool in hand the style sections come
+  first too. Before, the 44-shape library filled the panel and the selection's style began below
+  its first screen, so every colour change needed a scroll.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F11.1 (probe02.mjs, probe03-steps.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: panel-order
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

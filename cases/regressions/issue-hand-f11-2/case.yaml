@@ -1,0 +1,25 @@
+format: 1
+id: regressions/issue-hand-f11-2
+feature: board.editor.panel-order
+intent: >-
+  With something selected the shape library folds to one row under the style sections, and with
+  nothing selected it is open on top of the panel with its search. Before, the library always
+  took about 570 pixels at the top of the panel.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F11.2 (probe02.mjs, probe03-steps.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: panel-order
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

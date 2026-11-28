@@ -18,7 +18,6 @@ import type { ElementLayer, Override, Viewport } from '../../board/layer'
 import type { SnapGuide } from '../../board/snap'
 import type { Style } from '../../board/style'
 import type { BoardSync } from '../../board/sync'
-import type { Tool } from '../../tools'
 
 /** How far (screen pixels) the pointer goes before a press becomes a drag. */
 export const DRAG_THRESHOLD = 4
@@ -63,7 +62,8 @@ export type GestureContext = {
   readOnly: () => boolean
   selection: () => readonly string[]
   select: (ids: string[]) => void
-  setTool: (tool: Tool) => void
+  /** A drawing tool made something: back to Select, unless tool lock (Q) is on. */
+  toolDone: () => void
   shapeType: () => string
   drawStyle: () => Style
   highlightStyle: () => Style

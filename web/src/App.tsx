@@ -30,13 +30,14 @@ import { engineManifest } from './engine'
 import { CATALOGS, summary } from './strings'
 import type { Style } from './board/style'
 import { graphOf } from './board/mindmap'
-import { DownloadIcon as Download, LayoutTemplateIcon as LayoutTemplate } from '@kition/tessera/icons/react'
+import { DownloadIcon as Download, KeyboardIcon as Keyboard, LayoutTemplateIcon as LayoutTemplate } from '@kition/tessera/icons/react'
 import { CardSection, LinkDialog, relativePath, type CardState } from './panels/Cards'
 import { ExportDialog } from './panels/ExportDialog'
 import { PageTabs, type PageTab } from './panels/PageTabs'
 import { TemplateGallery } from './panels/TemplateGallery'
 import { MindMapSection, type MindNodeState } from './panels/MindMapSection'
-import { ShapeLibrary, isPreviews } from './panels/ShapeLibrary'
+import { ShapeLibrary, isPreviews, type ShapeDrag } from './panels/ShapeLibrary'
+import { Shortcuts } from './panels/Shortcuts'
 import { StylePanel, type ShapeChoice, type StyleTarget } from './panels/StylePanel'
 import { HIGHLIGHT_STYLE, PICTURE_EXTENSIONS, TOOLS, railId, type Tool } from './tools'
 
@@ -117,6 +118,9 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
   const [sync, setSync] = useState<BoardSync | null>(null)
   const [tool, setTool] = useState<Tool>('select')
   const [shapeType, setShapeType] = useState('rectangle')
+  // Tool lock (Q): a drawing tool stays after it made something.
+  const [toolLock, setToolLock] = useState(false)
+  const toggleToolLock = useCallback(() => setToolLock((on) => !on), [])
   const [zoom, setZoom] = useState(1)
   // What the drawing tools give new elements: only the fields the person chose (the rest are the kind's defaults).
   const [drawStyle, setDrawStyle] = useState<Style>({})
@@ -374,6 +378,8 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
     [editor, selectionRef, sync],
   )
   const onShape = useCallback((shape: string) => void changeShape(shape), [changeShape])
+  /** A library cell dragged over the page: the canvas previews it and makes the shape where it is let go. */
+  const dragShape = useCallback((drag: ShapeDrag) => canvasApi.current?.libraryDrag(drag), [])
 
   // A single selected mind-map node gets its map's controls in the panel.
   const mindNode = useStable(useMemo<MindNodeState | null>(() => {
@@ -411,6 +417,9 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
 
   // Templates, in the middle of the view.
   const [templates, setTemplates] = useState(false)
+  // The keyboard shortcuts at a glance (the header's button, or ?).
+  const [shortcuts, setShortcuts] = useState(false)
+  const openShortcuts = useCallback(() => setShortcuts(true), [])
   const insertTemplate = useCallback(
     (template: string) => {
       setTemplates(false)
@@ -466,23 +475,31 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
         <KitElement id="control:export">
           <IconButton icon={Download} label={t('export')} onClick={() => setExporting(true)} data-testid="board-export" />
         </KitElement>
+        <KitElement id="control:shortcuts">
+          <IconButton icon={Keyboard} label={t('shortcuts')} onClick={() => setShortcuts(true)} data-testid="board-shortcuts-open" />
+        </KitElement>
       </>
     ),
     [readOnly, t],
   )
-  const panels = useMemo(
-    () => (
+  // With something selected or a drawing tool in hand, the style sections come first and the
+  // library folds to one row; with nothing to style, the library is open on top (plan stage 2).
+  const busy = !readOnly && styleTarget != null
+  const panels = useMemo(() => {
+    const library = readOnly ? null : <ShapeLibrary key="library" previews={previews} active={tool === 'shape' ? shapeType : null} folded={busy} onPick={pickShape} onDrag={dragShape} />
+    const style = <StylePanel key="style" target={readOnly ? null : styleTarget} onApply={applyStyle} shape={shapeChoice} onShape={onShape} />
+    const mind = mindNode ? <MindMapSection key="mind" node={mindNode} onGrow={grow} /> : null
+    const card = cardState ? <CardSection key="card" card={cardState} onRetarget={() => void retarget()} onCaption={() => canvasApi.current?.edit(cardState.id)} /> : null
+    return (
       <KitElement id="panel:style">
         <Panel side="right" width={232} title={t('style')} testId="board-style">
-          {readOnly ? null : <ShapeLibrary previews={previews} active={tool === 'shape' ? shapeType : null} onPick={pickShape} />}
-          <StylePanel target={readOnly ? null : styleTarget} onApply={applyStyle} shape={shapeChoice} onShape={onShape} />
-          {mindNode ? <MindMapSection node={mindNode} onGrow={grow} /> : null}
-          {cardState ? <CardSection card={cardState} onRetarget={() => void retarget()} onCaption={() => canvasApi.current?.edit(cardState.id)} /> : null}
+          <div className="board-panel-order" data-first={busy ? 'style' : 'library'} data-testid="board-panel-order">
+            {busy ? [style, mind, card, library] : [library, style, mind, card]}
+          </div>
         </Panel>
       </KitElement>
-    ),
-    [applyStyle, cardState, grow, mindNode, onShape, pickShape, previews, readOnly, retarget, shapeChoice, shapeType, styleTarget, t, tool],
-  )
+    )
+  }, [applyStyle, busy, cardState, dragShape, grow, mindNode, onShape, pickShape, previews, readOnly, retarget, shapeChoice, shapeType, styleTarget, t, tool])
 
   return (
     <EditorFrame
@@ -515,6 +532,9 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
             drawStyle={drawStyle}
             highlightStyle={highlightStyle}
             onTool={chooseTool}
+            toolLock={toolLock}
+            onToolLock={toggleToolLock}
+            onHelp={openShortcuts}
             readOnly={readOnly}
             selection={selection}
             onSelection={onSelection}
@@ -542,6 +562,14 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       {linkDialog ? <LinkDialog initial={linkDialog} onDone={placeLink} onClose={() => setLinkDialog(null)} /> : null}
       {exporting ? <ExportDialog frame={exportFrame} onClose={() => setExporting(false)} /> : null}
       {templates ? <TemplateGallery onPick={insertTemplate} onClose={() => setTemplates(false)} /> : null}
+      {shortcuts ? (
+        <Shortcuts
+          onClose={() => {
+            setShortcuts(false)
+            canvasApi.current?.focus()
+          }}
+        />
+      ) : null}
     </EditorFrame>
   )
 }

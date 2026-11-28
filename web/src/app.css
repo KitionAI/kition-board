@@ -639,3 +639,172 @@
   min-width: 48px;
   height: 24px;
 }
+
+/*
+ * The selection bar (canvas/SelectionBar.tsx): the text bar's look, next to the selection; its
+ * menus are kit-editor's popovers.
+ */
+.board-selection-bar {
+  white-space: nowrap;
+}
+
+.board-bar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.board-bar-menu {
+  position: relative;
+}
+
+.board-bar-swatches {
+  padding: 4px;
+}
+
+.board-bar-row {
+  display: flex;
+  gap: 2px;
+  padding: 4px 4px 0;
+}
+
+/* The side panel puts its sections in the order App.tsx chooses (style first, or the library first). */
+.board-panel-order {
+  display: contents;
+}
+
+/* The folded library: one row of the same cells, scrolled sideways. */
+.board-library-row {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.board-library-row .board-library-shape {
+  flex: 0 0 32px;
+}
+
+.board-library-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kit-text-muted, #6b6b6b);
+  cursor: pointer;
+}
+
+.board-library-toggle:hover {
+  background: color-mix(in srgb, var(--kit-text, #1e1e1e) 8%, transparent);
+}
+
+/* A library cell dragged toward the canvas follows the pointer. */
+.board-library-ghost {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  padding: 4px;
+  border: 1px solid var(--kit-primary, #966e00);
+  border-radius: 6px;
+  background: var(--kit-surface, #ffffff);
+  color: var(--kit-text, #1e1e1e);
+  opacity: 0.85;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* The hint on an empty page: presses go through it to the canvas. */
+.board-empty-hint {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 1;
+  max-width: 440px;
+  color: var(--kit-text-muted, #6b6b6b);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.board-empty-hint p {
+  margin: 0;
+}
+
+/* Tool lock on (Q): a pill at the top of the canvas; a press turns it off. */
+.board-tool-lock {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--kit-primary, #966e00);
+  border-radius: 13px;
+  background: var(--kit-surface, #ffffff);
+  color: var(--kit-primary, #966e00);
+  font-size: 12px;
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+
+/* The keyboard shortcuts (panels/Shortcuts.tsx). */
+.board-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.board-shortcuts-title {
+  margin: 0 0 4px;
+  color: var(--kit-text, #1e1e1e);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.board-shortcuts dl {
+  margin: 0;
+}
+
+.board-shortcuts-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+.board-shortcuts-row dt {
+  display: inline-flex;
+  flex: 0 0 96px;
+  gap: 2px;
+}
+
+.board-shortcuts-row dd {
+  margin: 0;
+  color: var(--kit-text-muted, #6b6b6b);
+}
+
+.board-shortcuts kbd {
+  min-width: 14px;
+  padding: 0 4px;
+  border: 1px solid var(--kit-border, #e5e3df);
+  border-radius: 4px;
+  background: var(--kit-surface-muted, #f6f5f3);
+  color: var(--kit-text, #1e1e1e);
+  font-family: inherit;
+  font-size: 11px;
+  text-align: center;
+}

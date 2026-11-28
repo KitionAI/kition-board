@@ -11,7 +11,7 @@ export function placeMindMap(ctx: GestureContext, p: Point) {
   if (parent) root.parent = parent
   void ctx.commit('element.add', { elements: [root] }).then((answer) => {
     const created = createdOf(answer)
-    ctx.setTool('select')
+    ctx.toolDone()
     if (!created.length) return
     ctx.select(created)
     window.setTimeout(() => ctx.openText(created[0]), 0)
@@ -27,7 +27,7 @@ export function placeMindMap(ctx: GestureContext, p: Point) {
 export function downText(ctx: GestureContext, input: PointerInput, hit: string | null): Gesture | null {
   if (hit && ctx.sync.view.elements.get(hit)?.kind === 'text') {
     ctx.openText(hit)
-    ctx.setTool('select')
+    ctx.toolDone()
     return null
   }
   const start = input.p
@@ -46,7 +46,7 @@ export function downText(ctx: GestureContext, input: PointerInput, hit: string |
     },
     up(ctx, input, dragged) {
       ctx.setDraft(null)
-      ctx.setTool('select')
+      ctx.toolDone()
       if (dragged && width != null) ctx.openNewText(Math.min(start.x, input.p.x), start.y, width)
       else ctx.openNewText(start.x, start.y, null)
     },

@@ -1,0 +1,26 @@
+format: 1
+id: regressions/issue-hand-f4-7
+feature: board.editor.library-drag
+intent: >-
+  A library cell dragged onto the canvas makes that shape (a diamond) centred where it was let
+  go, previewed while it is dragged, selected, with the tool still Select; a click on a cell
+  still makes it the shape tool. Before, a shape from the library had to be clicked and then
+  drawn on the canvas.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F4.7 (probe02.mjs, probe03-steps.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: library-drag
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -38,7 +38,7 @@ export function downConnect(_ctx: GestureContext, from: EndTarget, at: Point, el
       void ctx.commit('connector.add', params).then((answer) => {
         const created = createdOf(answer)
         if (created.length) ctx.select(created)
-        ctx.setTool('select')
+        ctx.toolDone()
       })
     },
     cancel() {},

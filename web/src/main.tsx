@@ -21,6 +21,7 @@ const KIT_UI = defineKitUi({
   controls: [
     { id: 'control:templates', label: 'Templates' },
     { id: 'control:export', label: 'Export' },
+    { id: 'control:shortcuts', label: 'Keyboard shortcuts' },
   ],
 })
 

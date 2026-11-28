@@ -6,8 +6,10 @@
  * dispatches the pointer to them (a press stays "pressed" until the pointer has moved 4 screen
  * pixels, Escape cancels any of them) and draws the overlay: the hover outline, the selection with
  * its handles (following a gesture's preview), the gesture's draft, snap guides and drop targets.
- * It also keeps the keys (tools, typing into the selected element, the view keys), the text box,
- * the clipboard, the canvas menu, pan and zoom. During a gesture only the editor's own view changes;
+ * It also keeps the keys (tools, tool lock, typing into the selected element, the view keys, the
+ * shortcuts), the text box, the selection bar (`SelectionBar`: the selection's styles next to it),
+ * the hint on an empty page, shapes dragged in from the library, the clipboard, the canvas menu, pan
+ * and zoom. During a gesture only the editor's own view changes;
  * when it ends, one engine command makes the change, one undo step. The gesture's preview stays
  * until that command's change has arrived through the page replica, and goes in the same frame its
  * result is shown (no flicker).
@@ -16,11 +18,11 @@
  * `WhiteboardSelectionOverlay.tsx`, `hooks/useWhiteboardInteractionMachine.ts`,
  * `useWhiteboardCamera.ts`, `useWhiteboardKeyboard.ts` and `lib/boardInteractionMachine.ts`,
  * `whiteboardConnectionHandles.ts` and `WhiteboardMindMapQuickControls.tsx`.
- * Not ported: the selection toolbar (its commands are in the Arrange menu and the side panel) and
- * agent previews.
+ * Not ported: v1's selection toolbar (the selection bar is new, plan stage 2) and agent previews.
  */
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
-import { FrameChrome, toast, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
+import { FrameChrome, ICON_STROKE, toast, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
+import { LockIcon } from '@kition/tessera/icons/react'
 import * as clipboard from '../board/clipboard'
 import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rotate, union, type Point, type Rect } from '../board/geometry'
 import { rayAnchor } from '../board/outline'
@@ -31,14 +33,16 @@ import type { Handle, SnapGuide } from '../board/snap'
 import type { BoardSync, TextFrame } from '../board/sync'
 import { handleCursor, handlePoint } from '../board/resize'
 import { styleFor, type Style, type StyleAnswer, type Swatch } from '../board/style'
+import type { ShapeDrag } from '../panels/ShapeLibrary'
 import { TOOL_KEYS, type Tool } from '../tools'
 import { CanvasMenu, type CanvasAction, type CanvasMenuState } from './CanvasMenu'
 import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
 import { marksOf, sendMarks, type TextMark } from '../board/marks'
 import { strokeCss, TextEditor, type EditFrame, type TextEditing, type TextStyleBar } from './TextEditor'
+import { SelectionBar, type BarActions, type BarSelection } from './SelectionBar'
 import { downBrush } from './gestures/brush'
 import { downConnect } from './gestures/connect'
-import { downDraw } from './gestures/draw'
+import { clickBox, downDraw } from './gestures/draw'
 import { downErase } from './gestures/erase'
 import { downMove } from './gestures/move'
 import { downPan } from './gestures/pan'
@@ -63,6 +67,8 @@ export type BoardCanvasApi = {
   focus: () => void
   /** The element that holds the keys when nothing else does (the frame's `keyboardHome`). */
   element: () => HTMLElement | null
+  /** A library cell dragged over the page: previewed over the canvas, made where it is let go there. */
+  libraryDrag: (drag: ShapeDrag) => void
 }
 
 type Props = {
@@ -77,6 +83,11 @@ type Props = {
   drawStyle: Style
   highlightStyle: Style
   onTool: (tool: Tool) => void
+  /** Tool lock (Q): a drawing tool stays after it made something. */
+  toolLock: boolean
+  onToolLock: () => void
+  /** Opens the keyboard shortcuts (the ? key). */
+  onHelp: () => void
   readOnly: boolean
   selection: readonly string[]
   onSelection: (ids: string[]) => void
@@ -93,6 +104,8 @@ const MIN_ZOOM = 0.05
 const MAX_ZOOM = 4
 /** How far one Ctrl/Cmd+wheel event zooms at most (rule 15): 10%. */
 const WHEEL_ZOOM_STEP = 0.1
+/** The key that turns tool lock on and off. */
+const LOCK_KEY = 'q'
 const HANDLES: readonly Handle[] = ['north-west', 'north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west']
 const CONNECTION_HANDLES: Array<{ side: string; anchor: [number, number]; normal: Point }> = [
   { side: 'north', anchor: [0.5, 0], normal: { x: 0, y: -1 } },
@@ -167,6 +180,10 @@ export function BoardCanvas(props: Props) {
   hoverNow.current = hover
   /** The cursor of the gesture that is dragging (null: the tool's). */
   const [gestureCursor, setGestureCursor] = useState<string | null>(null)
+  /** Whether a gesture has started to drag (the selection bar and the empty page's hint wait). */
+  const [dragActive, setDragActive] = useState(false)
+  /** The selection's styles for the selection bar (`element.getStyle`), for the selection they were asked for. */
+  const [barStyle, setBarStyle] = useState<{ key: string; value: StyleAnswer } | null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [editing, setEditing] = useState<TextEditing | null>(null)
   /** The text box's sessions so far (each box opened is a new one). */
@@ -420,6 +437,21 @@ export function BoardCanvas(props: Props) {
       current = false
     }
   }, [editingId, tick])
+
+  // The selection's styles for the selection bar, again after each change of the board.
+  const selectionKey = selection.join(',')
+  useEffect(() => {
+    if (!selectionKey || readOnly) return undefined
+    let current = true
+    void Promise.resolve(latest.current.query('element.getStyle', { ids: selectionKey.split(',') }))
+      .then((answer) => {
+        if (current && answer) setBarStyle({ key: selectionKey, value: answer as StyleAnswer })
+      })
+      .catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [readOnly, selectionKey, props.revision])
 
   // Another selection ends the "just edited" state of the element whose text box closed.
   useEffect(() => {
@@ -803,6 +835,35 @@ export function BoardCanvas(props: Props) {
     if (groups.length) void commit('arrange.ungroup', { groupIds: groups })
   }
 
+  /**
+   * A library cell dragged over the page (rule 9): over the canvas its default box is previewed
+   * centred on the pointer; let go there, one `element.add` makes that shape there (in the frame
+   * under it), selected; let go elsewhere, nothing.
+   */
+  const libraryDrag = ({ shape, clientX, clientY, phase }: ShapeDrag) => {
+    const box = container.current?.getBoundingClientRect()
+    const inside = box != null && clientX >= box.left && clientX <= box.right && clientY >= box.top && clientY <= box.bottom
+    const over = inside && container.current?.contains(document.elementFromPoint(clientX, clientY)) === true
+    if (phase === 'cancel' || !over || latest.current.readOnly || editingNow.current) {
+      setDraft(null)
+      return
+    }
+    const made = clickBox('shape', toWorld(clientX, clientY))
+    if (phase === 'move') {
+      setDraft({ type: 'rect', box: made, dashed: true })
+      return
+    }
+    setDraft(null)
+    const element: Record<string, unknown> = { kind: 'shape', shapeType: shape, position: [made.x0, made.y0], size: [made.x1 - made.x0, made.y1 - made.y0], ...styleFor('shape', latest.current.drawStyle) }
+    const parent = frameUnder(center(made))
+    if (parent) element.parent = parent
+    container.current?.focus({ preventScroll: true })
+    void commit('element.add', { elements: [element] }).then((answer) => {
+      const created = createdOf(answer)
+      if (created.length) latest.current.onSelection(created)
+    })
+  }
+
   /** A row of the canvas menu, on the elements the menu opened on. */
   const onMenu = (action: CanvasAction) => {
     const open = menu
@@ -876,7 +937,9 @@ export function BoardCanvas(props: Props) {
       readOnly: () => latest.current.readOnly,
       selection: () => latest.current.selection,
       select: (ids) => latest.current.onSelection(ids),
-      setTool: (next) => latest.current.onTool(next),
+      toolDone: () => {
+        if (!latest.current.toolLock) latest.current.onTool('select')
+      },
       shapeType: () => latest.current.shapeType,
       drawStyle: () => latest.current.drawStyle,
       highlightStyle: () => latest.current.highlightStyle,
@@ -924,6 +987,7 @@ export function BoardCanvas(props: Props) {
     const now = active.current
     active.current = null
     setGestureCursor(null)
+    setDragActive(false)
     if (now && now.svg.hasPointerCapture?.(now.pointerId)) now.svg.releasePointerCapture(now.pointerId)
   }
 
@@ -1011,7 +1075,10 @@ export function BoardCanvas(props: Props) {
     const svg = event.currentTarget
     svg.setPointerCapture?.(event.pointerId)
     active.current = { gesture, pointerId: event.pointerId, start: { x: event.clientX, y: event.clientY }, dragging: !gesture.threshold, svg }
-    if (!gesture.threshold) setGestureCursor(gesture.cursor)
+    if (!gesture.threshold) {
+      setGestureCursor(gesture.cursor)
+      setDragActive(true)
+    }
   }
 
   /** The element the pointer is over, for the hover outline (select tool, no gesture). */
@@ -1033,6 +1100,7 @@ export function BoardCanvas(props: Props) {
       if (distance(now.start, { x: event.clientX, y: event.clientY }) < DRAG_THRESHOLD) return
       now.dragging = true
       setGestureCursor(now.gesture.cursor)
+      setDragActive(true)
     }
     now.gesture.move(ctx, inputOf(event))
   }
@@ -1096,9 +1164,10 @@ export function BoardCanvas(props: Props) {
       edit: (id: string) => openText(id),
       focus: () => container.current?.focus({ preventScroll: true }),
       element: () => container.current,
+      libraryDrag: (drag: ShapeDrag) => libraryDrag(drag),
       keyDown: (event: KeyboardEvent) => {
-        // The canvas menu's rows keep their keys (the arrows, Delete), and so does the text box.
-        if (editing || (event.target as Element | null)?.closest?.('[data-testid="board-canvas-menu"]')) return false
+        // The canvas menu's rows keep their keys (the arrows, Delete), and so do the text box and the selection bar's menus.
+        if (editing || (event.target as Element | null)?.closest?.('[data-testid="board-canvas-menu"], [data-testid="board-selection-bar"]')) return false
         const command = event.metaKey || event.ctrlKey
         const ids = latest.current.selection
         const key = event.key.toLowerCase()
@@ -1136,7 +1205,13 @@ export function BoardCanvas(props: Props) {
           selectAll()
           return true
         }
-        if (latest.current.readOnly) return false
+        if (latest.current.readOnly) {
+          if (event.key === '?') {
+            latest.current.onHelp()
+            return true
+          }
+          return false
+        }
         if (clipboardKey && key === 'x') {
           if (!ids.length) return false
           cutIds(ids)
@@ -1190,10 +1265,19 @@ export function BoardCanvas(props: Props) {
         // A character typed with one element selected that takes text starts its text with it (rule 10).
         if (latest.current.tool === 'select' && [...event.key].length === 1 && event.key !== ' ' && !event.isComposing && ids.length === 1 && ids[0] !== afterEdit.current) {
           const target = typingTarget(sync.view.elements.get(ids[0]))
-          if (target === 'any' || (target === 'shape' && !TOOL_KEYS[event.key])) {
+          if (target === 'any' || (target === 'shape' && !TOOL_KEYS[event.key] && event.key !== LOCK_KEY)) {
             openText(ids[0], undefined, event.key)
             return true
           }
+        }
+        if (event.key === '?') {
+          latest.current.onHelp()
+          return true
+        }
+        // Q turns tool lock on or off (a tool letter like the others).
+        if (event.key.toLowerCase() === LOCK_KEY) {
+          latest.current.onToolLock()
+          return true
         }
         const next = TOOL_KEYS[event.key.toLowerCase()]
         if (next) {
@@ -1281,6 +1365,61 @@ export function BoardCanvas(props: Props) {
     hover: hovered && hoverBox ? { id: hovered.id, box: hoverBox } : null,
     handles: resizable || shownScale ? HANDLES.length : 0,
   }
+  // The selection bar (plan stage 2): with the select tool, next to the selection, clear of its
+  // handles; hidden while a gesture drags, while a text box or the canvas menu is open.
+  const barShown = !readOnly && tool === 'select' && selected.length > 0 && selBox != null && !editing && !dragging && !dragActive && menu == null
+  const barClear = connectable ? 30 : rotateAt ? 22 : connector ? 6 : 0
+  /** What the bar should not cover: the other elements' boxes (not the selection, what it holds or what holds it) and the mind-map controls. */
+  const barOthers = (area: Rect): Rect[] => {
+    const layer = layerRef.current
+    if (!layer || !selBox) return []
+    const skip = new Set(selection.flatMap((id) => view.withDescendants(id)))
+    const boxes = layer.query(area).flatMap((id) => {
+      const element = view.elements.get(id)
+      const box = element && !skip.has(id) && isBoxed(element.kind) ? layer.worldBox(id) : null
+      if (!box) return []
+      const holds = box.x0 <= selBox.x0 && box.y0 <= selBox.y0 && box.x1 >= selBox.x1 && box.y1 >= selBox.y1
+      return holds ? [] : [box]
+    })
+    const controls = lanes.flatMap((lane) => lane.controls.map((control) => ({ x0: control.center.x - 17 * px, y0: control.center.y - 17 * px, x1: control.center.x + 17 * px, y1: control.center.y + 17 * px })))
+    return [...boxes, ...controls]
+  }
+  const barSelection: BarSelection = { ids: selection, kinds: selected.map((element) => element.kind), locked: lockedIn(selection), allLocked: selected.every((element) => element.locked) }
+  const backToCanvas = () => container.current?.focus({ preventScroll: true })
+  const barActions: BarActions = {
+    style: (style) => {
+      void commit('element.style', { ids: [...selection], style })
+      backToCanvas()
+    },
+    align: (edge) => {
+      void commit('layout.align', { ids: [...selection], edge })
+      backToCanvas()
+    },
+    distribute: (axis) => {
+      void commit('layout.distribute', { ids: [...selection], axis })
+      backToCanvas()
+    },
+    duplicate: () => {
+      duplicateIds(selection)
+      backToCanvas()
+    },
+    lock: (locked) => {
+      void commit('element.lock', { ids: [...selection], locked })
+      backToCanvas()
+    },
+    order: (placement) => {
+      void commit('element.reorder', { ids: [...selection], placement })
+      backToCanvas()
+    },
+    remove: () => {
+      deleteIds(selection)
+      backToCanvas()
+    },
+  }
+  // The hint on an empty page (finding F1.4): gone as soon as the page holds an element.
+  const shownPage = view.page(layerRef.current?.pageId ?? view.pages[0]?.id)
+  const emptyHint = !readOnly && shownPage != null && shownPage.elements.length === 0 && !editing && !dragActive
+
   // What the canvas menu's rows can do, from the elements it opened on (and what is inside them).
   const menuState = useMemo<CanvasMenuState | null>(() => {
     if (!menu) return null
@@ -1495,6 +1634,20 @@ export function BoardCanvas(props: Props) {
             container.current?.focus({ preventScroll: true })
           }}
         />
+      ) : null}
+      {barShown && selBox ? <SelectionBar selection={barSelection} style={barStyle?.key === selectionKey ? barStyle.value : null} anchor={selBox} clear={barClear} viewport={store} others={barOthers} actions={barActions} t={t} /> : null}
+      {emptyHint ? (
+        <div className="board-empty-hint" data-testid="board-empty-hint">
+          <p>{t('emptyHintTools')}</p>
+          <p>{t('emptyHintLibrary')}</p>
+          <p>{t('emptyHintKeys')}</p>
+        </div>
+      ) : null}
+      {props.toolLock && !readOnly ? (
+        <button type="button" className="board-tool-lock" aria-pressed="true" title={t('toolLockOff')} onClick={props.onToolLock} data-testid="board-tool-lock">
+          <LockIcon size={14} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          <span>{t('toolLockOn')}</span>
+        </button>
       ) : null}
       <CanvasMenu menu={menuState} t={t} onAction={onMenu} onClose={() => setMenu(null)} />
       {/* The overview is the frame's chrome: Focus shows only the board. */}

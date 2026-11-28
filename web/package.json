@@ -18,6 +18,7 @@
     "test:drafts": "node tests/drafts.mjs chromium && node tests/drafts.mjs webkit",
     "test:hand-canvas": "node tests/hand/canvas.mjs chromium && node tests/hand/canvas.mjs webkit",
     "test:hand-text": "node tests/hand/text.mjs chromium && node tests/hand/text.mjs webkit",
+    "test:hand-diagram": "node tests/hand/diagram.mjs chromium && node tests/hand/diagram.mjs webkit",
     "test:contract": "node ../../kition-sdk/tools/check-manifest.mjs ../kit.json --module public/engine"
   },
   "dependencies": {

@@ -1,0 +1,25 @@
+format: 1
+id: regressions/issue-hand-f6-11
+feature: board.editor.selection-bar
+intent: >-
+  A selected connector shows its route and arrowheads on the selection bar (and no fill); the
+  bar's elbow makes it an elbow, and the end menu gives its end a dot, each one element.style.
+  Before, the route and the arrowheads were only at the bottom of the side panel.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F6.11 (probe02.mjs, probe03-steps.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: bar-connector
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

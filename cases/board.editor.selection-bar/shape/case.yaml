@@ -1,0 +1,26 @@
+format: 1
+id: board.editor.selection-bar/shape
+feature: board.editor.selection-bar
+intent: >-
+  Selecting a shape shows the selection bar above it, centred on it, covering neither the shape
+  nor its handles (rotate, connection, resize), with fill, text and line colour, text size and
+  the more menu; Escape takes it away with the selection; with no room above the shape it is
+  below it (finding F11.3).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/diagram.mjs (plan: Board usable by hand, stage 2)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: bar-shows
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]
