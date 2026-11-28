@@ -122,3 +122,38 @@ export function rayAnchor(r: Rect, rotation: number, p: Point): [number, number]
   if (!Number.isFinite(t)) return null
   return [clamp01((c.x + dx * t - r.x0) / w), clamp01((c.y + dy * t - r.y0) / h)]
 }
+
+/**
+ * The outline a bound end meets, as SVG path data on the unrotated box `r` (world coordinates; turn
+ * it about the box's centre for a rotated element): the inscribed ellipse, the polygon or the
+ * parallelogram the engine answers, else the box. The connect gestures outline their target with it
+ * (rule 11: the target is highlighted by its own outline, not a rectangle).
+ */
+export function outlinePath(outline: Outline | null | undefined, r: Rect): string {
+  const w = r.x1 - r.x0
+  const h = r.y1 - r.y0
+  const n = (v: number) => Math.round(v * 100) / 100
+  const polygon = (corners: ReadonlyArray<readonly [number, number]>) => `M${corners.map(([x, y]) => `${n(x)} ${n(y)}`).join('L')}Z`
+  if (outline === 'ellipse') {
+    const rx = w / 2
+    const ry = h / 2
+    const cy = r.y0 + ry
+    return `M${n(r.x0)} ${n(cy)}A${n(rx)} ${n(ry)} 0 1 0 ${n(r.x1)} ${n(cy)}A${n(rx)} ${n(ry)} 0 1 0 ${n(r.x0)} ${n(cy)}Z`
+  }
+  if (outline && 'slant' in outline) {
+    const inset = Math.min(w * outline.slant[0], h * outline.slant[1])
+    return polygon([
+      [r.x0 + inset, r.y0],
+      [r.x1, r.y0],
+      [r.x1 - inset, r.y1],
+      [r.x0, r.y1],
+    ])
+  }
+  if (outline) return polygon(outline.map(([fx, fy]) => [r.x0 + w * fx, r.y0 + h * fy] as const))
+  return polygon([
+    [r.x0, r.y0],
+    [r.x1, r.y0],
+    [r.x1, r.y1],
+    [r.x0, r.y1],
+  ])
+}

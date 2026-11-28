@@ -57,6 +57,13 @@ name it.
   coordinates, counts and page insertion indexes do not name objects.
 - A connector's `anchor` is `[x, y]` on the element's box, each from 0 to 1: `[0, 0.5]` is the
   middle of the left edge, `[1, 0.5]` the middle of the right edge.
+- To see a route before you write it, [`connector.getRoute`](/kits/board/commands/connector.getRoute/)
+  answers how connectors would be drawn and changes nothing: `{"connectors": [{"from": …, "to": …,
+  "type": "elbow"}]}` for a new one, `{"id": …, "to": …}` for a stored one with that end moved, or
+  stored ones with `"move": {"ids": […], "delta": [dx, dy]}` for elements you are about to move.
+  Each answer has `points` (the corners the route turns at), the resolved `start` and `end`, the
+  arrowheads and the label's place: try anchors and route types there, then run `connector.add`
+  or `connector.bind` with the one whose route crosses no node.
 - **Sticky notes, flow-chart nodes and mind-map nodes are shapes** with a `shapeStyle`: `sticky`,
   `flow-node`, `mind-node`. There is no element kind `sticky`.
 - A shape belongs to a frame through `parent` (the frame's id). Moving the frame moves it.

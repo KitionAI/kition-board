@@ -1,0 +1,25 @@
+format: 1
+id: board.editor.connect/snap
+feature: board.editor.connect
+intent: >-
+  An end let go within 16 px of a shape's side midpoint, even just outside the shape, snaps to it:
+  the connector is bound at that midpoint's anchor, and the snapped point is marked while the
+  pointer is there (finding F6.12).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/diagram.mjs (plan: Board usable by hand, stage 3)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: connect-snap
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

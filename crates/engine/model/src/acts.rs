@@ -51,6 +51,16 @@ const PASTE: &[&str] = &["page", "payload.elements[].start.binding.target", "pay
 const PASTE_TYPES: &[(&str, &[&str])] =
     &[("page", &["Page"]), ("payload.elements[].start.binding.target", &["Element"]), ("payload.elements[].end.binding.target", &["Element"])];
 
+/// `connector.getRoute` reads stored connectors, the elements their new ends attach to and the
+/// elements it takes as moved; it writes nothing.
+const ROUTE: &[&str] = &["connectors[].id", "connectors[].from.element", "connectors[].to.element", "move.ids"];
+const ROUTE_TYPES: &[(&str, &[&str])] = &[
+    ("connectors[].id", &["Element"]),
+    ("connectors[].from.element", &["Element"]),
+    ("connectors[].to.element", &["Element"]),
+    ("move.ids", &["Element"]),
+];
+
 pub fn objects(id: &str) -> &'static [&'static str] {
     match id {
         "edit.paste" => PASTE,
@@ -60,6 +70,7 @@ pub fn objects(id: &str) -> &'static [&'static str] {
         "frame.add" => &["page", "children"],
         "connector.add" => &["page", "from.element", "to.element"],
         "connector.bind" => &["to.element"],
+        "connector.getRoute" => ROUTE,
         "stroke.add" | "template.insert" | "card.add" | "image.insert" | "page.rename" | "page.duplicate" | "page.delete" | "page.move"
         | "page.activate" => &["page"],
         "file.export" => &["page", "frame"],
@@ -79,6 +90,7 @@ pub fn object_types(id: &str) -> &'static [(&'static str, &'static [&'static str
         "frame.add" => &[("page", &["Page"]), ("children", &["Element"])],
         "connector.add" => &[("page", &["Page"]), ("from.element", &["Element"]), ("to.element", &["Element"])],
         "connector.bind" => &[("id", &["Element"]), ("to.element", &["Element"])],
+        "connector.getRoute" => ROUTE_TYPES,
         "file.export" => &[("page", &["Page"]), ("frame", &["Element"])],
         "file.render" => &[("target.page", &["Page"]), ("target.frame", &["Element"]), ("target.objectId", &["Element"])],
         "edit.paste" => PASTE_TYPES,

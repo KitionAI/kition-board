@@ -145,15 +145,16 @@ fn unit(from: Point, to: Point) -> Option<Point> {
     (length > 1e-9).then(|| Point::new((to.x - from.x) / length, (to.y - from.y) / length))
 }
 
-/// A polyline with its corners rounded (at most 12 units, at most half of either side).
-fn rounded(points: &[Point]) -> Option<Path> {
+/// `points` without repeats and without the middle of three points on one horizontal or vertical
+/// line: the corners an orthogonal route turns at.
+fn simplified(points: &[Point]) -> Vec<Point> {
     let mut unique: Vec<Point> = Vec::with_capacity(points.len());
     for point in points {
         if unique.last() != Some(point) {
             unique.push(*point);
         }
     }
-    let simplified: Vec<Point> = unique
+    unique
         .iter()
         .enumerate()
         .filter(|(index, point)| {
@@ -163,7 +164,12 @@ fn rounded(points: &[Point]) -> Option<Path> {
             !horizontal && !vertical
         })
         .map(|(_, point)| *point)
-        .collect();
+        .collect()
+}
+
+/// A polyline with its corners rounded (at most 12 units, at most half of either side).
+fn rounded(points: &[Point]) -> Option<Path> {
+    let simplified = simplified(points);
     let start = *simplified.first()?;
     let mut segs = Vec::new();
     for (index, corner) in simplified.iter().enumerate().skip(1) {
@@ -242,6 +248,23 @@ pub fn connector_from(route: &[Point], kind: Option<&str>, role: Option<&str>, a
         }
         Some("curved") => smooth(route),
         _ => Some(Path { start, segs: route.iter().skip(1).map(|p| Seg::Line(*p)).collect() }),
+    }
+}
+
+/// The corners a connector's path goes through, start and end included: an elbow's turns (its
+/// automatic ones without bends, else its route without repeats or straight-through points), the
+/// route itself for the other kinds (their bends; a curve's points it passes through). This is
+/// the line the editor puts a selected connector's segment handles on (`connector.getRoute`).
+pub fn corners(route: &[Point], kind: Option<&str>, role: Option<&str>, sides: [Option<Point>; 2]) -> Vec<Point> {
+    let (Some(start), Some(end)) = (route.first(), route.last()) else { return Vec::new() };
+    let bends = route.len() > 2;
+    if role == Some("mind-map-branch") && !bends {
+        return vec![*start, *end];
+    }
+    match kind {
+        Some("elbow") if !bends => simplified(&elbow(*start, *end, sides)),
+        Some("elbow") => simplified(route),
+        _ => route.to_vec(),
     }
 }
 
@@ -358,6 +381,17 @@ mod tests {
         assert_eq!(curved.end_direction(), Some(p(1.0, 0.0)), "a curve arrives horizontally");
         let short = connector(&[p(0.0, 0.0), p(5.0, 0.0)], None, None, None).unwrap();
         assert_eq!(short.trimmed(10.0, 10.0), short, "too short to trim");
+    }
+
+    #[test]
+    fn corners_are_the_turns_the_path_takes() {
+        let route = [p(0.0, 0.0), p(100.0, 50.0)];
+        assert_eq!(corners(&route, Some("elbow"), None, [None, None]), vec![p(0.0, 0.0), p(50.0, 0.0), p(50.0, 50.0), p(100.0, 50.0)]);
+        assert_eq!(corners(&route, None, None, [None, None]), route.to_vec());
+        let bent = [p(0.0, 0.0), p(0.0, 0.0), p(50.0, 0.0), p(80.0, 0.0), p(80.0, 50.0)];
+        assert_eq!(corners(&bent, Some("elbow"), None, [None, None]), vec![p(0.0, 0.0), p(80.0, 0.0), p(80.0, 50.0)]);
+        assert_eq!(corners(&route, Some("elbow"), Some("mind-map-branch"), [None, None]), route.to_vec());
+        assert!(corners(&[], None, None, [None, None]).is_empty());
     }
 
     #[test]

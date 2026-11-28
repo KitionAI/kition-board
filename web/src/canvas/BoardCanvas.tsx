@@ -25,10 +25,11 @@ import { FrameChrome, ICON_STROKE, toast, type KitCanvasHandle, type Strings } f
 import { LockIcon } from '@kition/tessera/icons/react'
 import * as clipboard from '../board/clipboard'
 import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rotate, union, type Point, type Rect } from '../board/geometry'
-import { rayAnchor } from '../board/outline'
+import { outlinePath, rayAnchor } from '../board/outline'
+import type { Route, RouteRequest } from '../board/route'
 import { ElementLayer, type Viewport } from '../board/layer'
 import { controlLanes, graphOf, isMindNode } from '../board/mindmap'
-import { frameAt, isBoxed, type BoardElement } from '../board/model'
+import { frameAt, isBindable, isBoxed, type BoardElement } from '../board/model'
 import type { Handle, SnapGuide } from '../board/snap'
 import type { BoardSync, TextFrame } from '../board/sync'
 import { handleCursor, handlePoint } from '../board/resize'
@@ -40,6 +41,7 @@ import { Minimap, type DocumentArea, type ViewportStore } from './Minimap'
 import { marksOf, sendMarks, type TextMark } from '../board/marks'
 import { strokeCss, TextEditor, type EditFrame, type TextEditing, type TextStyleBar } from './TextEditor'
 import { SelectionBar, type BarActions, type BarSelection } from './SelectionBar'
+import { downBend, type BendHandle } from './gestures/bend'
 import { downBrush } from './gestures/brush'
 import { downConnect } from './gestures/connect'
 import { clickBox, downDraw } from './gestures/draw'
@@ -52,7 +54,7 @@ import { downResize } from './gestures/resize'
 import { downRotate, ROTATE_CURSOR } from './gestures/rotate'
 import { downScale } from './gestures/scale'
 import { downTerminal } from './gestures/terminal'
-import { createdOf, DRAG_THRESHOLD, type Draft, type EndTarget, type Gesture, type GestureContext, type PointerInput, type SelectionPreview } from './gestures/types'
+import { createdOf, DRAG_THRESHOLD, targetHint, type ConnectHint, type Draft, type EndTarget, type Gesture, type GestureContext, type PointerInput, type SelectionPreview } from './gestures/types'
 
 export type { Tool }
 
@@ -114,11 +116,27 @@ const CONNECTION_HANDLES: Array<{ side: string; anchor: [number, number]; normal
   { side: 'west', anchor: [0, 0.5], normal: { x: -1, y: 0 } },
 ]
 
+/** How near (screen pixels) a connector end snaps to a side midpoint, or meets the outline under the pointer (rule 11). */
+const CONNECT_SNAP = 16
+/** How near (screen pixels) the select tool's pointer comes to a shape's edge before its side midpoints show (rule 11). */
+const EDGE_REACH = 12
+/** A selected connector's segment shorter than this (screen pixels) has no middle point to drag. */
+const MIN_SEGMENT = 24
+
 /** The gesture under way: the pointer it holds, where it was pressed, and whether it has started to drag. */
 type Active = { gesture: Gesture; pointerId: number; start: Point; dragging: boolean; svg: Element }
 
 /** Where the overlay draws the selection's frame and the hover outline (board coordinates), for the tests' `overlay()`. */
 type OverlayInfo = { selection: { box: Rect; rotation: number } | null; hover: { id: string; box: Rect } | null; handles: number }
+
+/** How far `p` is from the edge of the box `r` turned by `rotation` (0 on it, inside or out). */
+function edgeDistance(r: Rect, rotation: number, p: Point): number {
+  const local = rotate(p, center(r), -rotation)
+  const dx = Math.max(r.x0 - local.x, 0, local.x - r.x1)
+  const dy = Math.max(r.y0 - local.y, 0, local.y - r.y1)
+  if (dx > 0 || dy > 0) return Math.hypot(dx, dy)
+  return Math.min(local.x - r.x0, r.x1 - local.x, local.y - r.y0, r.y1 - local.y)
+}
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
@@ -169,6 +187,8 @@ export function BoardCanvas(props: Props) {
   const listeners = useRef(new Set<() => void>())
   const [zoom, setZoom] = useState(1)
   const [draft, setDraft] = useState<Draft | null>(null)
+  const draftNow = useRef(draft)
+  draftNow.current = draft
   const [guides, setGuides] = useState<SnapGuide[]>([])
   /** The frames a move under way drops its elements into. */
   const [drops, setDrops] = useState<string[]>([])
@@ -176,6 +196,20 @@ export function BoardCanvas(props: Props) {
   const [preview, setPreview] = useState<SelectionPreview | null>(null)
   /** The element under the pointer with the select tool (rule 3). */
   const [hover, setHover] = useState<string | null>(null)
+  /** The shape a connector end would go to, or whose side midpoints the select tool shows (rule 11). */
+  const [connectHint, setConnectHintState] = useState<ConnectHint | null>(null)
+  const connectHintNow = useRef(connectHint)
+  connectHintNow.current = connectHint
+  const setConnectHint = useCallback((next: ConnectHint | null) => {
+    const now = connectHintNow.current
+    if (now?.element === next?.element && now?.side === next?.side && now?.mode === next?.mode) return
+    connectHintNow.current = next
+    setConnectHintState(next)
+  }, [])
+  /** The selected connectors as the engine draws them (their corners and path), for their selected look. */
+  const [selectedRoutes, setSelectedRoutes] = useState<ReadonlyMap<string, Route>>(new Map())
+  const selectedRoutesNow = useRef(selectedRoutes)
+  selectedRoutesNow.current = selectedRoutes
   const hoverNow = useRef(hover)
   hoverNow.current = hover
   /** The cursor of the gesture that is dragging (null: the tool's). */
@@ -380,6 +414,22 @@ export function BoardCanvas(props: Props) {
       hover: () => hoverNow.current,
       gesture: () => (active.current ? { type: active.current.gesture.type, phase: active.current.dragging ? 'dragging' : 'pressed' } : null),
       overlay: () => structuredClone(overlayInfo.current),
+      connectHint: () => {
+        const hint = connectHintNow.current
+        const element = hint ? sync.view.elements.get(hint.element) : null
+        const box = element ? sync.view.rect(element) : null
+        if (!hint || !element || !box) return null
+        return { ...hint, points: CONNECTION_HANDLES.map((item) => ({ side: item.side, ...sync.view.boundPoint(element, box, item.anchor) })) }
+      },
+      draft: () => {
+        const now = draftNow.current
+        return now?.type === 'routes' ? structuredClone(now.routes.map(({ svg: _svg, ...route }) => route)) : null
+      },
+      routes: async (request) => (await sync.routes(request)).map(({ svg: _svg, ...route }) => route),
+      selectedRoute: (id) => {
+        const route = selectedRoutesNow.current.get(id)
+        return route ? structuredClone({ points: route.points, path: route.path }) : null
+      },
     }
     return () => {
       stop()
@@ -453,6 +503,25 @@ export function BoardCanvas(props: Props) {
     }
   }, [readOnly, selectionKey, props.revision])
 
+  // The selected connectors as the engine draws them, again after each change of the board.
+  const connectorKey = selection.filter((id) => sync.view.elements.get(id)?.kind === 'connector').join(',')
+  useEffect(() => {
+    if (!connectorKey) {
+      setSelectedRoutes(new Map())
+      return undefined
+    }
+    let current = true
+    void sync
+      .routes({ connectors: connectorKey.split(',').map((id) => ({ id })) })
+      .then((routes) => {
+        if (current) setSelectedRoutes(new Map(routes.flatMap((route) => (route.id ? [[route.id, route] as const] : []))))
+      })
+      .catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [connectorKey, sync, tick])
+
   // Another selection ends the "just edited" state of the element whose text box closed.
   useEffect(() => {
     if (afterEdit.current && !(selection.length === 1 && selection[0] === afterEdit.current)) afterEdit.current = null
@@ -515,6 +584,7 @@ export function BoardCanvas(props: Props) {
     layerRef.current?.setOverrides(new Map())
     layerRef.current?.setHidden([])
     setDraft(null)
+    setConnectHint(null)
     setGuides([])
     setDrops([])
     setPreview(null)
@@ -541,24 +611,79 @@ export function BoardCanvas(props: Props) {
     return null
   }
 
-  /** A connector end over `p`: on the element under the pointer (not `excluding`), else free. */
-  const endAt = (p: Point, client: { clientX: number; clientY: number }, excluding: string | null): EndTarget => {
-    const hit = elementUnder(client.clientX, client.clientY, excluding)
-    const element = hit && hit !== excluding ? sync.view.elements.get(hit) : null
-    const box = element && isBoxed(element.kind) ? sync.view.rect(element) : null
-    if (element && box) {
-      // Near an edge the end goes where the pointer is; further in, the engine faces it toward the
-      // other end (no anchor). A shape with an outline of its own (a diamond, an ellipse) is pinned
-      // on the ray from its centre through the pointer, so the end meets the outline under the
-      // pointer (design note 1.4); a box keeps the nearest edge.
-      const outline = sync.view.outlineOf(element)
-      const edge = nearestEdgeAnchor(box, element.rotation, p)
-      const anchor = (outline && rayAnchor(box, element.rotation, p)) || edge.anchor
-      const point = outline ? sync.view.boundPoint(element, box, anchor) : edge.point
-      const near = distance(point, p) <= 16 / viewport.current.zoom
-      return near ? { element: element.id, anchor, point } : { element: element.id, anchor: null, point: center(box) }
+  /**
+   * A connector end over `p` (rule 11), on none of `excluding`: within 16 screen pixels of one of a
+   * shape's four side midpoints it snaps there; else within 16 pixels of the outline under the
+   * pointer it goes there (a shape with an outline of its own, a diamond or an ellipse, is pinned on
+   * the ray from its centre through the pointer, design note 1.4; a box keeps the nearest edge);
+   * deep inside an element it binds to the centre, and the engine faces it toward the other end (no
+   * anchor); elsewhere it is free.
+   */
+  const endAt = (p: Point, client: { clientX: number; clientY: number }, excluding: readonly string[]): EndTarget => {
+    const view = sync.view
+    const reach = CONNECT_SNAP / viewport.current.zoom
+    let hit: BoardElement | null = null
+    for (const node of document.elementsFromPoint(client.clientX, client.clientY)) {
+      const id = elementAt(node)
+      if (!id || excluding.includes(id)) continue
+      const element = view.elements.get(id)
+      if (element && isBindable(element.kind) && view.rect(element)) hit = element
+      break
     }
+    const near = (layerRef.current?.query({ x0: p.x - reach, y0: p.y - reach, x1: p.x + reach, y1: p.y + reach }) ?? []).flatMap((id) => {
+      const element = view.elements.get(id)
+      return element && !excluding.includes(id) && isBindable(element.kind) ? [element] : []
+    })
+    const candidates = [...new Set([...(hit ? [hit] : []), ...near])].flatMap((element) => {
+      const box = view.rect(element)
+      return box ? [{ element, box }] : []
+    })
+    let snap: { element: string; side: string; anchor: [number, number]; point: Point; d: number } | null = null
+    let edge: { element: string; anchor: [number, number]; point: Point; d: number } | null = null
+    for (const { element, box } of candidates) {
+      for (const item of CONNECTION_HANDLES) {
+        const at = view.boundPoint(element, box, item.anchor)
+        const d = distance(at, p)
+        if (d <= reach && (!snap || d < snap.d)) snap = { element: element.id, side: item.side, anchor: item.anchor, point: at, d }
+      }
+      const outline = view.outlineOf(element)
+      const nearest = nearestEdgeAnchor(box, element.rotation, p)
+      const anchor = (outline && rayAnchor(box, element.rotation, p)) || nearest.anchor
+      const at = outline ? view.boundPoint(element, box, anchor) : nearest.point
+      const d = distance(at, p)
+      if (d <= reach && (!edge || d < edge.d)) edge = { element: element.id, anchor, point: at, d }
+    }
+    if (snap) return { element: snap.element, anchor: snap.anchor, point: snap.point, side: snap.side }
+    if (edge) return { element: edge.element, anchor: edge.anchor, point: edge.point, side: null }
+    const box = hit ? view.rect(hit) : null
+    if (hit && box) return { element: hit.id, anchor: null, point: center(box), side: null }
     return { element: null, point: p }
+  }
+
+  /**
+   * The shape whose side midpoints the select tool shows (rule 11): an unlocked shape whose edge the
+   * pointer is within 12 screen pixels of, inside or out (not a mind-map node, and not the one
+   * selected shape, whose connection handles and resize handles are there already); `side` is the
+   * midpoint under the pointer.
+   */
+  const pointsNear = (p: Point): ConnectHint | null => {
+    const view = sync.view
+    const zoom = viewport.current.zoom
+    const reach = EDGE_REACH / zoom
+    const selected = latest.current.selection
+    let best: { element: BoardElement; box: Rect; d: number } | null = null
+    for (const id of layerRef.current?.query({ x0: p.x - reach, y0: p.y - reach, x1: p.x + reach, y1: p.y + reach }) ?? []) {
+      const element = view.elements.get(id)
+      if (!element || element.kind !== 'shape' || element.locked || element.shapeStyle === 'mind-node' || (selected.length === 1 && selected[0] === id)) continue
+      const box = view.rect(element)
+      if (!box) continue
+      const d = edgeDistance(box, element.rotation, p)
+      if (d <= reach && (!best || d < best.d)) best = { element, box, d }
+    }
+    if (!best) return null
+    const { element, box } = best
+    const side = CONNECTION_HANDLES.find((item) => distance(view.boundPoint(element, box, item.anchor), p) <= 8 / zoom)?.side ?? null
+    return { element: element.id, side, mode: 'hover' }
   }
 
   /**
@@ -960,8 +1085,10 @@ export function BoardCanvas(props: Props) {
       frameUnder: (p) => frameUnderRef.current(p),
       elementUnder: (clientX, clientY, excluding) => elementUnderRef.current(clientX, clientY, excluding),
       endAt: (p, input, excluding) => endAtRef.current(p, input, excluding),
+      setConnectHint,
+      routeQuery: (answer) => sync.routeQuery(answer),
     }),
-    [applyView, clearPreview, sync],
+    [applyView, clearPreview, setConnectHint, sync],
   )
   const duplicateRef = useRef(duplicateIds)
   duplicateRef.current = duplicateIds
@@ -1032,12 +1159,24 @@ export function BoardCanvas(props: Props) {
         return box ? downRotate(ctx, input, [...selection], center(box)) : null
       }
       if (kind === 'terminal') return selection[0] ? downTerminal(ctx, input, selection[0], value as 'start' | 'end') : null
-      if (kind === 'connect') {
-        const element = v.elements.get(selection[0])
+      // A selected shape's connection handle, or a side midpoint the select tool shows near a shape's edge.
+      if (kind === 'connect' || kind === 'point') {
+        const element = v.elements.get(kind === 'connect' ? selection[0] : (connectHintNow.current?.element ?? ''))
         const box = element ? v.rect(element) : null
         const side = CONNECTION_HANDLES.find((item) => item.side === value)
         if (!element || !box || !side) return null
-        return downConnect(ctx, { element: element.id, anchor: side.anchor, point: v.boundPoint(element, box, side.anchor) }, input.p, true)
+        return downConnect(ctx, { element: element.id, anchor: side.anchor, point: v.boundPoint(element, box, side.anchor), side: side.side }, input.p, kind === 'point')
+      }
+      if (kind === 'bend' || kind === 'waypoint') {
+        const connector = selection.length === 1 ? v.elements.get(selection[0]) : null
+        const route = connector ? selectedRoutes.get(connector.id) : null
+        const at = Number(value)
+        if (!connector || !route || !Number.isInteger(at)) return null
+        const elbow = connector.connectorType === 'elbow'
+        // An elbow's bends are its corners: they are removed (double-click) but not dragged one by one.
+        if (kind === 'waypoint' && elbow) return null
+        const bend: BendHandle = kind === 'waypoint' ? { kind: 'move', waypoint: at } : { kind: elbow ? 'shift' : 'insert', segment: at }
+        return downBend(ctx, input, connector.id, bend, route.points)
       }
     }
     const hit = elementAt(event.target)
@@ -1048,7 +1187,7 @@ export function BoardCanvas(props: Props) {
       placeMindMap(ctx, input.p)
       return null
     }
-    if (tool === 'connector') return downConnect(ctx, endAt(input.p, input, null), input.p, false)
+    if (tool === 'connector') return downConnect(ctx, endAt(input.p, input, []), input.p)
     if (tool === 'pen' || tool === 'highlight') return downPen(ctx, input, tool === 'highlight')
     if (tool === 'eraser') return downErase(ctx, input)
     return downDraw(ctx, input, tool)
@@ -1071,6 +1210,7 @@ export function BoardCanvas(props: Props) {
     if (active.current) cancelGesture()
     setHover(null)
     const gesture = startGesture(event, inputOf(event))
+    setConnectHint(null)
     if (!gesture) return
     const svg = event.currentTarget
     svg.setPointerCapture?.(event.pointerId)
@@ -1094,6 +1234,13 @@ export function BoardCanvas(props: Props) {
     if (!now || now.pointerId !== event.pointerId) {
       const over = hoverAt(event.target)
       if (over !== hoverNow.current) setHover(over)
+      // The connector tool shows where an end would go; the select tool a shape's side midpoints near its edge.
+      const p = toWorld(event.clientX, event.clientY)
+      if (editing || readOnly) setConnectHint(null)
+      else if (tool === 'connector') setConnectHint(targetHint(endAt(p, event, [])))
+      // Over a handle (a selected connector's end on a shape's midpoint, say) the handle is what a press takes.
+      else if (tool === 'select') setConnectHint((event.target as Element).closest?.('[data-handle]:not([data-handle^="point:"])') ? null : pointsNear(p))
+      else setConnectHint(null)
       return
     }
     if (!now.dragging) {
@@ -1114,6 +1261,18 @@ export function BoardCanvas(props: Props) {
   }
 
   const onDoubleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    // A double-click on a selected connector's bend removes it (an elbow's: all of them, back to its own route).
+    const bend = document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .map((node) => node.getAttribute('data-handle'))
+      .find((handle) => handle?.startsWith('waypoint:'))
+    const connector = bend && selection.length === 1 ? sync.view.elements.get(selection[0]) : null
+    if (bend && connector?.kind === 'connector' && !readOnly) {
+      const at = Number(bend.split(':')[1])
+      const kept = connector.connectorType === 'elbow' ? [] : connector.waypoints.filter((_, index) => index !== at)
+      void commit('connector.setWaypoints', { id: connector.id, waypoints: kept.map((p) => [p.x, p.y]) })
+      return
+    }
     // A captured pointer's clicks target the canvas: find what is under it.
     const hit = elementUnder(event.clientX, event.clientY, null)
     if (hit) openText(hit)
@@ -1323,7 +1482,23 @@ export function BoardCanvas(props: Props) {
   // A selection of several, or one stroke or group, scales by its bounds.
   const scalable = handlesShown && !resizable && selected.length > 0 && !selected.some((element) => element.locked) && !(single?.kind === 'connector')
   const scaleBox = scalable ? selected.reduce<Rect | null>((all, element) => union(all, view.bounds(element)), null) : null
-  const connector = handlesShown && single?.kind === 'connector' && !single.locked ? view.route(single) : null
+  const connector = handlesShown && single?.kind === 'connector' && !single.locked && !dragActive ? view.route(single) : null
+  // A selected connector's look (rule 4, finding F2.5): highlighted along its line, its two ends,
+  // a point in the middle of each segment (an elbow's inner ones), and its bends.
+  const connectorLook = (() => {
+    if (!connector || !single) return null
+    const route = selectedRoutes.get(single.id)
+    if (!route) return null
+    const elbow = single.connectorType === 'elbow'
+    const corners = route.points
+    const middles = corners.slice(0, -1).flatMap((a, index) => {
+      const b = corners[index + 1]
+      if (!b || distance(a, b) * zoom < MIN_SEGMENT) return []
+      if (elbow && (index === 0 || index === corners.length - 2 || (a.x !== b.x && a.y !== b.y))) return []
+      return [{ index, at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, cursor: elbow ? (a.y === b.y ? 'ns-resize' : 'ew-resize') : 'move' }]
+    })
+    return { route, middles, waypoints: single.waypoints, elbow }
+  })()
   // While a gesture drags, the handles that start other gestures (connect, mind-map controls) wait.
   const dragging = gestureCursor != null || preview != null
   const connectable = handlesShown && single?.kind === 'shape' && singleBox && !single.locked && tool === 'select' && !dragging
@@ -1491,7 +1666,10 @@ export function BoardCanvas(props: Props) {
         }}
         onPointerLeave={() => {
           pointer.current = null
-          if (!active.current) setHover(null)
+          if (!active.current) {
+            setHover(null)
+            setConnectHint(null)
+          }
         }}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
@@ -1513,10 +1691,39 @@ export function BoardCanvas(props: Props) {
                 })()}
               </g>
             ) : null}
+            {/* Under the selection, so a selected connector's end handle on a shape's midpoint stays on top. */}
+            {connectHint ? (() => {
+              const element = view.elements.get(connectHint.element)
+              const box = element ? view.rect(element) : null
+              if (!element || !box) return null
+              const c = center(box)
+              const turn = element.rotation ? `rotate(${element.rotation} ${c.x} ${c.y})` : undefined
+              const pressable = connectHint.mode === 'hover'
+              return (
+                <g data-testid="board-connect-points" data-element={element.id} data-mode={connectHint.mode}>
+                  {connectHint.mode === 'target' ? <path className="board-target" data-testid="board-connect-target" d={outlinePath(view.outlineOf(element), box)} transform={turn} strokeWidth={2 * px} /> : null}
+                  {CONNECTION_HANDLES.map((item) => {
+                    const at = view.boundPoint(element, box, item.anchor)
+                    const snapped = connectHint.side === item.side
+                    return (
+                      <g key={item.side}>
+                        {pressable ? <circle className="board-connect-hit" data-handle={`point:${item.side}`} cx={at.x} cy={at.y} r={9 * px} /> : null}
+                        <circle className={snapped ? 'board-connect-point board-connect-snapped' : 'board-connect-point'} data-handle={pressable ? `point:${item.side}` : undefined} data-testid={`board-connect-point-${item.side}`} data-snapped={snapped ? 'true' : 'false'} cx={at.x} cy={at.y} r={(snapped ? 6 : 4.5) * px} strokeWidth={1.5 * px} />
+                      </g>
+                    )
+                  })}
+                </g>
+              )
+            })() : null}
             <g data-testid="board-selection" transform={selectionTransform}>
               {preview?.type === 'scale'
                 ? null
                 : selected.map((element) => {
+                    // A connector is highlighted along its line, not boxed (F2.5); hidden while it is dragged.
+                    if (element.kind === 'connector') {
+                      const route = selectedRoutes.get(element.id)
+                      return route?.path && !dragActive ? <path key={element.id} className={single ? 'board-selected-line' : 'board-selected'} d={route.path} strokeWidth={(single ? 6 : 1.5) * px} data-selected={element.id} data-testid="board-connector-highlight" /> : null
+                    }
                     // One rotated box is outlined in its own frame (and a resize on its new box).
                     const own = single && (single.rotation || preview?.type === 'resize') && shownSingle ? shownSingle : null
                     const box = own ?? layerRef.current?.worldBox(element.id)
@@ -1541,6 +1748,16 @@ export function BoardCanvas(props: Props) {
                   })
                 : null}
               {rotateAt ? <circle className="board-handle" data-handle="rotate:0" data-testid="board-handle-rotate" cx={rotateAt.x} cy={rotateAt.y} r={5 * px} strokeWidth={1.5 * px} style={{ cursor: ROTATE_CURSOR }} /> : null}
+              {connectorLook
+                ? connectorLook.middles.map((middle) => (
+                    <circle key={`mid-${middle.index}`} className="board-bend-handle" data-handle={`bend:${middle.index}`} data-testid={`board-connector-mid-${middle.index}`} cx={middle.at.x} cy={middle.at.y} r={4 * px} strokeWidth={1.5 * px} style={{ cursor: middle.cursor }} />
+                  ))
+                : null}
+              {connectorLook
+                ? connectorLook.waypoints.map((point, index) => (
+                    <circle key={`bend-${index}`} className="board-handle" data-handle={`waypoint:${index}`} data-testid={`board-connector-waypoint-${index}`} cx={point.x} cy={point.y} r={5 * px} strokeWidth={1.5 * px} style={{ cursor: connectorLook.elbow ? 'pointer' : 'move' }} />
+                  ))
+                : null}
               {connector && connector.length >= 2
                 ? (['start', 'end'] as const).map((terminal) => {
                     const point = terminal === 'start' ? connector[0] : connector[connector.length - 1]
@@ -1597,14 +1814,12 @@ export function BoardCanvas(props: Props) {
               return box ? <rect key={id} className="board-drop-target" data-testid="board-drop-target" data-frame={id} x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={2 * px} /> : null
             })}
             {draft?.type === 'rect' ? <rect className={draft.dashed ? 'board-brush' : 'board-draft'} x={draft.box.x0} y={draft.box.y0} width={draft.box.x1 - draft.box.x0} height={draft.box.y1 - draft.box.y0} strokeWidth={px} /> : null}
-            {draft?.type === 'lines'
-              ? draft.lines.map((line, index) => <polyline key={index} className="board-live" data-testid="board-live-line" points={line.map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={2 * px} />)
+            {draft?.type === 'routes'
+              ? draft.routes.map((route, index) => (
+                  // The connector as the engine will draw it (connector.getRoute): its own SVG.
+                  <g key={route.id ?? index} className="board-live" data-testid="board-live-line" data-connector={route.id ?? undefined} dangerouslySetInnerHTML={{ __html: route.svg }} />
+                ))
               : null}
-            {draft?.type === 'lines' && draft.target ? (() => {
-              const element = view.elements.get(draft.target)
-              const box = element ? view.rect(element) : null
-              return box ? <rect className="board-target" x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={2 * px} /> : null
-            })() : null}
             {draft?.type === 'pen' ? <polyline className={draft.highlight ? 'board-pen board-highlight' : 'board-pen'} data-testid="board-pen-draft" points={draft.points.map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={draft.highlight ? 16 : 2.5} /> : null}
             {guides.map((guide, index) =>
               guide.axis === 'x' ? (
@@ -1688,5 +1903,13 @@ type BoardWindow = Window & {
     gesture: () => { type: string; phase: 'pressed' | 'dragging' } | null
     /** Where the overlay draws the selection's frame (board coordinates, unrotated box and its rotation) and the hover outline. */
     overlay: () => OverlayInfo
+    /** The shape a connector end would go to (or whose side midpoints the select tool shows), with those midpoints. */
+    connectHint: () => (ConnectHint & { points: Array<{ side: string; x: number; y: number }> }) | null
+    /** The connectors the gesture under way previews, as the engine answered them (without their SVG). */
+    draft: () => Array<Omit<Route, 'svg'>> | null
+    /** Asks the engine how connectors would be drawn (`connector.getRoute`), without their SVG. */
+    routes: (request: RouteRequest) => Promise<Array<Omit<Route, 'svg'>>>
+    /** A selected connector's corners and path as its selected look draws them. */
+    selectedRoute: (id: string) => { points: Point[]; path: string } | null
   }
 }

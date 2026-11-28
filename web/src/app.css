@@ -99,6 +99,42 @@
   cursor: crosshair;
 }
 
+/* A selected connector: highlighted along its line (rule 4), points in its segments' middles. */
+.board-selected-line {
+  fill: none;
+  stroke: var(--kit-primary, #966e00);
+  stroke-opacity: 0.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.board-bend-handle {
+  fill: var(--kit-primary, #966e00);
+  stroke: var(--kb-paper, #ffffff);
+}
+
+/* A shape's four side midpoints (rule 11): where a connector end snaps. */
+.board-connect-point {
+  fill: var(--kb-paper, #ffffff);
+  stroke: var(--kit-primary, #966e00);
+  cursor: crosshair;
+}
+
+.board-connect-snapped {
+  fill: var(--kit-primary, #966e00);
+}
+
+.board-connect-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: crosshair;
+}
+
+[data-mode='target'] .board-connect-point {
+  pointer-events: none;
+}
+
 .board-brush {
   fill: color-mix(in srgb, var(--kit-primary, #966e00) 8%, transparent);
   stroke: var(--kit-primary, #966e00);
@@ -113,7 +149,15 @@
   pointer-events: none;
 }
 
-.board-live,
+/* A previewed connector is the engine's own drawing, stroked as the board strokes it. */
+.board-live {
+  pointer-events: none;
+}
+
+.board-overlay .board-live * {
+  vector-effect: none;
+}
+
 .board-pen {
   fill: none;
   stroke: var(--kb-stroke-ink, #1e1e1e);

@@ -1,0 +1,22 @@
+format: 1
+id: board.connectors.route/engine
+feature: board.connectors.route
+intent: >-
+  connector.getRoute draws connectors without writing anything: a new connector between two ends,
+  a stored one with one end re-attached, or stored ones whose shapes are taken as moved, each as the
+  command it stands for (connector.add, connector.bind, element.move) then draws it, with its
+  corners, path, arrowheads, resolved ends and label place; malformed and hostile requests answer
+  typed errors and change nothing.
+layer: unit
+dimension: function
+source:
+  kind: synthetic
+  from: bindings/wasm/tests/connector_route.rs
+  license: Apache-2.0
+input: []
+steps:
+  - cargo-test: { package: kition-board-kit, test: connector_route }
+expected:
+  - actual: out:exit
+    compare: exit
+since: "2026-11-28"

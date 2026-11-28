@@ -1,0 +1,25 @@
+format: 1
+id: board.editor.connector-edit/rebind-label
+feature: board.editor.connector-edit
+intent: >-
+  A labelled connector whose end is dragged to another shape shows its label while dragged and
+  keeps it after connector.bind. The walkthrough's missing label (F6.8) came from its own Undo
+  after a drag that made no step, not from the re-attach; this case keeps it that way.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F6.8 (probe02.mjs, round2/09-terminal-done.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: rebind-label
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

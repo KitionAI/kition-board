@@ -17,6 +17,7 @@ import type { Point, Rect } from '../../board/geometry'
 import type { ElementLayer, Override, Viewport } from '../../board/layer'
 import type { SnapGuide } from '../../board/snap'
 import type { Style } from '../../board/style'
+import type { EndParam, Route, RouteQuery } from '../../board/route'
 import type { BoardSync } from '../../board/sync'
 
 /** How far (screen pixels) the pointer goes before a press becomes a drag. */
@@ -24,14 +25,27 @@ export const DRAG_THRESHOLD = 4
 /** The smallest drawn box (screen pixels); a smaller one is a click's default box. */
 export const MIN_DRAW = 6
 
-/** Where a connector end goes: an element (and where on it) or a free point. */
-export type EndTarget = { element: string; anchor: [number, number] | null; point: Point } | { element: null; point: Point }
+/**
+ * Where a connector end goes: an element (and where on it; `side` when it snapped to one of its
+ * four side midpoints, no anchor when it binds to the centre and the engine faces it to the other
+ * end) or a free point.
+ */
+export type EndTarget = { element: string; anchor: [number, number] | null; point: Point; side: string | null } | { element: null; point: Point }
 
-/** What the overlay draws for the gesture under way. */
-export type Draft =
-  | { type: 'rect'; box: Rect; dashed: boolean }
-  | { type: 'lines'; lines: Point[][]; target: string | null }
-  | { type: 'pen'; points: Point[]; highlight: boolean }
+/**
+ * What the overlay draws for the gesture under way. `routes` are connectors as the engine would
+ * draw them (`connector.getRoute`): the connector being drawn, re-attached or bent, or those
+ * carried by a move.
+ */
+export type Draft = { type: 'rect'; box: Rect; dashed: boolean } | { type: 'routes'; routes: Route[] } | { type: 'pen'; points: Point[]; highlight: boolean }
+
+/**
+ * The shape a connector end would go to, shown with its four side midpoints (rule 11): `target`
+ * while a connector is drawn or re-attached, or the connector tool hovers (outlined by its own
+ * outline, `side` the midpoint it snaps to); `hover` with the select tool near a shape's edge (the
+ * midpoints start a connector when pressed).
+ */
+export type ConnectHint = { element: string; side: string | null; mode: 'target' | 'hover' }
 
 /** Where the selection overlay is drawn while a gesture previews its change (rule 4: it follows). */
 export type SelectionPreview =
@@ -91,11 +105,15 @@ export type GestureContext = {
   frameUnder: (p: Point) => string | null
   /** The topmost element painted at a client point, other than `excluding`. */
   elementUnder: (clientX: number, clientY: number, excluding: string | null) => string | null
-  /** A connector end over `p`. */
-  endAt: (p: Point, input: { clientX: number; clientY: number }, excluding: string | null) => EndTarget
+  /** A connector end over `p`, on none of the elements `excluding`. */
+  endAt: (p: Point, input: { clientX: number; clientY: number }, excluding: readonly string[]) => EndTarget
+  /** Shows the shape a connector end would go to, with its side midpoints (null: none). */
+  setConnectHint: (hint: ConnectHint | null) => void
+  /** A question at a time to the engine for routes (`connector.getRoute`); `answer` hears the latest. */
+  routeQuery: (answer: (routes: Route[]) => void) => RouteQuery
 }
 
-export type GestureType = 'pan' | 'move' | 'resize' | 'scale' | 'rotate' | 'brush' | 'draw' | 'connect' | 'terminal' | 'pen' | 'erase' | 'text'
+export type GestureType = 'pan' | 'move' | 'resize' | 'scale' | 'rotate' | 'brush' | 'draw' | 'connect' | 'terminal' | 'bend' | 'pen' | 'erase' | 'text'
 
 export interface Gesture {
   readonly type: GestureType
@@ -110,8 +128,12 @@ export interface Gesture {
   cancel(ctx: GestureContext): void
 }
 
-/** A connector end as `connector.add` and `connector.bind` take it. */
-export const endParams = (end: EndTarget) => (end.element ? (end.anchor ? { element: end.element, anchor: end.anchor } : { element: end.element }) : { point: [end.point.x, end.point.y] })
+/** A connector end as `connector.add`, `connector.bind` and `connector.getRoute` take it. */
+export const endParams = (end: EndTarget): EndParam =>
+  end.element ? (end.anchor ? { element: end.element, anchor: end.anchor } : { element: end.element }) : { point: [end.point.x, end.point.y] }
+
+/** The hint for an end over `end`: its element as the target, the midpoint it snapped to. */
+export const targetHint = (end: EndTarget): ConnectHint | null => (end.element ? { element: end.element, side: end.side, mode: 'target' } : null)
 
 /** The element ids a command's answer names as made. */
 export function createdOf(answer: Record<string, unknown> | null): string[] {

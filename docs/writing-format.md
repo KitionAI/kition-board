@@ -4,7 +4,7 @@ How a model writes Kition Board documents: the steps it sends, how it names what
 what a new document starts with, the named values commands accept, and worked examples.
 The package ships the short version for models as [agent/guide.md](../agent/guide.md); this file is
 the complete reference it is drawn from. Everything below comes from the engine itself
-(its 47 commands and their parameter schemas, and what `inspect` reports) and from the guide.
+(its 50 commands and their parameter schemas, and what `inspect` reports) and from the guide.
 
 ## What a model writes
 
@@ -37,16 +37,17 @@ Commands by namespace (the part of the id before the first dot):
 | --- | ---: | ---: | ---: | --- |
 | `arrange` | 2 | 2 | 2 | `arrange.group`, `arrange.ungroup` |
 | `card` | 2 | 2 | 2 | `card.add`, `card.setTarget` |
-| `connector` | 4 | 4 | 4 | `connector.add`, `connector.bind`, `connector.setLabel` |
+| `connector` | 5 | 4 | 5 | `connector.add`, `connector.bind`, `connector.setLabel`, `connector.getRoute` |
 | `edit` | 4 | 3 | 4 | `edit.undo`, `edit.redo`, `edit.copy` |
 | `element` | 12 | 11 | 12 | `element.duplicate`, `element.delete`, `element.add` |
-| `file` | 1 | 0 | 1 | `file.export` |
+| `file` | 2 | 0 | 2 | `file.export`, `file.render` |
 | `frame` | 2 | 2 | 2 | `frame.add`, `frame.fit` |
 | `image` | 2 | 2 | 2 | `image.insert`, `image.setAlt` |
 | `layout` | 4 | 4 | 4 | `layout.align`, `layout.distribute`, `layout.stack` |
 | `link` | 1 | 1 | 1 | `link.retarget` |
 | `mindmap` | 4 | 4 | 4 | `mindmap.addChild`, `mindmap.addSibling`, `mindmap.collapse` |
 | `page` | 6 | 5 | 6 | `page.add`, `page.rename`, `page.duplicate` |
+| `shape` | 1 | 0 | 1 | `shape.previews` |
 | `stroke` | 1 | 1 | 1 | `stroke.add` |
 | `template` | 1 | 1 | 1 | `template.insert` |
 | `text` | 1 | 1 | 1 | `text.mark` |
@@ -64,6 +65,10 @@ Commands by namespace (the part of the id before the first dot):
 - **Sticky notes, flow-chart nodes and mind-map nodes are shapes** with a `shapeStyle`: `sticky`,
   `flow-node`, `mind-node`. There is no element kind `sticky`.
 - A shape belongs to a frame through `parent` (the frame's id). Moving the frame moves it.
+- **A route before it is written:** `connector.getRoute` answers how connectors would be drawn
+  (new ones between `from` and `to`, stored ones by `id` with an end, the route type or the bends
+  replaced, or stored ones with `move: {ids, delta}`), with the corners each route turns at, its
+  resolved ends, arrowheads and label place, and changes nothing.
 - A `text` without `size` is one line per paragraph, as wide as its longest line; with `size` its
   lines wrap at the width and its box grows downward to hold them (the height given is the least).
 
@@ -128,7 +133,7 @@ schema says which.
 | `template` | `mindmap`, `flowchart`, `roadmap`, `kanban`, `retrospective`, `storyboard` | `template.insert` |
 | `textAlign` | `left`, `center`, `right` | `element.add`, `element.style` |
 | `textFormat` | `plain`, `markdown` | `element.add` |
-| `type` | `straight`, `elbow`, `curved` | `connector.add` |
+| `type` | `straight`, `elbow`, `curved` | `connector.add`, `connector.getRoute` |
 | `units` | `scalar`, `utf16` | `text.mark` |
 
 ## Examples

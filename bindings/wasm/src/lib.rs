@@ -578,6 +578,7 @@ impl BoardDocument {
             "page.activate" => self.activate(&params),
             "element.getStyle" => self.style_of(&params),
             "shape.previews" => self.shape_previews(&params),
+            "connector.getRoute" => self.connector_route(&params),
             "file.export" => self.export_file(&params),
             "file.render" => self.render_view(&params),
             _ if !kition_board_model::mutates(command) => Ok(kition_board_model::read(self.session.model(), command, &params)?),

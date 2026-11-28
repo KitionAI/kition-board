@@ -22,9 +22,11 @@ land work, then this list. The comparison with the target application is in
 - `board.editor.text-tool`: The text is not re-wrapped while a side handle is dragged (only the new box shows); it wraps on release.
 - `board.editor.selection-bar`: A shape's text colour is its line colour (strokeColor), so the bar offers one text and line colour for a shape; the bar has no stroke weight, opacity, typeface or alignment (the side panel has them), and no link button.
 - `board.editor.tool-lock`: Lower-case q with a plain shape selected turns tool lock on or off, as the other tool letters pick tools (plan section 5, item 7); a double-click on a rail tool does not lock it.
+- `board.editor.connect`: An end binds to the centre only deep inside a shape (more than 16 px from its outline), not also when the pointer enters slowly or rests there: how fast the pointer moves is not read. The select tool shows the side midpoints of shapes only (not texts, pictures, cards, frames or mind-map nodes), and not on the one selected shape, whose connection handles are there.
+- `board.editor.connector-edit`: An elbow's bends are its corners: its inner segments move sideways, and a double-click on one of its bends goes back to the automatic route (all bends removed), but its corners are not dragged one by one. An elbow given bends keeps them when its shapes move, so its first and last segments can slant until the bends are removed.
 - `board.connectors.ends`: Ends meet the outline of the ellipses, the polygon shapes of outline.rs (the diamond, triangles, hexagon, parallelogram and the others in its table) and the curved document, delay, display and stored-data (each curve sampled as a polygon within 0.3% of the box); a star, cloud, heart, cylinder, pill, multi-document, note and the four single arrows, and the actor and the other open marks (line, check, the braces), still meet their box.
 - `board.images`: Inserting a picture from a lent file (image.insert with `file`) is covered by the command tests, not by the round trip in bindings/wasm/tests/round_trip.rs.
 
 ## Catalogue
 
-The catalogue has 46 features: 41 `has`, 5 not yet (5 `partial`).
+The catalogue has 49 features: 44 `has`, 5 not yet (5 `partial`).

@@ -675,28 +675,59 @@ fn arrowhead(out: &mut String, kind: &str, tip: Point, direction: Point, look: &
 }
 
 fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fragment {
-    let look = style::look(element, options.colors);
     let route_points = model.route(element);
     let sides = [&element.start, &element.end].map(|end| end.as_ref().and_then(|end| model.end_side(&element.id, end)));
-    let path = route::connector_from(
-        &route_points,
-        text_of(element, "connectorType"),
-        text_of(element, "connectorRole"),
-        text_of(element, "mindMapBranchAxis"),
-        sides,
-    );
+    connector_drawn(element, &route_points, sides, options).fragment
+}
+
+/// An arrowhead as a connector draws it: on which end, its kind, its tip, the unit direction the
+/// line arrives in (toward the tip), and its length and half width.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Head {
+    /// `start` or `end`.
+    pub end: &'static str,
+    pub kind: String,
+    pub tip: Point,
+    pub direction: Point,
+    pub length: f64,
+    pub half_width: f64,
+}
+
+/// A connector as drawn from its route: the fragment, the path it strokes, the corners it turns
+/// at ([`route::corners`]) and its arrowheads (none drawn for `none`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawnConnector {
+    pub fragment: Fragment,
+    pub path: Option<Path>,
+    pub corners: Vec<Point>,
+    pub heads: Vec<Head>,
+}
+
+/// Draws the connector `element` along `route_points` (its start, bends and end, ends derived),
+/// leaving and entering through `sides` (`BoardModel::end_side`). The board's fragment of a
+/// connector and `connector.getRoute`'s preview of one both come from here, so a preview is what
+/// the command that follows draws.
+pub fn connector_drawn(element: &Element, route_points: &[Point], sides: [Option<Point>; 2], options: &Options<'_>) -> DrawnConnector {
+    let look = style::look(element, options.colors);
+    let kind = text_of(element, "connectorType");
+    let role = text_of(element, "connectorRole");
+    let corners = route::corners(route_points, kind, role, sides);
+    let path = route::connector_from(route_points, kind, role, text_of(element, "mindMapBranchAxis"), sides);
     let Some(path) = path else {
-        return Fragment {
+        let fragment = Fragment {
             svg: String::new(),
-            bounds: Rect::of_points(&route_points).unwrap_or_default(),
+            bounds: Rect::of_points(route_points).unwrap_or_default(),
             local: false,
             slot: None,
             size: None,
             text: None,
         };
+        return DrawnConnector { fragment, path: None, corners, heads: Vec::new() };
     };
     let start_head = text_of(element, "startArrowhead").unwrap_or("none");
     let end_head = text_of(element, "endArrowhead").unwrap_or("arrow");
+    let (length, half_width) = arrow_size(look.width);
+    let mut heads = Vec::new();
     let drawn: Path = path.trimmed(head_inset(start_head, look.width), head_inset(end_head, look.width));
     let mut out = format!(
         r#"<path d="{}" fill="none" stroke="transparent" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round" class="kb-hit"/>"#,
@@ -708,9 +739,15 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
     let paper = style::named(PAPER, options.colors);
     if let Some(direction) = path.end_direction() {
         arrowhead(&mut out, end_head, path.end(), direction, &solid, &paper);
+        if end_head != "none" {
+            heads.push(Head { end: "end", kind: end_head.to_owned(), tip: path.end(), direction, length, half_width });
+        }
     }
     if let Some(direction) = path.start_direction() {
         arrowhead(&mut out, start_head, path.start, direction, &solid, &paper);
+        if start_head != "none" {
+            heads.push(Head { end: "start", kind: start_head.to_owned(), tip: path.start, direction, length, half_width });
+        }
     }
     let reach = head_reach(start_head, look.width).max(head_reach(end_head, look.width));
     let mut bounds = grow(Rect::of_points(&path.hull()).unwrap_or_default(), reach.max(7.0));
@@ -749,7 +786,8 @@ fn connector(model: &BoardModel, element: &Element, options: &Options<'_>) -> Fr
         text_block(&mut out, &shifted, style, &look.stroke, options.lod == Lod::Low);
         bounds = bounds.union(rect);
     }
-    Fragment { svg: wrap_opacity(out, look.opacity), bounds, local: false, slot: None, size: None, text: Some(text) }
+    let fragment = Fragment { svg: wrap_opacity(out, look.opacity), bounds, local: false, slot: None, size: None, text: Some(text) };
+    DrawnConnector { fragment, path: Some(path), corners, heads }
 }
 
 /// Where a connector's label wraps.

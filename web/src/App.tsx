@@ -143,6 +143,7 @@ function BoardEditor({ session, selection, onSelection, selectionRef, phrase }: 
       blob: (hash) => doc.invoke<Uint8Array>('blob', hash),
       textMetrics: (request) => doc.invoke<string>('textMetrics', request),
       shapePreviews: async () => JSON.parse(await doc.execute('shape.previews', {})) as unknown,
+      connectorRoute: async (request) => JSON.parse(await doc.execute('connector.getRoute', request)) as unknown,
     }
     void BoardSync.open(engine)
       .then((made) => {

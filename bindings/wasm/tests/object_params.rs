@@ -47,6 +47,12 @@ fn references(command: &str) -> Vec<(&'static str, &'static str)> {
         "frame.add" => out.extend([("page", "Page"), ("children", "Element")]),
         "connector.add" => out.extend([("page", "Page"), ("from.element", "Element"), ("to.element", "Element")]),
         "connector.bind" => out.push(("to.element", "Element")),
+        "connector.getRoute" => out.extend([
+            ("connectors[].id", "Element"),
+            ("connectors[].from.element", "Element"),
+            ("connectors[].to.element", "Element"),
+            ("move.ids", "Element"),
+        ]),
         "page.rename" | "page.duplicate" | "page.delete" | "page.move" | "page.activate" => out.push(("page", "Page")),
         "file.export" => out.extend([("page", "Page"), ("frame", "Element")]),
         "file.render" => out.extend([("target.frame", "Element"), ("target.objectId", "Element")]),

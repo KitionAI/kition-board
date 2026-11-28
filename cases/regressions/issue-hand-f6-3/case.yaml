@@ -1,0 +1,27 @@
+format: 1
+id: regressions/issue-hand-f6-3
+feature: board.editor.connect
+intent: >-
+  The line drawn while a connector is dragged is the engine's own connector (connector.getRoute):
+  it has its arrowhead, the target shape is outlined, and its route is the route the release
+  commits. A connector drawn from a selected shape's handle takes the drawing style's route
+  (straight by default). Before, the preview was a plain line from the press point without an
+  arrowhead, and a handle always drew an elbow.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F6.3 (probe02.mjs, round2/03-connector-centre-mid.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: connect-draft
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -1,0 +1,27 @@
+format: 1
+id: regressions/issue-hand-f6-4
+feature: board.editor.connect
+intent: >-
+  Near a shape's edge the select tool shows the shape's four side midpoints on its outline (not
+  only after it is selected, and not 24 px away from it); a midpoint pressed and dragged out
+  starts a connector from that side; the connector tool over an ellipse outlines it with its own
+  outline and shows its four points. Before, the points showed only on a selected shape, 24 px
+  outside it, and nothing showed on hover (F6.1).
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F6.4 (probe01.mjs, round1/13-selected-handles.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: connect-points
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -245,6 +245,52 @@ impl BoardDocument {
         Ok(json!({ "groups": groups }))
     }
 
+    /// `connector.getRoute { connectors, move? }` → `{ connectors: [{ id?, points, path, start?,
+    /// end?, heads, svg, box, text? }] }`: each connector as the board would draw it after the
+    /// command the entry stands for (`kition_board_model::connectors::plan`), drawn by the scene's
+    /// own connector drawing, so the editor's preview of a connector being drawn, re-attached or
+    /// carried by a move is the line the command then leaves. A reading command: the board does not
+    /// change.
+    pub fn connector_route(&self, params: &Value) -> Result<Value, String> {
+        use kition_board_scene::fragment::{Lod, Options, Pictures, connector_drawn};
+        let planned = kition_board_model::connectors::plan(self.session.model(), params)?;
+        let options = Options { colors: kition_board_scene::Colors::Css, lod: Lod::Full, pictures: Pictures::Reference, blobs: &self.blobs };
+        let pair = |point: kition_board_kdm::Point| json!([point.x, point.y]);
+        let answers: Vec<Value> = planned
+            .iter()
+            .map(|plan| {
+                let drawn = connector_drawn(&plan.element, &plan.route, plan.sides, &options);
+                let bounds = drawn.fragment.bounds;
+                let mut entry = serde_json::Map::new();
+                if let Some(id) = &plan.id {
+                    entry.insert("id".into(), json!(id.as_str()));
+                }
+                entry.insert("points".into(), Value::Array(drawn.corners.iter().copied().map(pair).collect()));
+                entry.insert("path".into(), json!(drawn.path.as_ref().map(kition_board_scene::route::Path::d).unwrap_or_default()));
+                for (name, end) in [("start", &plan.start), ("end", &plan.end)] {
+                    if let Some(end) = end {
+                        entry.insert(name.into(), end.to_json());
+                    }
+                }
+                let heads: Vec<Value> = drawn
+                    .heads
+                    .iter()
+                    .map(|head| {
+                        json!({ "end": head.end, "kind": head.kind, "tip": pair(head.tip), "direction": pair(head.direction), "length": head.length, "halfWidth": head.half_width })
+                    })
+                    .collect();
+                entry.insert("heads".into(), Value::Array(heads));
+                entry.insert("svg".into(), json!(drawn.fragment.svg));
+                entry.insert("box".into(), json!([bounds.x0, bounds.y0, bounds.x1, bounds.y1]));
+                if let Some(text) = &drawn.fragment.text {
+                    entry.insert("text".into(), text.to_json());
+                }
+                Value::Object(entry)
+            })
+            .collect();
+        Ok(json!({ "connectors": answers }))
+    }
+
     /// `file.export { format: png | svg | pdf, page?, frame?, scale?, background?, fit? }` →
     /// `{ format, mime, extension, base64, width, height }`: the shown page (or `page`), or one
     /// frame and what is in it, drawn from the editor's scene. A reading command: the board does

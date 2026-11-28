@@ -5,6 +5,11 @@
  * frames they would drop into light up. The release runs one `element.move { reparent }` (a drop
  * into a frame makes it the parent, a drop out of one frees it).
  *
+ * The connectors bound to what moves (and a moving connector with a bound end) are drawn as the
+ * engine would draw them after the move, asked of it as the pointer goes (`connector.getRoute` with
+ * `move`, every connector in one question): their real route, arrowheads and labels, the result of
+ * the release's own command.
+ *
  * Alt pressed during the drag makes copies at the drop instead (one `element.duplicate`): the
  * originals stay drawn where they are and a dashed box shows the copies; releasing Alt before the
  * drop makes it a move again. Alt held from the press moves without snapping (web/tests/flow.mjs
@@ -12,30 +17,11 @@
  */
 import { center, offset, type Point } from '../../board/geometry'
 import type { Override } from '../../board/layer'
-import { frameAt } from '../../board/model'
+import { frameAt, type BoardElement } from '../../board/model'
 import { translationSnap, type SnapGuide } from '../../board/snap'
 import type { Gesture, GestureContext, PointerInput } from './types'
 
 const SNAP_KINDS = ['shape', 'text', 'image', 'card', 'frame']
-
-/** The live route of a connector whose bound targets are being moved by `delta`. */
-export function liveRoute(ctx: GestureContext, id: string, moving: ReadonlySet<string>, delta: Point): Point[] {
-  const view = ctx.sync.view
-  const element = view.elements.get(id)
-  if (!element || element.kind !== 'connector') return []
-  const endOf = (end: typeof element.start) => {
-    if (!end) return null
-    const target = end.binding ? view.elements.get(end.binding.target) : null
-    const box = target ? view.rect(target) : null
-    if (end.binding && target && box) {
-      const moved = moving.has(target.id) ? offset(box, delta.x, delta.y) : box
-      return view.boundPoint(target, moved, end.binding.anchor)
-    }
-    return moving.has(id) ? { x: end.point.x + delta.x, y: end.point.y + delta.y } : end.point
-  }
-  const shift = moving.has(id) ? delta : { x: 0, y: 0 }
-  return [endOf(element.start), ...element.waypoints.map((p) => ({ x: p.x + shift.x, y: p.y + shift.y })), endOf(element.end)].filter((p): p is Point => p != null)
-}
 
 /** The press on element `hit` with the select tool: selects, and answers the move (null: nothing to move). */
 export function downMove(ctx: GestureContext, input: PointerInput, hit: string): Gesture | null {
@@ -64,10 +50,21 @@ export function downMove(ctx: GestureContext, input: PointerInput, hit: string):
         return box ? [center(box)] : []
       })
     : []
-  const connectors = view.connectorsOf(moving).filter((item) => !moving.has(item))
+  // A moving connector with an end bound to something that stays is not simply shifted.
+  const bound = (element: BoardElement | undefined) => element?.kind === 'connector' && [element.start, element.end].some((end) => end?.binding)
+  const connectors = [...new Set([...view.connectorsOf(moving), ...[...moving].filter((item) => bound(view.elements.get(item)))])]
+  const routed = new Set(connectors)
   const start = input.p
   const altAtStart = input.alt
   let delta: Point = { x: 0, y: 0 }
+  let copying = false
+  const query = connectors.length
+    ? ctx.routeQuery((routes) => {
+        if (copying) return
+        ctx.setHidden(connectors)
+        ctx.setDraft({ type: 'routes', routes })
+      })
+    : null
   return {
     type: 'move',
     threshold: true,
@@ -86,7 +83,8 @@ export function downMove(ctx: GestureContext, input: PointerInput, hit: string):
         delta = { x: delta.x + snap.adjustment.x, y: delta.y + snap.adjustment.y }
         guides = snap.guides
       }
-      if (!altAtStart && input.alt) {
+      copying = !altAtStart && input.alt
+      if (copying) {
         // The originals stay where they are; a dashed box shows where the copies land.
         ctx.setOverrides(new Map())
         ctx.setHidden([])
@@ -97,15 +95,15 @@ export function downMove(ctx: GestureContext, input: PointerInput, hit: string):
         return
       }
       const overrides = new Map<string, Override>()
-      for (const item of moving) overrides.set(item, { dx: delta.x, dy: delta.y })
+      for (const item of moving) if (!routed.has(item)) overrides.set(item, { dx: delta.x, dy: delta.y })
       ctx.setOverrides(overrides)
-      ctx.setHidden(connectors)
       ctx.setPreview({ type: 'move', dx: delta.x, dy: delta.y })
-      ctx.setDraft({ type: 'lines', lines: connectors.map((item) => liveRoute(ctx, item, moving, delta)), target: null })
+      query?.request({ connectors: connectors.map((id) => ({ id })), move: { ids: roots, delta: [delta.x, delta.y] } })
       ctx.setGuides(guides)
       ctx.setDrops([...new Set(centers.flatMap((c) => frameAt(frames, { x: c.x + delta.x, y: c.y + delta.y })?.id ?? []))])
     },
     up(ctx, input, dragged) {
+      query?.cancel()
       ctx.setGuides([])
       ctx.setDrops([])
       if (!dragged) {
@@ -119,6 +117,8 @@ export function downMove(ctx: GestureContext, input: PointerInput, hit: string):
       }
       void ctx.commit('element.move', { ids: roots, delta: [delta.x, delta.y], reparent: true }, ctx.clearPreview)
     },
-    cancel() {},
+    cancel() {
+      query?.cancel()
+    },
   }
 }

@@ -13,6 +13,7 @@ import schemaJson from '../../../crates/kdm/kdm-model/model/schema.json'
 import type { Rect } from './geometry'
 import { BoardView } from './model'
 import { readOutlines } from './outline'
+import { parseRoutes, RouteQuery, type Route, type RouteRequest } from './route'
 
 export const boardSchema = parseSchema(schemaJson)
 
@@ -25,6 +26,8 @@ export type BoardEngine = {
   textMetrics(request: string): Promise<string>
   /** `shape.previews`'s answer: each shape's `outline`, what a bound end meets (design note 1.4). */
   shapePreviews(): Promise<unknown>
+  /** `connector.getRoute`'s answer: connectors as the engine would draw them, nothing written. */
+  connectorRoute(request: RouteRequest): Promise<unknown>
 }
 
 export type Lod = 'full' | 'low'
@@ -225,6 +228,16 @@ export class BoardSync {
     const [full, low] = await Promise.all([this.fragments.fetch(ids, 'full'), this.lowLoaded ? this.fragments.fetch(ids, 'low') : Promise.resolve(new Set<string>())])
     for (const id of low) full.add(id)
     return full
+  }
+
+  /** Connectors as the engine would draw them (`connector.getRoute`); nothing is written. */
+  async routes(request: RouteRequest): Promise<Route[]> {
+    return parseRoutes(await this.engine.connectorRoute(request))
+  }
+
+  /** A question at a time for a gesture's previews: `answer` hears the latest routes (`RouteQuery`). */
+  routeQuery(answer: (routes: Route[]) => void): RouteQuery {
+    return new RouteQuery((request) => this.routes(request), answer)
   }
 
   /** The engine's line layout (`textMetrics`), for checking it against the browser. */

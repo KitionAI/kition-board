@@ -1,0 +1,24 @@
+format: 1
+id: board.editor.connector-edit/delete-shape
+feature: board.editor.connector-edit
+intent: >-
+  Deleting a shape bound to a connector leaves the connector: that end becomes free where it was
+  drawn, and the other end stays bound (finding F6.13; design note 1.5, rule V6 at the source).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/diagram.mjs (plan: Board usable by hand, stage 3; finding F6.13)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: delete-shape
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

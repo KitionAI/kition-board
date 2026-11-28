@@ -312,6 +312,28 @@ features:
     gap: "Lower-case q with a plain shape selected turns tool lock on or off, as the other tool letters pick tools (plan section 5, item 7); a double-click on a rail tool does not lock it."
     cases: [board.editor.tool-lock/q]
     since: "2026-11-28"
+  - id: board.editor.connect
+    title: "Drawing a connector by hand: near a shape's edge (the select tool) or over it (the connector tool) the shape shows its four side midpoints; an end within 16 px of one snaps to it, else meets the outline under the pointer, else binds to the centre deep inside; the target is outlined by its own outline; the line being drawn is the engine's connector with its arrowhead, the route the release commits; a handle draws the drawing style's route, and let go on the empty canvas the end is free there"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [connector.add, connector.getRoute]
+    paths: [web/src/canvas/gestures/connect.ts, web/src/canvas/BoardCanvas.tsx, web/src/board/route.ts, web/src/board/outline.ts, web/src/app.css, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    gap: "An end binds to the centre only deep inside a shape (more than 16 px from its outline), not also when the pointer enters slowly or rests there: how fast the pointer moves is not read. The select tool shows the side midpoints of shapes only (not texts, pictures, cards, frames or mind-map nodes), and not on the one selected shape, whose connection handles are there."
+    cases: [regressions/issue-hand-f6-4, board.editor.connect/snap, regressions/issue-hand-f6-3, regressions/issue-hand-f6-6]
+    since: "2026-11-28"
+  - id: board.editor.connector-edit
+    title: "A connector by hand once drawn: selected, it is highlighted along its line with its two ends and a point in each segment's middle (no box); a segment's middle point dragged adds a bend, a bend dragged moves, a double-click removes it, an elbow's inner segment moves sideways; an end re-attached keeps the label and style; two free ends drag it whole; the connectors of moving shapes are drawn live on their real route with arrowhead and label; a deleted shape leaves the connector's end free where it was"
+    dimension: [function]
+    priority: P0
+    status: has
+    commands: [connector.setWaypoints, connector.bind, element.move, connector.getRoute]
+    paths: [web/src/canvas/gestures/bend.ts, web/src/canvas/gestures/terminal.ts, web/src/canvas/gestures/move.ts, web/src/canvas/BoardCanvas.tsx, web/src/board/route.ts, web/src/app.css, web/tests/hand/diagram.mjs]
+    target: "Miro (web, 2026-11)"
+    gap: "An elbow's bends are its corners: its inner segments move sideways, and a double-click on one of its bends goes back to the automatic route (all bends removed), but its corners are not dragged one by one. An elbow given bends keeps them when its shapes move, so its first and last segments can slant until the bends are removed."
+    cases: [regressions/issue-hand-f2-5, board.editor.connector-edit/rebind-label, board.editor.connector-edit/free-drag, regressions/issue-hand-f3-2, board.editor.connector-edit/delete-shape]
+    since: "2026-11-28"
   - id: board.text
     title: "Text on the board: marks on a text run; auto-width text, and fixed-width text that wraps and is as tall as its lines; where each element's text is laid out, for the editor"
     dimension: [function]
@@ -359,6 +381,16 @@ features:
     gap: "Ends meet the outline of the ellipses, the polygon shapes of outline.rs (the diamond, triangles, hexagon, parallelogram and the others in its table) and the curved document, delay, display and stored-data (each curve sampled as a polygon within 0.3% of the box); a star, cloud, heart, cylinder, pill, multi-document, note and the four single arrows, and the actor and the other open marks (line, check, the braces), still meet their box"
     cases: [board.connectors/arrowheads, board.connectors/outline-ends, board.connectors/outline-ends-page]
     since: "2026-11-21"
+  - id: board.connectors.route
+    title: "connector.getRoute: how connectors would be drawn, without writing anything (a new one between two ends, a stored one with other ends or fields, or stored ones whose shapes are taken as moved), each with its corners, path, arrowheads, resolved ends, label place and the board's own SVG, from the drawing the board uses"
+    dimension: [function, ai]
+    priority: P0
+    status: has
+    commands: [connector.getRoute]
+    paths: [crates/engine/model/src/connectors.rs, crates/render/scene/src/fragment.rs, crates/render/scene/src/route.rs, bindings/wasm/src/scene.rs, bindings/wasm/tests/connector_route.rs]
+    target: "Miro (web, 2026-11)"
+    cases: [board.connectors.route/engine]
+    since: "2026-11-28"
   - id: board.cards
     title: "Cards that link to a file or a web page, and links retargeted when files move"
     dimension: [function]

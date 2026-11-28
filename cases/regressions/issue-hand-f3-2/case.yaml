@@ -1,0 +1,26 @@
+format: 1
+id: regressions/issue-hand-f3-2
+feature: board.editor.connector-edit
+intent: >-
+  While a shape moves, the connectors bound to it are drawn live on their real route with
+  arrowhead and label, asked of the engine (connector.getRoute with move), and the live route is
+  the route the connector has after the drop. Before, they were straight lines without arrowheads
+  or labels until the release.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F3.2 (probe01.mjs, round1/11-move-mid.png)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/diagram.mjs
+      scenario: move-live
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

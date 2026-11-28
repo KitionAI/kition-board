@@ -64,6 +64,7 @@ pub const COMMANDS: &[Spec] = &[
     spec("connector.bind", "Attach connector end", None),
     spec("connector.setLabel", "Connector label", None),
     spec("connector.setWaypoints", "Connector bends", None),
+    Spec { mutates: false, ..spec("connector.getRoute", "Connector route", None) },
     Spec { reads_files: true, ..spec("card.setTarget", "Change card target", None) },
     spec("image.setAlt", "Alternative text", None),
     spec("frame.fit", "Fit frame to content", ARRANGE),
@@ -351,6 +352,24 @@ pub fn schema(id: &str) -> Option<Value> {
         "connector.setWaypoints" => {
             json!({ "id": required(text("The connector")), "waypoints": required(points("Bends in path order; empty for an automatic route")) })
         }
+        "connector.getRoute" => json!({
+            "connectors": required(json!({ "type": "array", "description": "The connectors to draw, at most 500: each a stored one (id) with what replaces its fields, or a new one between from and to", "items": { "type": "object", "additionalProperties": false, "properties": {
+                "id": text("A connector to start from: its stored ends, fields and label, each replaced by what the entry gives (from or to alone moves that end, as connector.bind)"),
+                "from": end("The start (required without id)"),
+                "to": end("The end (required without id)"),
+                "type": choice(CONNECTOR_TYPES, "The route"),
+                "startArrowhead": choice(ARROWHEADS, "Arrowhead at the start"),
+                "endArrowhead": choice(ARROWHEADS, "Arrowhead at the end"),
+                "labelPosition": number(0.0, 1.0, "Where the label sits along the route, 0 to 1"),
+                "waypoints": points("Bends in path order"),
+                "label": text("The label"),
+                "style": connector_style(),
+            } } })),
+            "move": json!({ "type": "object", "additionalProperties": false, "description": "Draw as if these elements (and what is inside them) were moved by delta, as element.move would move them", "properties": {
+                "ids": required(ids("The elements taken as moved")),
+                "delta": required(pair("[dx, dy] they are moved by")),
+            } }),
+        }),
         "card.add" | "card.setTarget" => {
             let mut properties = json!({
                 "file": text("A workspace file, relative to the board's folder or rooted with /"),
@@ -524,6 +543,9 @@ pub fn description(id: &str) -> &'static str {
         "connector.bind" => "Moves one end of an existing connector onto an element (at an anchor on its box) or to a free point.",
         "connector.setLabel" => "Sets or removes a connector's label and where along the route it sits (0 to 1).",
         "connector.setWaypoints" => "Replaces a connector's bend points; an empty list returns it to an automatic route.",
+        "connector.getRoute" => {
+            "Answers how connectors would be drawn, without changing the board: new ones between two ends, or stored ones with other ends, fields or elements moved; each with its route's corners, path, arrowheads, resolved ends, label place and the engine's SVG."
+        }
         "card.setTarget" => "Points an existing card at another workspace file or web address, keeping its place and size.",
         "image.setAlt" => "Sets or removes a picture's alternative text, read by screen readers and exports.",
         "frame.fit" => "Resizes a frame to wrap its content with padding (32 units by default).",
@@ -582,6 +604,32 @@ pub fn output(id: &str) -> Option<Value> {
         "page.activate" => json!({ "type": "object", "additionalProperties": false, "properties": {
             "page": { "type": "string", "required": true, "description": "The page now shown" },
         } }),
+        "connector.getRoute" => {
+            let end = json!({ "type": "object", "additionalProperties": false, "properties": {
+                "point": { "type": "array", "required": true, "items": { "type": "number" }, "description": "[x, y] where the end is drawn" },
+                "binding": { "type": "object", "additionalProperties": false, "description": "The element the end is attached to and where on its box, absent for a free end", "properties": {
+                    "target": { "type": "string", "required": true }, "anchor": { "type": "array", "required": true, "items": { "type": "number" } } } },
+            } });
+            json!({ "type": "object", "additionalProperties": false, "properties": {
+                "connectors": { "type": "array", "required": true, "description": "One answer per entry, in the order given", "items": { "type": "object", "additionalProperties": false, "properties": {
+                    "id": { "type": "string", "description": "The stored connector the entry named" },
+                    "points": { "type": "array", "required": true, "items": { "type": "array", "items": { "type": "number" } }, "description": "The corners the route turns at, start and end included ([x, y] each)" },
+                    "path": { "type": "string", "required": true, "description": "The SVG path data of the line through its route, arrowheads not trimmed off; empty when it has no length" },
+                    "start": end.clone(),
+                    "end": end,
+                    "heads": { "type": "array", "required": true, "description": "The arrowheads drawn", "items": { "type": "object", "additionalProperties": false, "properties": {
+                        "end": { "type": "string", "required": true, "enum": ["start", "end"] },
+                        "kind": { "type": "string", "required": true },
+                        "tip": { "type": "array", "required": true, "items": { "type": "number" } },
+                        "direction": { "type": "array", "required": true, "items": { "type": "number" }, "description": "The unit direction the line arrives in, toward the tip" },
+                        "length": { "type": "number", "required": true },
+                        "halfWidth": { "type": "number", "required": true } } } },
+                    "svg": { "type": "string", "required": true, "description": "The connector drawn as the board draws it, in world coordinates" },
+                    "box": { "type": "array", "required": true, "items": { "type": "number" }, "description": "[x0, y0, x1, y1] the drawing covers" },
+                    "text": { "type": "json", "description": "Where its label is laid out (elementSvg's text frame)" },
+                } } },
+            } })
+        }
         "file.render" => json!({ "type": "object", "additionalProperties": false, "properties": {
             "png": { "type": "string", "required": true, "description": "The picture, base64" },
             "mimeType": { "type": "string", "required": true },
