@@ -471,28 +471,31 @@ await h.run([
   ['marquee-edge-scroll', async () => {
     await fresh([RECT])
     const svg = await h.svgBox()
-    const start = await screen(700, 450)
+    const start = await screen(400, 420)
     const before = await board(() => window.kitBoard.viewport())
+    const edgeX = svg.x + svg.width - 3
     await page.mouse.move(start.x, start.y)
     await page.mouse.down()
-    await page.mouse.move(svg.x + 200, start.y, { steps: 6 })
-    await page.mouse.move(svg.x + 3, start.y, { steps: 3 })
-    const scrolled = await until(async () => (await board(() => window.kitBoard.viewport().x)) < before.x - 40, 60)
+    await page.mouse.move(edgeX - 100, start.y, { steps: 8 })
+    await page.mouse.move(edgeX, start.y, { steps: 2 })
+    const scrolled = await until(async () => (await board(() => window.kitBoard.viewport().x)) > before.x + 40, 60)
     const gesture = await gestureNow()
     await page.mouse.up()
-    step('a marquee held at the left edge scrolls the view left', scrolled && gesture?.type === 'brush', `${JSON.stringify(before)} → ${JSON.stringify(await board(() => window.kitBoard.viewport()))}`)
+    step('a marquee held at the right edge scrolls the view right', scrolled && gesture?.type === 'brush', `${JSON.stringify(before)} → ${JSON.stringify(await board(() => window.kitBoard.viewport()))}, ${JSON.stringify(gesture)}`)
+    await board(() => window.kitBoard.setViewport({ x: 0, y: 0, zoom: 1 }))
     await page.keyboard.press('Escape')
   }],
   // F3.6, rule 7: Shift keeps a move on one axis.
   ['move-axis', async () => {
     const [shape] = await fresh([RECT])
     const at = await centre(shape)
+    await page.mouse.move(at.x, at.y)
     await page.keyboard.down('Shift')
     await drag(at, { x: at.x + 150, y: at.y + 35 })
     await page.keyboard.up('Shift')
     await until(async () => ((await positionOf(shape))?.x ?? 0) > 300)
     const p = await positionOf(shape)
-    step('Shift held, a move mostly across stays on its row', near(p?.x, 350, 1) && p?.y === 200, JSON.stringify(p))
+    step('Shift held, a move mostly across stays on its row', near(p?.x, 350, 1) && p?.y === 200, `${JSON.stringify(p)} ${JSON.stringify(await board(() => window.kitBoard.trace()))}`)
     await page.keyboard.press('Escape')
   }],
   // Rule 7: snapping within 8 px while the pointer is slow; not when it is fast, not with Cmd/Ctrl.
