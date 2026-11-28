@@ -1,0 +1,27 @@
+format: 1
+id: regressions/issue-hand-f9-3
+feature: board.editor.containers
+intent: >-
+  A click on a grouped shape selects the group; a double-click goes into the group and selects
+  that member alone, which then moves on its own; the next double-click opens the member's text;
+  Escape goes back up to the group, and Escape again clears the selection. Before, a double-click
+  on a member opened its text while the group stayed selected, so a member could not be moved or
+  styled alone.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F9.3 (probe02.mjs, the group step)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: group-drill
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

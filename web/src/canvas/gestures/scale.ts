@@ -1,21 +1,28 @@
 /**
  * Scale a selection of several (or one stroke or group) by a handle of its bounds: every element
  * inside is previewed the way the engine will map it, the selection overlay is drawn on the new
- * bounds, and the release runs one `element.resize { ids, box }`.
+ * bounds, and the release runs one `element.resize { ids, box }`. Dragged past the opposite side,
+ * the bounds flip over it (rule 8). Held at the canvas's edge, the view scrolls.
  */
 import type { Rect } from '../../board/geometry'
-import { handleCursor, resized, scaleOverrides } from '../../board/resize'
+import { flippedHandle, handleCursor, resizedBox, scaleOverrides } from '../../board/resize'
 import type { Handle } from '../../board/snap'
 import type { Gesture, GestureContext } from './types'
 
 export function downScale(_ctx: GestureContext, roots: string[], moving: string[], handle: Handle, box: Rect): Gesture {
   let current = box
+  let cursor = handleCursor(handle, 0)
   return {
     type: 'scale',
     threshold: true,
-    cursor: handleCursor(handle, 0),
+    get cursor() {
+      return cursor
+    },
+    edgeScroll: true,
     move(ctx, input) {
-      current = resized(box, handle, input.p, input.shift)
+      const next = resizedBox(box, handle, input.p, input.shift)
+      current = next.box
+      cursor = handleCursor(flippedHandle(handle, next.flipX, next.flipY), 0)
       ctx.setOverrides(scaleOverrides(ctx.sync.view, moving, box, current))
       // Connectors from outside the selection are drawn again once their targets have moved.
       const inside = new Set(moving)

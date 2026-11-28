@@ -1,0 +1,24 @@
+format: 1
+id: board.editor.draw-shape/square
+feature: board.editor.draw-shape
+intent: >-
+  With Shift held, a shape drawn by a drag 160 across and 80 down is made 160 by 160 (finding
+  F4.5); while drawn it is previewed as that shape.
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/canvas.mjs (plan: Board usable by hand, stage 4)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: draw-preview
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

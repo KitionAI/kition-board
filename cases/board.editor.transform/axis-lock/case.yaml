@@ -1,0 +1,24 @@
+format: 1
+id: board.editor.transform/axis-lock
+feature: board.editor.transform
+intent: >-
+  With Shift held, a move that goes mostly across stays on its row: one element.move with no
+  vertical part (finding F3.6).
+layer: gate
+dimension: function
+source:
+  kind: synthetic
+  from: "web/tests/hand/canvas.mjs (plan: Board usable by hand, stage 4)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: move-axis
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

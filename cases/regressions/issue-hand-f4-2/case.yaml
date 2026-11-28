@@ -1,0 +1,25 @@
+format: 1
+id: regressions/issue-hand-f4-2
+feature: board.editor.draw-shape
+intent: >-
+  While an ellipse is drawn with the shape tool, the preview is the engine's own picture of an
+  ellipse stretched to the dragged box, not a rectangle, and the shape made is an ellipse; with
+  Shift held the shape is drawn square. Before, every shape was previewed as a thin rectangle.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F4.2 (probe01.mjs)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: draw-preview
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

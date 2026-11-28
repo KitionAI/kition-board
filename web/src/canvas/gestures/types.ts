@@ -24,6 +24,10 @@ import type { BoardSync } from '../../board/sync'
 export const DRAG_THRESHOLD = 4
 /** The smallest drawn box (screen pixels); a smaller one is a click's default box. */
 export const MIN_DRAW = 6
+/** How near (screen pixels) a moved or resized box snaps to the edges and centres around it (rule 7). */
+export const SNAP_THRESHOLD = 8
+/** A move snaps only while the pointer is slower than this (screen pixels per millisecond, rule 7). */
+export const SNAP_SPEED = 0.5
 
 /**
  * Where a connector end goes: an element (and where on it; `side` when it snapped to one of its
@@ -37,7 +41,12 @@ export type EndTarget = { element: string; anchor: [number, number] | null; poin
  * draw them (`connector.getRoute`): the connector being drawn, re-attached or bent, or those
  * carried by a move.
  */
-export type Draft = { type: 'rect'; box: Rect; dashed: boolean } | { type: 'routes'; routes: Route[] } | { type: 'pen'; points: Point[]; highlight: boolean }
+export type Draft =
+  | { type: 'rect'; box: Rect; dashed: boolean }
+  | { type: 'routes'; routes: Route[] }
+  | { type: 'pen'; points: Point[]; highlight: boolean }
+  /** A shape being drawn: the engine's picture of it (`shape.previews`), stretched to `box`. */
+  | { type: 'shape'; box: Rect; shape: string; picture: { viewBox: string; body: string } | null }
 
 /**
  * The shape a connector end would go to, shown with its four side midpoints (rule 11): `target`
@@ -63,6 +72,8 @@ export type PointerInput = {
   alt: boolean
   /** Cmd or Ctrl. */
   command: boolean
+  /** How fast the pointer moves (screen pixels per millisecond, from the browser's event times). */
+  speed: number
   /** The browser's event (its coalesced samples, for the eraser). */
   native: PointerEvent
 }
@@ -76,6 +87,8 @@ export type GestureContext = {
   readOnly: () => boolean
   selection: () => readonly string[]
   select: (ids: string[]) => void
+  /** What a press on element `id` selects: its outermost group, or within the group drilled into, the member there (rule 14). */
+  selectable: (id: string) => string
   /** A drawing tool made something: back to Select, unless tool lock (Q) is on. */
   toolDone: () => void
   shapeType: () => string
@@ -119,8 +132,10 @@ export interface Gesture {
   readonly type: GestureType
   /** Whether the press waits for `DRAG_THRESHOLD` before it drags (false: it drags at once). */
   readonly threshold: boolean
-  /** The canvas's cursor while it drags (null: the tool's). */
+  /** The canvas's cursor while it drags (null: the tool's); read again after each move (a resize that flips turns it). */
   readonly cursor: string | null
+  /** Whether the view scrolls while the pointer is held at the canvas's edge (move, marquee, resize). */
+  readonly edgeScroll?: boolean
   move(ctx: GestureContext, input: PointerInput): void
   /** The release; `dragged` is false for a release before the threshold (a click). */
   up(ctx: GestureContext, input: PointerInput, dragged: boolean): void

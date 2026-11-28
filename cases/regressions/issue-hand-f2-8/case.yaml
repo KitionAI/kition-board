@@ -1,0 +1,28 @@
+format: 1
+id: regressions/issue-hand-f2-8
+feature: board.editor.selection
+intent: >-
+  A press within 4.5 screen pixels outside a filled shape's edge selects it (9 pixels out is the
+  empty canvas); a press inside a hollow shape away from its line selects it, the smaller of two
+  nested ones; a drag from a locked shape draws a marquee and leaves the locked shape where it is,
+  while a click on it still selects it. Before, only painted pixels counted: a press just off an
+  edge or inside a hollow shape was the empty canvas, and a press on a locked shape selected it
+  and started nothing.
+layer: gate
+dimension: function
+source:
+  kind: probe
+  from: "the by-hand walkthrough of 2026-11-28, finding F2.8 (read from the source: hits were the browser's painted geometry only)"
+  license: owned
+input: []
+steps:
+  - flow:
+      spec: web/tests/hand/canvas.mjs
+      scenario: hit-rules
+      browsers: [chromium, webkit]
+expected:
+  - { actual: "out:flow", compare: exit, value: 0 }
+since: "2026-11-28"
+timeout_s: 300
+requires: [chromium, webkit]
+tags: [browser]

@@ -20,11 +20,12 @@
  * `whiteboardConnectionHandles.ts` and `WhiteboardMindMapQuickControls.tsx`.
  * Not ported: v1's selection toolbar (the selection bar is new, plan stage 2) and agent previews.
  */
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactElement, type Ref } from 'react'
 import { FrameChrome, ICON_STROKE, toast, type KitCanvasHandle, type Strings } from '@kition/sdk/editor'
 import { LockIcon } from '@kition/tessera/icons/react'
 import * as clipboard from '../board/clipboard'
-import { anchorPoint, center, distance, nearestEdgeAnchor, offset, rotate, union, type Point, type Rect } from '../board/geometry'
+import { anchorPoint, center, distance, grow, nearestEdgeAnchor, offset, rotate, union, type Point, type Rect } from '../board/geometry'
+import { HIT_MARGIN, pick } from '../board/hit'
 import { outlinePath, rayAnchor } from '../board/outline'
 import type { Route, RouteRequest } from '../board/route'
 import { ElementLayer, type Viewport } from '../board/layer'
@@ -47,6 +48,8 @@ import { downConnect } from './gestures/connect'
 import { clickBox, downDraw } from './gestures/draw'
 import { downErase } from './gestures/erase'
 import { downMove } from './gestures/move'
+import { NudgeRun } from './gestures/nudge'
+import { EdgeScroller } from './edgeScroll'
 import { downPan } from './gestures/pan'
 import { downPen } from './gestures/pen'
 import { downText, placeMindMap } from './gestures/place'
@@ -122,6 +125,14 @@ const CONNECT_SNAP = 16
 const EDGE_REACH = 12
 /** A selected connector's segment shorter than this (screen pixels) has no middle point to drag. */
 const MIN_SEGMENT = 24
+/** How far above a frame (board units) its title line can reach, for a press on an untitled frame's title. */
+const FRAME_TITLE_REACH = 48
+/** How wide (board units) an untitled frame's title target is: its placeholder, "Double-click to name". */
+const UNTITLED_WIDTH = 140
+/** The arrow keys' nudge directions (rule 7: 1 unit, Shift 10). */
+const ARROWS: Record<string, Point> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } }
+/** A run of nudges whose last key's release never came lands after this long without a nudge (ms). */
+const NUDGE_IDLE = 2000
 
 /** The gesture under way: the pointer it holds, where it was pressed, and whether it has started to drag. */
 type Active = { gesture: Gesture; pointerId: number; start: Point; dragging: boolean; svg: Element }
@@ -232,6 +243,21 @@ export function BoardCanvas(props: Props) {
   const [editStyle, setEditStyle] = useState<{ id: string; color: string | null } | null>(null)
   const [tick, setTick] = useState(0)
   const active = useRef<Active | null>(null)
+  /**
+   * The group a double-click drilled into (rule 14): a press on one of its members selects that
+   * member, not the group; Escape goes back up a level. It ends once the selection leaves it.
+   */
+  const focusGroup = useRef<string | null>(null)
+  /** The arrow-key nudges under way (one undo step when the last arrow is let go), and the arrows held. */
+  const nudge = useRef<NudgeRun | null>(null)
+  const nudgeTimer = useRef<number | null>(null)
+  const arrowsHeld = useRef(new Set<string>())
+  /** The last pointer sample (client point, event time) for the pointer's speed. */
+  const sample = useRef<{ x: number; y: number; t: number; speed: number } | null>(null)
+  /** The last pointer input of the gesture under way, for edge scrolling while the pointer rests. */
+  const lastInput = useRef<PointerInput | null>(null)
+  /** A hovered connector's line as the engine draws it (`connector.getRoute`), for its hover outline. */
+  const [hoverRoute, setHoverRoute] = useState<{ id: string; path: string } | null>(null)
   const overlayInfo = useRef<OverlayInfo>({ selection: null, hover: null, handles: 0 })
   /** The last pointer events, for a failing flow test to show. */
   const trace = useRef<string[]>([])
@@ -527,6 +553,32 @@ export function BoardCanvas(props: Props) {
     if (afterEdit.current && !(selection.length === 1 && selection[0] === afterEdit.current)) afterEdit.current = null
   }, [selection])
 
+  // A selection outside the group drilled into leaves it (rule 14).
+  useEffect(() => {
+    const group = focusGroup.current
+    if (group && !(selection.length && selection.every((id) => within(id, group)))) focusGroup.current = null
+  }, [selection])
+
+  // A hovered connector is outlined along its real route (rule 8), asked of the engine once per change.
+  const hoveredConnector = hover && sync.view.elements.get(hover)?.kind === 'connector' ? hover : null
+  useEffect(() => {
+    if (!hoveredConnector) {
+      setHoverRoute(null)
+      return undefined
+    }
+    let current = true
+    void sync
+      .routes({ connectors: [{ id: hoveredConnector }] })
+      .then((routes) => {
+        const path = routes[0]?.path
+        if (current && path) setHoverRoute({ id: hoveredConnector, path })
+      })
+      .catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [hoveredConnector, sync, tick])
+
   // Another page: the selection does not come along, and each page keeps its own view (where it
   // was left; a page not shown yet shows its content, and an empty one opens where the view is).
   const pageViews = useRef(new Map<string, Pick<Viewport, 'x' | 'y' | 'zoom'>>())
@@ -609,6 +661,82 @@ export function BoardCanvas(props: Props) {
       if (id && id !== excluding) return id
     }
     return null
+  }
+
+  /**
+   * A frame's title in the frame's own frame (board units from its top-left corner, unrotated): the
+   * box of its glyphs as drawn, or for a frame without a title the start of the line its title would
+   * take (where the overlay writes "Double-click to name"); null when the frame is not drawn.
+   */
+  const frameTitle = (id: string): Rect | null => {
+    const node = layerRef.current?.node(id)
+    if (!node) return null
+    if (!sync.view.elements.get(id)?.text) return untitledFrameTitle(id)
+    let out: Rect | null = null
+    for (const text of node.querySelectorAll('text')) {
+      const b = (text as SVGTextElement).getBBox()
+      if (b.width > 0 && b.height > 0) out = union(out, { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height })
+    }
+    return out
+  }
+  /** Where an untitled frame's placeholder title goes (its own frame), from the engine's text frame of the frame. */
+  const untitledFrameTitle = (id: string): Rect | null => {
+    const area = sync.fragments.full.get(id)?.text?.area
+    return area ? { x0: area.x0, y0: area.y0, x1: area.x0 + Math.min(area.x1 - area.x0, UNTITLED_WIDTH), y1: area.y1 } : null
+  }
+
+  /**
+   * The element a press at a client point hits with the select tool (rule 2, `board/hit.ts`): what is
+   * painted there, a boxed element's outline within 4.5 screen pixels, the smallest hollow shape
+   * around it; a frame by its line and title only; locked elements only with `locked` (else they are
+   * the empty canvas).
+   */
+  const hitAt = (clientX: number, clientY: number, locked = false): string | null => {
+    const layer = layerRef.current
+    const v = viewport.current
+    if (!layer) return null
+    const p = toWorld(clientX, clientY)
+    const margin = HIT_MARGIN / v.zoom
+    const painted: string[] = []
+    for (const node of document.elementsFromPoint(clientX, clientY)) {
+      const id = elementAt(node)
+      if (id && !painted.includes(id)) painted.push(id)
+    }
+    const near = () => {
+      const ids = layer.query(grow({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }, margin))
+      // An untitled frame's title line is above its drawn box (and so outside its box in the index).
+      const shownPage = sync.view.page(layer.pageId ?? sync.view.pages[0]?.id)
+      const titled = (shownPage ? sync.view.framesOn(shownPage, new Set(ids)) : []).filter(({ box }) => p.x >= box.x0 - margin && p.x <= box.x1 + margin && p.y >= box.y0 - FRAME_TITLE_REACH && p.y <= box.y0)
+      return [...titled.map((frame) => frame.id), ...ids]
+    }
+    const viewArea = (v.width / v.zoom) * (v.height / v.zoom)
+    return pick({ view: sync.view, painted, near, shown: (id) => layer.node(id) != null, margin, viewArea, frameTitle, locked }, p)
+  }
+
+  /** What a press on element `id` selects: its outermost group, or inside the group drilled into, its member there (rule 14). */
+  const selectableIn = (id: string): string => {
+    const view = sync.view
+    const group = focusGroup.current
+    if (group && view.elements.get(group)?.kind === 'group') {
+      let current = id
+      for (let depth = 0; depth < 64; depth += 1) {
+        const parent = view.elements.get(current)?.parent
+        if (!parent) break
+        if (parent === group) return current
+        current = parent
+      }
+    }
+    return view.selectable(id)
+  }
+
+  /** Whether `id` is inside `container` (through `parent`, not `container` itself). */
+  const within = (id: string, container: string): boolean => {
+    let parent = sync.view.elements.get(id)?.parent ?? null
+    for (let depth = 0; parent && depth < 64; depth += 1) {
+      if (parent === container) return true
+      parent = sync.view.elements.get(parent)?.parent ?? null
+    }
+    return false
   }
 
   /**
@@ -1043,10 +1171,10 @@ export function BoardCanvas(props: Props) {
     if (editing || active.current) return
     const at = { x: event.clientX, y: event.clientY }
     const world = toWorld(event.clientX, event.clientY)
-    const hit = elementUnder(event.clientX, event.clientY, null)
+    const hit = hitAt(event.clientX, event.clientY, true)
     if (hit) {
-      // A right-click on an element outside the selection selects it first.
-      const id = sync.view.selectable(hit)
+      // A right-click on an element outside the selection selects it first (a locked one too).
+      const id = selectableIn(hit)
       const ids = selection.includes(id) ? [...selection] : [id]
       if (!selection.includes(id)) onSelection(ids)
       setMenu({ at, world, ids })
@@ -1067,6 +1195,7 @@ export function BoardCanvas(props: Props) {
       readOnly: () => latest.current.readOnly,
       selection: () => latest.current.selection,
       select: (ids) => latest.current.onSelection(ids),
+      selectable: (id) => selectableRef.current(id),
       toolDone: () => {
         if (!latest.current.toolLock) latest.current.onTool('select')
       },
@@ -1095,6 +1224,8 @@ export function BoardCanvas(props: Props) {
     }),
     [applyView, clearPreview, setConnectHint, sync],
   )
+  const ctxRef = useRef(ctx)
+  ctxRef.current = ctx
   const duplicateRef = useRef(duplicateIds)
   duplicateRef.current = duplicateIds
   const frameUnderRef = useRef(frameUnder)
@@ -1103,25 +1234,72 @@ export function BoardCanvas(props: Props) {
   elementUnderRef.current = elementUnder
   const endAtRef = useRef(endAt)
   endAtRef.current = endAt
+  const selectableRef = useRef(selectableIn)
+  selectableRef.current = selectableIn
 
-  const inputOf = (event: React.PointerEvent<SVGSVGElement>): PointerInput => ({
+  /** The pointer's speed (screen pixels per millisecond) from the last sample to this event (by the browser's event times). */
+  const speedOf = (event: React.PointerEvent<SVGSVGElement>): number => {
+    const last = sample.current
+    const now = { x: event.clientX, y: event.clientY, t: event.timeStamp }
+    const dt = last ? now.t - last.t : 0
+    const speed = last && dt > 0 ? distance(last, now) / dt : (last?.speed ?? 0)
+    sample.current = { ...now, speed }
+    return speed
+  }
+
+  const inputOf = (event: React.PointerEvent<SVGSVGElement>, speed = 0): PointerInput => ({
     p: toWorld(event.clientX, event.clientY),
     clientX: event.clientX,
     clientY: event.clientY,
     shift: event.shiftKey,
     alt: event.altKey,
     command: event.metaKey || event.ctrlKey,
+    speed,
     native: event.nativeEvent,
   })
+
+  /**
+   * Edge scrolling (rule 7): the view scrolls while a move, marquee or resize holds the pointer at
+   * the canvas's edge, and the gesture follows the board point now under the resting pointer
+   * (without snapping while the board slides under it).
+   */
+  const edge = useMemo(
+    () =>
+      new EdgeScroller((dx, dy) => {
+        const v = viewport.current
+        applyView({ x: v.x + dx / v.zoom, y: v.y + dy / v.zoom })
+        const now = active.current
+        const last = lastInput.current
+        if (!now?.dragging || !last) return
+        const moved: PointerInput = { ...last, p: toWorld(last.clientX, last.clientY), speed: Infinity }
+        lastInput.current = moved
+        now.gesture.move(ctxRef.current, moved)
+      }),
+    [applyView, toWorld],
+  )
+  useEffect(() => () => edge.stop(), [edge])
 
   /** Lets the gesture's pointer go and forgets the gesture. */
   const release = () => {
     const now = active.current
     active.current = null
+    edge.stop()
+    lastInput.current = null
     setGestureCursor(null)
     setDragActive(false)
     if (now && now.svg.hasPointerCapture?.(now.pointerId)) now.svg.releasePointerCapture(now.pointerId)
   }
+
+  /** The arrow-key nudges under way land as one element.move (one undo step). */
+  const endNudge = () => {
+    if (nudgeTimer.current != null) window.clearTimeout(nudgeTimer.current)
+    nudgeTimer.current = null
+    const run = nudge.current
+    nudge.current = null
+    run?.end(ctx)
+  }
+  const endNudgeRef = useRef(endNudge)
+  endNudgeRef.current = endNudge
 
   /** Escape, or the browser taking the pointer: the gesture puts back what it changed, the preview goes, the pointer is let go (rule 1). */
   const cancelGesture = () => {
@@ -1184,10 +1362,17 @@ export function BoardCanvas(props: Props) {
         return downBend(ctx, input, connector.id, bend, route.points)
       }
     }
-    const hit = elementAt(event.target)
-    if (tool === 'select') return hit ? downMove(ctx, input, hit) : downBrush(ctx, input)
+    if (tool === 'select') {
+      const hit = hitAt(event.clientX, event.clientY)
+      // A drilled-into group is left by a press outside it.
+      if (focusGroup.current && !(hit && within(hit, focusGroup.current))) focusGroup.current = null
+      if (hit) return downMove(ctx, input, hit)
+      // Locked elements are the empty canvas for a press; a click on one still selects it.
+      const locked = hitAt(event.clientX, event.clientY, true)
+      return downBrush(ctx, input, locked && sync.view.elements.get(locked)?.locked ? selectableIn(locked) : null)
+    }
     if (readOnly) return null
-    if (tool === 'text') return downText(ctx, input, hit)
+    if (tool === 'text') return downText(ctx, input, elementAt(event.target))
     if (tool === 'mindmap') {
       placeMindMap(ctx, input.p)
       return null
@@ -1213,7 +1398,9 @@ export function BoardCanvas(props: Props) {
     afterEdit.current = null
     // A press while another is held (a second button) ends the first.
     if (active.current) cancelGesture()
+    endNudge()
     setHover(null)
+    sample.current = { x: event.clientX, y: event.clientY, t: event.timeStamp, speed: 0 }
     const gesture = startGesture(event, inputOf(event))
     setConnectHint(null)
     if (!gesture) return
@@ -1226,18 +1413,19 @@ export function BoardCanvas(props: Props) {
     }
   }
 
-  /** The element the pointer is over, for the hover outline (select tool, no gesture). */
-  const hoverAt = (target: EventTarget | null): string | null => {
+  /** The element the pointer is over, for the hover outline (select tool, no gesture): what a press there would select. */
+  const hoverAt = (clientX: number, clientY: number): string | null => {
     if (tool !== 'select' || editing) return null
-    const hit = elementAt(target)
-    return hit ? sync.view.selectable(hit) : null
+    const hit = hitAt(clientX, clientY)
+    return hit ? selectableIn(hit) : null
   }
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     pointer.current = { x: event.clientX, y: event.clientY }
     const now = active.current
+    const speed = speedOf(event)
     if (!now || now.pointerId !== event.pointerId) {
-      const over = hoverAt(event.target)
+      const over = hoverAt(event.clientX, event.clientY)
       if (over !== hoverNow.current) setHover(over)
       // The connector tool shows where an end would go; the select tool a shape's side midpoints near its edge.
       const p = toWorld(event.clientX, event.clientY)
@@ -1254,10 +1442,15 @@ export function BoardCanvas(props: Props) {
     if (!now.dragging) {
       if (distance(now.start, { x: event.clientX, y: event.clientY }) < DRAG_THRESHOLD) return
       now.dragging = true
-      setGestureCursor(now.gesture.cursor)
       setDragActive(true)
     }
-    now.gesture.move(ctx, inputOf(event))
+    const input = inputOf(event, speed)
+    lastInput.current = input
+    now.gesture.move(ctx, input)
+    // A resize that flipped over its opposite side turns its cursor.
+    setGestureCursor(now.gesture.cursor)
+    const box = container.current?.getBoundingClientRect()
+    if (now.gesture.edgeScroll && box) edge.update({ x: event.clientX, y: event.clientY }, box)
   }
 
   const onPointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -1282,10 +1475,27 @@ export function BoardCanvas(props: Props) {
       return
     }
     // A captured pointer's clicks target the canvas: find what is under it.
-    const hit = elementUnder(event.clientX, event.clientY, null)
-    if (hit) openText(hit)
+    const hit = tool === 'select' ? hitAt(event.clientX, event.clientY) : elementUnder(event.clientX, event.clientY, null)
+    if (hit && tool !== 'select') {
+      openText(hit)
+      return
+    }
+    if (hit) {
+      const target = selectableIn(hit)
+      // On a group, a double-click goes one level down and selects the member there (rule 14); on
+      // that member, the next one opens its text.
+      if (sync.view.elements.get(target)?.kind === 'group') {
+        focusGroup.current = target
+        onSelection([selectableIn(hit)])
+        return
+      }
+      openText(target)
+      return
+    }
+    // A locked element is not written into, and no text is made over it.
+    if (tool === 'select' && hitAt(event.clientX, event.clientY, true)) return
     // On the empty canvas, a new text there (rule 10).
-    else if (tool === 'select' && !readOnly) openText(null, toWorld(event.clientX, event.clientY))
+    if (tool === 'select' && !readOnly) openText(null, toWorld(event.clientX, event.clientY))
   }
 
   const onWheel = useCallback(
@@ -1338,6 +1548,8 @@ export function BoardCanvas(props: Props) {
         const command = event.metaKey || event.ctrlKey
         const ids = latest.current.selection
         const key = event.key.toLowerCase()
+        // Any other key lands the nudges under way first.
+        if (nudge.current && !(event.key in ARROWS && !command)) endNudge()
         const clipboardKey = command && !event.altKey && !event.shiftKey
         // Copy works in a read-only board too; with nothing selected the key goes on.
         if (clipboardKey && key === 'c') {
@@ -1354,6 +1566,14 @@ export function BoardCanvas(props: Props) {
         // nothing of these it is not taken, so in Focus it leaves Focus (KitPointer 4.4).
         if (event.key === 'Escape') {
           if (cancelGesture()) return true
+          // Inside a group drilled into, back up one level: the group is selected.
+          const group = focusGroup.current
+          if (group && latest.current.selection.length && sync.view.elements.has(group)) {
+            const parent = sync.view.elements.get(group)?.parent
+            focusGroup.current = parent && sync.view.elements.get(parent)?.kind === 'group' ? parent : null
+            latest.current.onSelection([group])
+            return true
+          }
           if (latest.current.selection.length) latest.current.onSelection([])
           else if (latest.current.tool !== 'select') onTool('select')
           else return false
@@ -1421,11 +1641,18 @@ export function BoardCanvas(props: Props) {
           openText(ids[0])
           return true
         }
-        const arrows: Record<string, Point> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } }
-        const arrow = arrows[event.key]
+        const arrow = ARROWS[event.key]
         if (arrow && ids.length && !command) {
+          // A run of nudges (keys held, repeating) is previewed and lands as one element.move when
+          // the last arrow is let go: one undo step (rule 7).
           const step = event.shiftKey ? 10 : 1
-          void commit('element.move', { ids, delta: [arrow.x * step, arrow.y * step] })
+          arrowsHeld.current.add(event.key)
+          if (nudge.current && !nudge.current.same(ids)) endNudge()
+          if (!nudge.current) nudge.current = new NudgeRun(ctx, ids)
+          nudge.current.add(ctx, arrow.x * step, arrow.y * step)
+          // Should the key's release never come (the focus went elsewhere), the run lands anyway.
+          if (nudgeTimer.current != null) window.clearTimeout(nudgeTimer.current)
+          nudgeTimer.current = window.setTimeout(() => endNudgeRef.current(), NUDGE_IDLE)
           return true
         }
         if (command || event.altKey) return false
@@ -1459,14 +1686,21 @@ export function BoardCanvas(props: Props) {
 
   useEffect(() => {
     const up = (event: KeyboardEvent) => {
+      if (event.key in ARROWS) {
+        arrowsHeld.current.delete(event.key)
+        if (!arrowsHeld.current.size) endNudgeRef.current()
+        return
+      }
       if (event.key !== ' ') return
       space.current = false
       setSpaceHeld(false)
     }
-    // A Space released while the page had no focus never comes back as a keyup.
+    // A Space released while the page had no focus never comes back as a keyup; nudges under way land.
     const lost = () => {
       space.current = false
       setSpaceHeld(false)
+      arrowsHeld.current.clear()
+      endNudgeRef.current()
     }
     window.addEventListener('keyup', up)
     window.addEventListener('blur', lost)
@@ -1484,6 +1718,26 @@ export function BoardCanvas(props: Props) {
   const px = 1 / zoom
   const single = selected.length === 1 ? selected[0] : null
   const singleBox = single ? view.rect(single) : null
+  // A selection of several (or one group or stroke) shows one frame round it all, with the handles,
+  // and a thin outline of each member in its own shape, not a box per element (rule 4, F2.4).
+  const several = selected.length > 1 || single?.kind === 'group' || single?.kind === 'stroke'
+  const memberOutline = (element: BoardElement, depth = 0): ReactElement[] => {
+    const common = { className: 'board-member', strokeWidth: px, 'data-selected': element.id, 'data-testid': 'board-selection-member' }
+    if (element.kind === 'group') return depth > 64 ? [] : view.children(element.id).flatMap((child) => memberOutline(child, depth + 1))
+    if (element.kind === 'connector') {
+      if (dragActive) return []
+      const route = selectedRoutes.get(element.id)
+      if (route?.path) return [<path key={element.id} {...common} d={route.path} />]
+      return [<polyline key={element.id} {...common} points={view.route(element).map((q) => `${q.x},${q.y}`).join(' ')} />]
+    }
+    if (element.kind === 'stroke') return element.points.length > 1 ? [<polyline key={element.id} {...common} points={element.points.map((q) => `${q.x},${q.y}`).join(' ')} />] : []
+    const box = view.rect(element)
+    if (!box) return []
+    const c = center(box)
+    const turn = element.rotation ? `rotate(${element.rotation} ${c.x} ${c.y})` : undefined
+    if (element.kind === 'shape') return [<path key={element.id} {...common} d={outlinePath(view.outlineOf(element), box)} transform={turn} />]
+    return [<rect key={element.id} {...common} x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} transform={turn} />]
+  }
   // While a text box is open the selection is only outlined: no handles beside the box and its bar.
   const handlesShown = !readOnly && !editing
   const resizable = handlesShown && single && singleBox && !single.locked && isBoxed(single.kind)
@@ -1601,6 +1855,26 @@ export function BoardCanvas(props: Props) {
   }
   // The hint on an empty page (finding F1.4): gone as soon as the page holds an element.
   const shownPage = view.page(layerRef.current?.pageId ?? view.pages[0]?.id)
+  // The selection bar keeps clear of a selected untitled frame's title line too (a double-click there names it).
+  const barAnchor = selected.reduce<Rect | null>((all, element) => {
+    if (element.kind !== 'frame' || element.text) return all
+    const box = view.rect(element)
+    const title = untitledFrameTitle(element.id)
+    return box && title ? union(all, { x0: box.x0 + title.x0, y0: box.y0 + title.y0, x1: box.x0 + title.x1, y1: box.y0 + title.y1 }) : all
+  }, selBox)
+  // An untitled frame says where its title goes (rule 14: a double-click there names it).
+  const untitled = readOnly
+    ? []
+    : (shownPage?.elements ?? []).flatMap((id) => {
+        const element = view.elements.get(id)
+        if (element?.kind !== 'frame' || element.text || editing?.id === id || !layerRef.current?.node(id)) return []
+        const box = view.rect(element)
+        const title = untitledFrameTitle(id)
+        const text = sync.fragments.full.get(id)?.text
+        if (!box || !title || !text) return []
+        const c = center(box)
+        return [{ id, x: box.x0 + title.x0, y: box.y0 + title.y1 - text.size * 0.3, size: text.size, family: text.family, turn: element.rotation ? `rotate(${element.rotation} ${c.x} ${c.y})` : undefined }]
+      })
   const emptyHint = !readOnly && shownPage != null && shownPage.elements.length === 0 && !editing && !dragActive
 
   // What the canvas menu's rows can do, from the elements it opened on (and what is inside them).
@@ -1688,7 +1962,12 @@ export function BoardCanvas(props: Props) {
             {hovered && hoverBox ? (
               <g data-testid="board-hover" data-hover={hovered.id}>
                 {hovered.kind === 'connector' ? (
-                  <polyline className="board-hover" points={view.route(hovered).map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={1.5 * px} />
+                  // Along the connector's real route (the engine's path), once it has answered.
+                  hoverRoute?.id === hovered.id ? (
+                    <path className="board-hover" data-testid="board-hover-line" d={hoverRoute.path} strokeWidth={1.5 * px} />
+                  ) : (
+                    <polyline className="board-hover" points={view.route(hovered).map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={1.5 * px} />
+                  )
                 ) : hovered.kind === 'stroke' && hovered.points.length > 1 ? (
                   <polyline className="board-hover" points={hovered.points.map((q) => `${q.x},${q.y}`).join(' ')} strokeWidth={1.5 * px} />
                 ) : (() => {
@@ -1699,6 +1978,11 @@ export function BoardCanvas(props: Props) {
                 })()}
               </g>
             ) : null}
+            {untitled.map((frame) => (
+              <text key={frame.id} className="board-frame-placeholder" data-testid="board-frame-placeholder" data-frame={frame.id} x={frame.x} y={frame.y} fontSize={frame.size} fontFamily={frame.family} transform={frame.turn}>
+                {t('frameUntitled')}
+              </text>
+            ))}
             {/* Under the selection, so a selected connector's end handle on a shape's midpoint stays on top. */}
             {connectHint ? (() => {
               const element = view.elements.get(connectHint.element)
@@ -1726,7 +2010,9 @@ export function BoardCanvas(props: Props) {
             <g data-testid="board-selection" transform={selectionTransform}>
               {preview?.type === 'scale'
                 ? null
-                : selected.map((element) => {
+                : several
+                  ? selected.flatMap((element) => memberOutline(element))
+                  : selected.map((element) => {
                     // A connector is highlighted along its line, not boxed (F2.5); hidden while it is dragged.
                     if (element.kind === 'connector') {
                       const route = selectedRoutes.get(element.id)
@@ -1739,9 +2025,10 @@ export function BoardCanvas(props: Props) {
                     const c = center(box)
                     return <rect key={element.id} className="board-selected" x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={1.5 * px} data-selected={element.id} data-testid="board-selection-frame" transform={own && single!.rotation ? `rotate(${single!.rotation} ${c.x} ${c.y})` : undefined} />
                   })}
-              {selBox && selected.length > 1 ? (() => {
+              {selBox && several ? (() => {
+                // One frame round the whole selection, its handles on it (rule 4).
                 const box = shownScale ?? selBox
-                return <rect className="board-selection-box" data-testid="board-selection-box" x={box.x0 - 6 * px} y={box.y0 - 6 * px} width={box.x1 - box.x0 + 12 * px} height={box.y1 - box.y0 + 12 * px} strokeWidth={px} />
+                return <rect className="board-selection-box" data-testid="board-selection-box" x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={px} />
               })() : null}
               {resizable && single && shownSingle
                 ? HANDLES.map((handle) => {
@@ -1821,6 +2108,14 @@ export function BoardCanvas(props: Props) {
               const box = element ? view.rect(element) : null
               return box ? <rect key={id} className="board-drop-target" data-testid="board-drop-target" data-frame={id} x={box.x0} y={box.y0} width={box.x1 - box.x0} height={box.y1 - box.y0} strokeWidth={2 * px} /> : null
             })}
+            {draft?.type === 'shape' ? (
+              draft.picture ? (
+                // The engine's picture of the shape being drawn, stretched to the box (its lines keep their width).
+                <svg className="board-draft-shape" data-testid="board-draft-shape" data-shape={draft.shape} x={draft.box.x0} y={draft.box.y0} width={Math.max(draft.box.x1 - draft.box.x0, 1e-3)} height={Math.max(draft.box.y1 - draft.box.y0, 1e-3)} viewBox={draft.picture.viewBox} preserveAspectRatio="none" overflow="visible" dangerouslySetInnerHTML={{ __html: draft.picture.body }} />
+              ) : (
+                <rect className="board-draft" data-testid="board-draft-shape" data-shape={draft.shape} x={draft.box.x0} y={draft.box.y0} width={draft.box.x1 - draft.box.x0} height={draft.box.y1 - draft.box.y0} strokeWidth={px} />
+              )
+            ) : null}
             {draft?.type === 'rect' ? <rect className={draft.dashed ? 'board-brush' : 'board-draft'} x={draft.box.x0} y={draft.box.y0} width={draft.box.x1 - draft.box.x0} height={draft.box.y1 - draft.box.y0} strokeWidth={px} /> : null}
             {draft?.type === 'routes'
               ? draft.routes.map((route, index) => (
@@ -1858,7 +2153,7 @@ export function BoardCanvas(props: Props) {
           }}
         />
       ) : null}
-      {barShown && selBox ? <SelectionBar selection={barSelection} style={barStyle?.key === selectionKey ? barStyle.value : null} anchor={selBox} clear={barClear} viewport={store} others={barOthers} actions={barActions} t={t} /> : null}
+      {barShown && selBox ? <SelectionBar selection={barSelection} style={barStyle?.key === selectionKey ? barStyle.value : null} anchor={barAnchor ?? selBox} clear={barClear} viewport={store} others={barOthers} actions={barActions} t={t} /> : null}
       {emptyHint ? (
         <div className="board-empty-hint" data-testid="board-empty-hint">
           <p>{t('emptyHintTools')}</p>

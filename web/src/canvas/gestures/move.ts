@@ -1,9 +1,13 @@
 /**
- * Select and move. A press on an element selects it at once (Shift, Cmd or Ctrl adds it, or takes a
- * selected one out), so a drag can start straight away; past the threshold the selection's unlocked
- * elements move, snapping their box to the edges and centres of the elements near them, and the
- * frames they would drop into light up. The release runs one `element.move { reparent }` (a drop
- * into a frame makes it the parent, a drop out of one frees it).
+ * Select and move. A press on an element outside the selection selects it at once (Shift, Cmd or
+ * Ctrl adds it), so a drag can start straight away (rule 5); a press on a selected element keeps the
+ * selection, and a release without a drag then takes it out (with Shift, Cmd or Ctrl) or narrows a
+ * selection of several to it. Past the threshold the selection's unlocked elements move, snapping
+ * their box within 8 screen pixels to the edges and centres of the elements near them while the
+ * pointer is slower than 0.5 px/ms (Cmd or Ctrl held: no snapping); Shift keeps the move on the
+ * axis it has gone further along (rule 7). The frames they would drop into light up. The release
+ * runs one `element.move { reparent }` (a drop into a frame makes it the parent, a drop out of one
+ * frees it). Held at the canvas's edge, the view scrolls (`edgeScroll`).
  *
  * The connectors bound to what moves (and a moving connector with a bound end) are drawn as the
  * engine would draw them after the move, asked of it as the pointer goes (`connector.getRoute` with
@@ -19,26 +23,29 @@ import { center, offset, type Point } from '../../board/geometry'
 import type { Override } from '../../board/layer'
 import { frameAt, type BoardElement } from '../../board/model'
 import { translationSnap, type SnapGuide } from '../../board/snap'
-import type { Gesture, GestureContext, PointerInput } from './types'
+import { SNAP_SPEED, SNAP_THRESHOLD, type Gesture, type GestureContext, type PointerInput } from './types'
 
 const SNAP_KINDS = ['shape', 'text', 'image', 'card', 'frame']
 
 /** The press on element `hit` with the select tool: selects, and answers the move (null: nothing to move). */
 export function downMove(ctx: GestureContext, input: PointerInput, hit: string): Gesture | null {
   const view = ctx.sync.view
-  const id = view.selectable(hit)
-  const selection = ctx.selection()
+  const id = ctx.selectable(hit)
+  const selection = [...ctx.selection()]
   const additive = input.shift || input.command
-  let next: string[]
-  if (additive) next = selection.includes(id) ? selection.filter((item) => item !== id) : [...selection, id]
-  else next = selection.includes(id) ? [...selection] : [id]
-  ctx.select(next)
-  if (ctx.readOnly() || (additive && !next.includes(id))) return null
+  const was = selection.includes(id)
+  // A release without a drag on a selected element: Shift, Cmd or Ctrl takes it out, a plain click
+  // narrows a selection of several to it (rule 5).
+  const clicked = was ? (additive ? selection.filter((item) => item !== id) : selection.length > 1 ? [id] : null) : null
+  const next = was ? selection : additive ? [...selection, id] : [id]
+  if (!was) ctx.select(next)
+  if (ctx.readOnly()) {
+    if (clicked) ctx.select(clicked)
+    return null
+  }
   const roots = next.filter((item) => !view.elements.get(item)?.locked)
-  if (!roots.length) return null
   const moving = new Set(roots.flatMap((root) => view.withDescendants(root)))
-  const base = ctx.selectionBox([...moving])
-  if (!base) return null
+  const base = roots.length ? ctx.selectionBox([...moving]) : null
   const layer = ctx.layer()
   const shownPage = view.page(layer?.pageId ?? view.pages[0]?.id)
   // Where each root's centre is, for the frame a drop lands it in (the engine's rule).
@@ -69,19 +76,26 @@ export function downMove(ctx: GestureContext, input: PointerInput, hit: string):
     type: 'move',
     threshold: true,
     cursor: 'move',
+    edgeScroll: true,
     move(ctx, input) {
+      if (!base) return
       const z = ctx.view().zoom
       delta = { x: input.p.x - start.x, y: input.p.y - start.y }
+      // Shift: only along the axis the pointer has gone further along.
+      const axis = input.shift ? (Math.abs(delta.x) >= Math.abs(delta.y) ? 'x' : 'y') : null
+      if (axis === 'x') delta = { x: delta.x, y: 0 }
+      if (axis === 'y') delta = { x: 0, y: delta.y }
       let guides: SnapGuide[] = []
-      if (!input.alt) {
+      if (!input.alt && !input.command && input.speed <= SNAP_SPEED) {
         const moved = offset(base, delta.x, delta.y)
         const margin = Math.max(128, 512 / z)
         const layer = ctx.layer()
         const near = layer?.query({ x0: moved.x0 - margin, y0: moved.y0 - margin, x1: moved.x1 + margin, y1: moved.y1 + margin }) ?? []
         const targets = near.filter((item) => !moving.has(item) && SNAP_KINDS.includes(ctx.sync.view.elements.get(item)?.kind ?? '')).flatMap((item) => layer?.worldBox(item) ?? [])
-        const snap = translationSnap(moved, targets, 6 / z)
-        delta = { x: delta.x + snap.adjustment.x, y: delta.y + snap.adjustment.y }
-        guides = snap.guides
+        const snap = translationSnap(moved, targets, SNAP_THRESHOLD / z)
+        // A locked axis does not snap.
+        delta = { x: delta.x + (axis === 'y' ? 0 : snap.adjustment.x), y: delta.y + (axis === 'x' ? 0 : snap.adjustment.y) }
+        guides = snap.guides.filter((guide) => axis == null || guide.axis === axis)
       }
       copying = !altAtStart && input.alt
       if (copying) {
@@ -106,8 +120,9 @@ export function downMove(ctx: GestureContext, input: PointerInput, hit: string):
       query?.cancel()
       ctx.setGuides([])
       ctx.setDrops([])
-      if (!dragged) {
+      if (!dragged || !base) {
         ctx.clearPreview()
+        if (!dragged && clicked) ctx.select(clicked)
         return
       }
       if (!altAtStart && input.alt) {
