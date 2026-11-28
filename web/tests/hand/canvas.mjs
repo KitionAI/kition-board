@@ -218,6 +218,11 @@ await h.run([
     await page.keyboard.press('Enter')
     await until(async () => (await storedOne(note))?.text === 'hello')
     step('a selected sticky note takes what is typed, tool keys included', value === 'hello' && (await storedOne(note))?.text === 'hello' && (await tool()) === 'select', `box ${JSON.stringify(value)}, stored ${JSON.stringify((await storedOne(note))?.text)}, tool ${await tool()}`)
+    // Just written, the note stays selected and the next letter is a tool key again (N for the next note).
+    await page.keyboard.press('n')
+    const noteTool = await until(async () => (await tool()) === 'note', 20)
+    step('right after its text closed, a letter picks a tool and leaves the text alone', noteTool && !(await editorOpen()) && (await storedOne(note))?.text === 'hello', `tool ${await tool()}, editor ${await editorOpen()}, stored ${JSON.stringify((await storedOne(note))?.text)}`)
+    await page.keyboard.press('v')
     await page.mouse.click((await centre(shape)).x, (await centre(shape)).y)
     await until(async () => (await selection())[0] === shape)
     await page.keyboard.type('Hello')
@@ -226,6 +231,7 @@ await h.run([
     await page.keyboard.press('Enter')
     await until(async () => (await storedOne(shape))?.text === 'Hello')
     step('a selected shape takes "Hello" and the tool stays Select', shapeValue === 'Hello' && (await storedOne(shape))?.text === 'Hello' && (await tool()) === 'select', `box ${JSON.stringify(shapeValue)}, stored ${JSON.stringify((await storedOne(shape))?.text)}, tool ${await tool()}`)
+    await page.mouse.click((await centre(shape)).x, (await centre(shape)).y)
     await page.keyboard.press('2')
     const digit = await until(editorOpen, 20)
     const digitValue = digit ? await kit.getByTestId('board-text-editor').inputValue() : null

@@ -2,11 +2,13 @@ format: 1
 id: regressions/issue-hand-f5-5
 feature: board.editor.type-to-edit
 intent: >-
-  With one sticky note selected, typing hello writes "hello" into it (tool letters included); with
-  one shape selected, typing Hello writes "Hello" and the tool stays Select; a digit starts the
-  text too, and Escape then keeps the old text; a lower-case tool letter with a shape selected
-  still picks its tool (web/tests/flow.mjs relies on it). Before, every letter was a tool key:
-  typing Hello on a selected shape ended on the highlighter and wrote nothing.
+  With one sticky note selected, typing hello writes "hello" into it (tool letters included);
+  right after its text box closes, with the note still selected, N picks the note tool and leaves
+  the text alone; with one shape selected (clicked), typing Hello writes "Hello" and the tool
+  stays Select; a digit starts the text too, and Escape then keeps the old text; a lower-case tool
+  letter with a shape selected still picks its tool (web/tests/flow.mjs relies on it). Before,
+  every letter was a tool key: typing Hello on a selected shape ended on the highlighter and wrote
+  nothing.
 layer: gate
 dimension: function
 source:

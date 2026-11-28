@@ -182,6 +182,13 @@ export function BoardCanvas(props: Props) {
   const latest = useRef(props)
   latest.current = props
   const editingNow = useRef(editing)
+  /**
+   * The element whose text box just closed (Enter, Escape, a press elsewhere): while it stays the
+   * selection, a typed letter is a tool key again, so a note just written and a tool letter pressed
+   * next (N for the next note) do not replace what was written. A press on the canvas or another
+   * selection ends it.
+   */
+  const afterEdit = useRef<string | null>(null)
   /** Commits and closes the open text box (`TextEditor`'s `commitRef`). */
   const commitEditor = useRef<(() => void) | null>(null)
   editingNow.current = editing
@@ -355,6 +362,11 @@ export function BoardCanvas(props: Props) {
     }
   }, [applyView, contentBox, show, sync, takeKeys])
 
+  // Another selection ends the "just edited" state of the element whose text box closed.
+  useEffect(() => {
+    if (afterEdit.current && !(selection.length === 1 && selection[0] === afterEdit.current)) afterEdit.current = null
+  }, [selection])
+
   // Another page: the selection does not come along, and each page keeps its own view (where it
   // was left; a page not shown yet shows its content, and an empty one opens where the view is).
   const pageViews = useRef(new Map<string, Pick<Viewport, 'x' | 'y' | 'zoom'>>())
@@ -523,6 +535,7 @@ export function BoardCanvas(props: Props) {
     (value: string, marks: readonly TextMark[]) => {
       const current = editing
       setEditing(null)
+      afterEdit.current = current?.id ?? null
       // The keys go back to the canvas (Undo, Delete) once the box closes.
       container.current?.focus({ preventScroll: true })
       if (!current) return
@@ -532,6 +545,7 @@ export function BoardCanvas(props: Props) {
         const parent = frameUnder(at)
         void commit('element.add', { elements: [{ kind: 'text', position: [at.x, at.y], text: value, ...styleFor('text', latest.current.drawStyle), ...(parent ? { parent } : {}) }] }).then(async (answer) => {
           const created = (answer?.created as string[] | undefined) ?? []
+          if (created.length === 1) afterEdit.current = created[0]
           if (created.length) latest.current.onSelection(created)
           if (created.length === 1 && marks.length) await commitMarks(created[0], value, marks)
         })
@@ -922,6 +936,7 @@ export function BoardCanvas(props: Props) {
     }
     // The canvas takes the keys (tool letters, Delete, Undo) once it is used.
     container.current?.focus({ preventScroll: true })
+    afterEdit.current = null
     // A press while another is held (a second button) ends the first.
     if (active.current) cancelGesture()
     setHover(null)
@@ -1107,7 +1122,7 @@ export function BoardCanvas(props: Props) {
         }
         if (command || event.altKey) return false
         // A character typed with one element selected that takes text starts its text with it (rule 10).
-        if (latest.current.tool === 'select' && [...event.key].length === 1 && event.key !== ' ' && !event.isComposing && ids.length === 1) {
+        if (latest.current.tool === 'select' && [...event.key].length === 1 && event.key !== ' ' && !event.isComposing && ids.length === 1 && ids[0] !== afterEdit.current) {
           const target = typingTarget(sync.view.elements.get(ids[0]))
           if (target === 'any' || (target === 'shape' && !TOOL_KEYS[event.key])) {
             openText(ids[0], undefined, event.key)
@@ -1355,6 +1370,7 @@ export function BoardCanvas(props: Props) {
         </g>
       </svg>
       {editing ? <TextEditor key={`${editing.id}:${editing.left}:${editing.top}`} editing={editing} placeholder={t('textPlaceholder')} labels={markLabels} commitRef={commitEditor} onCommit={commitText} onCancel={() => {
+            afterEdit.current = editing.id
             setEditing(null)
             container.current?.focus({ preventScroll: true })
           }} /> : null}
